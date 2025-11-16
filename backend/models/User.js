@@ -5,15 +5,20 @@
  * Assumes existing users table with fields: id, email, password, name, google_id, apple_id, etc.
  */
 
-const { get, run } = require('../config/database');
 const bcrypt = require('bcrypt');
 
 const SALT_ROUNDS = 10;
+
+// Helper to get database functions (lazy load to avoid circular dependency)
+function getDB() {
+  return require('../config/database');
+}
 
 /**
  * Find user by email
  */
 async function findByEmail(email) {
+  const { get } = getDB();
   return await get('SELECT * FROM users WHERE email = ?', [email]);
 }
 
@@ -21,6 +26,7 @@ async function findByEmail(email) {
  * Find user by ID
  */
 async function findById(id) {
+  const { get } = getDB();
   return await get('SELECT id, email, name, created_at FROM users WHERE id = ?', [id]);
 }
 
@@ -38,6 +44,7 @@ async function createUser(email, password, name) {
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
   
   // Insert user
+  const { run } = getDB();
   const result = await run(`
     INSERT INTO users (email, password, name, email_verified, created_at)
     VALUES (?, ?, ?, 0, datetime('now'))
@@ -89,6 +96,7 @@ async function updateProfile(userId, updates) {
   
   values.push(userId);
   
+  const { run } = getDB();
   await run(`
     UPDATE users 
     SET ${fields.join(', ')}, updated_at = datetime('now')

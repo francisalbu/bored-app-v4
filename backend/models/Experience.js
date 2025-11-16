@@ -5,7 +5,10 @@
  * Matches the actual database schema with operator_id, video_url, image_url, etc.
  */
 
-const { query, get, run } = require('../config/database');
+// Helper to get database functions (lazy load to avoid circular dependency)
+function getDB() {
+  return require('../config/database');
+}
 
 /**
  * Parse JSON fields safely
@@ -24,6 +27,7 @@ function parseJSON(field) {
  * Includes all media URLs for video display
  */
 async function getAllExperiences(limit = 50, offset = 0) {
+  const { query } = getDB();
   const experiences = await query(`
     SELECT 
       e.id, e.title, e.description, e.location, e.address,
@@ -59,6 +63,7 @@ async function getAllExperiences(limit = 50, offset = 0) {
  * Returns all details including media URLs
  */
 async function getExperienceById(id) {
+  const { get } = getDB();
   const experience = await get(`
     SELECT 
       e.*, o.company_name as operator_name, o.logo_url as operator_logo,
@@ -88,6 +93,7 @@ async function getExperienceById(id) {
  * Search experiences by query
  */
 async function searchExperiences(searchQuery, limit = 50) {
+  const { query } = getDB();
   const searchTerm = `%${searchQuery}%`;
   
   const experiences = await query(`
@@ -114,6 +120,7 @@ async function searchExperiences(searchQuery, limit = 50) {
  * Get experiences by category
  */
 async function getExperiencesByCategory(category, limit = 50) {
+  const { query } = getDB();
   const experiences = await query(`
     SELECT 
       e.id, e.title, e.description, e.location, e.price, e.duration,
@@ -138,6 +145,7 @@ async function getExperiencesByCategory(category, limit = 50) {
  * Get trending experiences (most reviewed/rated)
  */
 async function getTrendingExperiences(limit = 20) {
+  const { query } = getDB();
   const experiences = await query(`
     SELECT 
       e.id, e.title, e.description, e.location, e.price, e.duration,

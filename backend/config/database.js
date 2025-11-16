@@ -12,7 +12,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 // Database path from environment or default
-const DB_PATH = process.env.DB_PATH || '/Users/francisalbu/Documents/Bored New Backend/bored_tourist.db';
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../bored_tourist.db');
 
 let db;
 
@@ -21,13 +21,28 @@ let db;
  */
 function initDB() {
   return new Promise((resolve, reject) => {
-    db = new sqlite3.Database(DB_PATH, (err) => {
+    console.log('🔄 Attempting to connect to database at:', DB_PATH);
+    
+    db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READWRITE, (err) => {
       if (err) {
         console.error('❌ Error connecting to database:', err.message);
         reject(err);
       } else {
-        console.log('✅ Connected to SQLite database:', DB_PATH);
-        resolve(db);
+        console.log('✅ Connected to SQLite database');
+        
+        // Simple configuration without WAL mode
+        db.configure('busyTimeout', 5000);
+        
+        // Test query to ensure database is working
+        db.get('SELECT 1 as test', (testErr) => {
+          if (testErr) {
+            console.error('❌ Database test query failed:', testErr.message);
+            reject(testErr);
+          } else {
+            console.log('✅ Database is ready');
+            resolve(db);
+          }
+        });
       }
     });
   });

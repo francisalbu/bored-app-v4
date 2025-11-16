@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { User, Mail, Lock, Phone, ArrowLeft } from 'lucide-react-native';
+import { User, Mail, Lock, ArrowLeft } from 'lucide-react-native';
 import colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,22 +21,23 @@ export default function SignupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { register } = useAuth();
+  const params = useLocalSearchParams();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Pre-fill email if passed as parameter
+  useEffect(() => {
+    if (params.email && typeof params.email === 'string') {
+      setEmail(params.email);
+    }
+  }, [params.email]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async () => {
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !password) {
       Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
@@ -46,11 +47,21 @@ export default function SignupScreen() {
     }
 
     setIsLoading(true);
-    const result = await register(name, email, password, phone);
+    const result = await register(name, email, password);
     setIsLoading(false);
 
     if (result.success) {
-      router.replace('/(tabs)');
+      // Check if email confirmation is needed
+      if (result.needsEmailConfirmation) {
+        console.log('📧 Redirecting to email verification');
+        router.push({
+          pathname: '/auth/verify-email',
+          params: { email: result.email || email },
+        });
+      } else {
+        // Registration complete, go to home
+        router.replace('/(tabs)');
+      }
     } else {
       Alert.alert('Signup Failed', result.error || 'Failed to create account');
     }
@@ -106,19 +117,6 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Phone size={20} color={colors.dark.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Phone (Optional)"
-              placeholderTextColor={colors.dark.textTertiary}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              autoComplete="tel"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
             <Lock size={20} color={colors.dark.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
@@ -126,20 +124,6 @@ export default function SignupScreen() {
               placeholderTextColor={colors.dark.textTertiary}
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete="password-new"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Lock size={20} color={colors.dark.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password"
-              placeholderTextColor={colors.dark.textTertiary}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
               secureTextEntry
               autoCapitalize="none"
               autoComplete="password-new"

@@ -1,5 +1,5 @@
 import { Settings, Award, TrendingUp, MapPin, Star, LogOut, LogIn } from 'lucide-react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -16,12 +16,14 @@ import colors from '@/constants/colors';
 import { USER_PROFILE, type Badge } from '@/constants/profile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
+import AuthBottomSheet from '@/components/AuthBottomSheet';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
   const { savedExperiences } = useFavorites();
+  const [showAuthSheet, setShowAuthSheet] = useState(false);
   
   // For new users, all stats start at 0
   const currentXP = 0;
@@ -47,7 +49,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogin = () => {
-    router.push('/auth/login' as any);
+    setShowAuthSheet(true);
   };
 
   // Show login prompt when not authenticated
@@ -68,6 +70,11 @@ export default function ProfileScreen() {
               <Text style={styles.guestButtonText}>Sign in or create account</Text>
             </Pressable>
           </View>
+
+          <AuthBottomSheet
+            visible={showAuthSheet}
+            onClose={() => setShowAuthSheet(false)}
+          />
 
           <View style={styles.guestSettingsSection}>
             <Text style={styles.guestSectionTitle}>Settings</Text>

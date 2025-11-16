@@ -7,7 +7,6 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const AppleStrategy = require('passport-apple').Strategy;
-const { get, run } = require('./database');
 
 /**
  * Configure Google OAuth Strategy
@@ -20,6 +19,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'your-googl
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
+      const { get, run } = require('./database');
       const email = profile.emails[0].value;
       
       // Check if user exists
@@ -59,6 +59,7 @@ if (process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_ID !== 'your-apple-c
   },
   async (accessToken, refreshToken, idToken, profile, done) => {
     try {
+      const { get, run } = require('./database');
       // Apple provides email only on first login
       const email = profile.email;
       const appleId = profile.sub;
@@ -97,6 +98,7 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
   try {
+    const { get } = require('./database');
     const user = await get('SELECT * FROM users WHERE id = ?', [id]);
     done(null, user);
   } catch (error) {

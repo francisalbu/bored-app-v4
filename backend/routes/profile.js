@@ -9,13 +9,13 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
-const { authenticate } = require('../middleware/auth');
+const { authenticateSupabase } = require('../middleware/supabaseAuth');
 
 /**
  * GET /api/profile
  * Get current user's profile
  */
-router.get('/', authenticate, async (req, res, next) => {
+router.get('/', authenticateSupabase, async (req, res, next) => {
   try {
     const user = User.findById(req.user.id);
     
@@ -54,7 +54,7 @@ router.get('/', authenticate, async (req, res, next) => {
  * Update user profile
  */
 router.put('/',
-  authenticate,
+  authenticateSupabase,
   [
     body('name').optional().trim().notEmpty(),
     body('bio').optional().trim(),

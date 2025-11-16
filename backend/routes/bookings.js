@@ -13,7 +13,8 @@ const express = require('express');
 const router = express.Router();
 const { body, param, validationResult } = require('express-validator');
 const Booking = require('../models/Booking');
-const { authenticate } = require('../middleware/auth');
+const { authenticateSupabase } = require('../middleware/supabaseAuth');
+const { sendBookingConfirmation, sendBookingCancellation } = require('../services/emailService');
 
 /**
  * POST /api/bookings
@@ -22,7 +23,7 @@ const { authenticate } = require('../middleware/auth');
  * Prevents: double-booking, overbooking
  */
 router.post('/',
-  authenticate,
+  authenticateSupabase,
   [
     body('experience_id').isInt({ min: 1 }).withMessage('Valid experience ID required'),
     body('slot_id').isInt({ min: 1 }).withMessage('Valid slot ID required'),
@@ -55,6 +56,12 @@ router.post('/',
       // Create booking with transaction safety
       const booking = await Booking.createBooking(req.user.id, bookingData);
       
+      // Send confirmation email (don't wait for it, don't block the response)
+      sendBookingConfirmation(booking).catch(err => {
+        console.error('⚠️  Failed to send confirmation email:', err);
+        // Don't fail the booking if email fails
+      });
+      
       res.status(201).json({
         success: true,
         message: 'Booking created successfully',
@@ -83,7 +90,7 @@ router.post('/',
  * - status: filter by status (confirmed, cancelled, completed)
  * - upcoming: boolean, only show future bookings
  */
-router.get('/', authenticate, async (req, res, next) => {
+router.get('/', authenticateSupabase, async (req, res, next) => {
   try {
     console.log('🎫 GET /api/bookings - User ID:', req.user.id, '| Email:', req.user.email);
     
@@ -119,7 +126,7 @@ router.get('/', authenticate, async (req, res, next) => {
  * GET /api/bookings/upcoming/count
  * Get count of upcoming bookings for user
  */
-router.get('/upcoming/count', authenticate, async (req, res, next) => {
+router.get('/upcoming/count', authenticateSupabase, async (req, res, next) => {
   try {
     const count = await Booking.getUpcomingBookingsCount(req.user.id);
     
@@ -138,7 +145,7 @@ router.get('/upcoming/count', authenticate, async (req, res, next) => {
  * User must own the booking
  */
 router.get('/:id',
-  authenticate,
+  authenticateSupabase,
   [
     param('id').isInt({ min: 1 }).withMessage('Valid booking ID required')
   ],
@@ -182,7 +189,7 @@ router.get('/:id',
  * Only allows updating: customer_name, customer_email, customer_phone
  */
 router.put('/:id',
-  authenticate,
+  authenticateSupabase,
   [
     param('id').isInt({ min: 1 }).withMessage('Valid booking ID required'),
     body('customer_name').optional().trim().notEmpty(),
@@ -238,7 +245,7 @@ router.put('/:id',
  * User must own the booking
  */
 router.put('/:id/cancel',
-  authenticate,
+  authenticateSupabase,
   [
     param('id').isInt({ min: 1 }).withMessage('Valid booking ID required')
   ],
@@ -255,6 +262,11 @@ router.put('/:id/cancel',
       
       const { id } = req.params;
       const booking = await Booking.cancelBooking(id, req.user.id);
+      
+      // Send cancellation email (don't wait for it)
+      sendBookingCancellation(booking).catch(err => {
+        console.error('⚠️  Failed to send cancellation email:', err);
+      });
       
       res.json({
         success: true,
@@ -286,7 +298,7 @@ router.put('/:id/cancel',
  * Only cancelled bookings can be deleted
  */
 router.delete('/:id',
-  authenticate,
+  authenticateSupabase,
   [
     param('id').isInt({ min: 1 }).withMessage('Valid booking ID required')
   ],

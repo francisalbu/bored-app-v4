@@ -6,14 +6,16 @@
 
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
+const { body, validationResult } = require('express-validator');
+const db = require('../config/database');
+const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const { query, run, get } = require('../config/database');
 
 /**
  * GET /api/favorites
  * Get all saved experiences for the authenticated user
  */
-router.get('/', authenticate, async (req, res, next) => {
+router.get('/', authenticateSupabase, async (req, res, next) => {
   try {
     const userId = req.user.id;
     
@@ -45,7 +47,7 @@ router.get('/', authenticate, async (req, res, next) => {
  * POST /api/favorites
  * Add an experience to favorites
  */
-router.post('/', authenticate, async (req, res, next) => {
+router.post('/', authenticateSupabase, async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { experienceId } = req.body;
@@ -89,7 +91,7 @@ router.post('/', authenticate, async (req, res, next) => {
  * DELETE /api/favorites/:experienceId
  * Remove an experience from favorites
  */
-router.delete('/:experienceId', authenticate, async (req, res, next) => {
+router.delete('/:experienceId', authenticateSupabase, async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { experienceId } = req.params;
@@ -112,7 +114,7 @@ router.delete('/:experienceId', authenticate, async (req, res, next) => {
  * GET /api/favorites/check/:experienceId
  * Check if an experience is favorited
  */
-router.get('/check/:experienceId', authenticate, async (req, res, next) => {
+router.get('/check/:experienceId', authenticateSupabase, async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { experienceId } = req.params;

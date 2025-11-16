@@ -20,6 +20,8 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
         <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/verify-email" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="saved-experiences" options={{ headerShown: false }} />
       </Stack>
     </>
