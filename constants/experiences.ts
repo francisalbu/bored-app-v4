@@ -34,6 +34,7 @@ export interface Experience {
   whatToBring?: string[];
   cancellationPolicy?: string;
   importantInfo?: string;
+  calculatedDistance?: number; // Distance in km (calculated from user location)
 }
 
 export const EXPERIENCES: Experience[] = [

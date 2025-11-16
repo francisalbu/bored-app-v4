@@ -147,6 +147,10 @@ class ApiService {
     return this.request('/experiences/trending');
   }
 
+  async getNearbyExperiences(lat: number, lon: number, radius: number = 50) {
+    return this.request(`/experiences/nearby?lat=${lat}&lon=${lon}&radius=${radius}`);
+  }
+
   // Booking APIs
   async createBooking(bookingData: {
     experienceId: string;
