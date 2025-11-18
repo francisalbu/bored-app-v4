@@ -61,14 +61,16 @@ interface BookingsContextType {
   isLoading: boolean;
   error: string | null;
   refreshBookings: () => Promise<void>;
-  createBooking: (bookingData: {
-    experience_id: number;
-    slot_id: number;
-    participants: number;
-    customer_name: string;
-    customer_email: string;
-    customer_phone: string;
-  }) => Promise<{ success: boolean; data?: Booking; error?: string }>;
+  createBooking: (
+    bookingData: {
+      experience_id: number;
+      slot_id: number;
+      participants: number;
+      customer_name: string;
+      customer_email: string;
+      customer_phone: string;
+    }
+  ) => Promise<{ success: boolean; data?: Booking; error?: string }>;
   updateBooking: (
     bookingId: number,
     updates: {
@@ -145,16 +147,19 @@ export function BookingsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const createBooking = async (bookingData: {
-    experience_id: number;
-    slot_id: number;
-    participants: number;
-    customer_name: string;
-    customer_email: string;
-    customer_phone: string;
-  }) => {
+  const createBooking = async (
+    bookingData: {
+      experience_id: number;
+      slot_id: number;
+      participants: number;
+      customer_name: string;
+      customer_email: string;
+      customer_phone: string;
+    }
+  ) => {
     try {
       setError(null);
+      
       const response = await api.post<any>(
         '/bookings',
         bookingData

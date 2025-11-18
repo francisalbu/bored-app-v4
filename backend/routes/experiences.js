@@ -47,49 +47,6 @@ router.get('/', optionalAuth, async (req, res, next) => {
 });
 
 /**
- * GET /api/experiences/nearby
- * Get experiences near user's location
- * Query params: lat, lon, radius (optional, default 50km), limit
- */
-router.get('/nearby', async (req, res, next) => {
-  try {
-    const lat = parseFloat(req.query.lat);
-    const lon = parseFloat(req.query.lon);
-    const radius = parseFloat(req.query.radius) || 50;
-    const limit = parseInt(req.query.limit) || 50;
-    
-    // Validate coordinates
-    if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid latitude and longitude are required'
-      });
-    }
-    
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid coordinates'
-      });
-    }
-    
-    const experiences = await Experience.getExperiencesByProximity(lat, lon, radius, limit);
-    
-    res.json({
-      success: true,
-      data: experiences,
-      meta: {
-        userLocation: { lat, lon },
-        radius,
-        count: experiences.length
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
  * GET /api/experiences/trending
  * Get trending/popular experiences
  */

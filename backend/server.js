@@ -15,39 +15,22 @@
  * Server listens on 0.0.0.0:3000 for network access
  */
 
-console.log('🔥 Starting server.js...');
-
 require('dotenv').config();
-console.log('✅ Dotenv loaded');
-
 const express = require('express');
 const cors = require('cors');
-console.log('✅ Express and CORS loaded');
-
 const passport = require('./config/passport');
-console.log('✅ Passport loaded');
-
 const { initDB, closeDB } = require('./config/database');
-console.log('✅ Database module loaded');
 const errorHandler = require('./middleware/errorHandler');
-console.log('✅ Error handler loaded');
 
 // Import routes
-console.log('📦 Loading routes...');
 const authRoutes = require('./routes/auth');
-console.log('✅ Auth routes loaded');
-const supabaseAuthRoutes = require('./routes/supabaseAuth');
-console.log('✅ Supabase auth routes loaded');
+// TEMPORARILY DISABLED - const supabaseAuthRoutes = require('./routes/supabaseAuth');
 const experienceRoutes = require('./routes/experiences');
-console.log('✅ Experience routes loaded');
 const bookingRoutes = require('./routes/bookings');
-console.log('✅ Booking routes loaded');
 const profileRoutes = require('./routes/profile');
-console.log('✅ Profile routes loaded');
 const favoritesRoutes = require('./routes/favorites');
-console.log('✅ Favorites routes loaded');
 const availabilityRoutes = require('./routes/availability');
-console.log('✅ Availability routes loaded');
+const paymentsRoutes = require('./routes/payments');
 
 // Initialize Express app
 const app = express();
@@ -94,12 +77,13 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/auth/supabase', supabaseAuthRoutes);
+// TEMPORARILY DISABLED - app.use('/api/auth/supabase', supabaseAuthRoutes);
 app.use('/api/experiences', experienceRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/availability', availabilityRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -116,11 +100,8 @@ app.use(errorHandler);
 // DATABASE & SERVER STARTUP
 // =======================
 
-console.log('⚡ About to initialize database...');
-
 // Initialize database and start server
 initDB().then(() => {
-  console.log('✅ Database initialized successfully!');
   // Start server on 0.0.0.0 to accept connections from network (mobile devices)
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('\n' + '='.repeat(50));

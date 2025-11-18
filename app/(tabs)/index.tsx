@@ -27,8 +27,6 @@ import { type Experience } from '@/constants/experiences';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExperiences } from '@/hooks/useExperiences';
-import { useLocation } from '@/hooks/useLocation';
-import { calculateDistance, formatDistance } from '@/utils/distance';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -43,46 +41,21 @@ export default function FeedScreen() {
 
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading: loadingExperiences, error: experiencesError } = useExperiences();
-  
-  // Get user location for "Near Me" filter
-  const { location, loading: locationLoading, error: locationError } = useLocation();
 
   // Filter experiences based on selected filter
   const filteredExperiences = React.useMemo(() => {
-    if (selectedFilter === 'nearMe' && location) {
-      console.log('📍 Filtering by proximity to:', location);
-      
-      // Calculate distance for each experience
-      const experiencesWithDistance = EXPERIENCES.map(exp => ({
-        ...exp,
-        calculatedDistance: calculateDistance(
-          location.latitude,
-          location.longitude,
-          exp.latitude,
-          exp.longitude
-        )
-      }));
-
-      // Sort by distance (closest first)
-      const sorted = experiencesWithDistance.sort((a, b) => 
-        (a.calculatedDistance || Infinity) - (b.calculatedDistance || Infinity)
-      );
-
-      console.log('📊 Sorted by distance:', sorted.map(e => ({
-        title: e.title,
-        distance: e.calculatedDistance,
-        formatted: formatDistance(e.calculatedDistance || 0)
-      })));
-
-      return sorted;
-    } else if (selectedFilter === 'nearMe' && !location) {
-      // No location yet - return all experiences unsorted
-      return [...EXPERIENCES];
+    if (selectedFilter === 'nearMe') {
+      // Sort by distance (closest first) - using distance string parsing
+      return [...EXPERIENCES].sort((a, b) => {
+        const distA = parseInt(a.distance.replace(/[^\d]/g, '')) || 999;
+        const distB = parseInt(b.distance.replace(/[^\d]/g, '')) || 999;
+        return distA - distB;
+      });
     } else {
       // Filter only experiences available today
       return EXPERIENCES.filter(exp => exp.availableToday);
     }
-  }, [selectedFilter, EXPERIENCES, location]);
+  }, [selectedFilter, EXPERIENCES]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -131,21 +104,11 @@ export default function FeedScreen() {
 
   const experience = filteredExperiences[currentIndex];
 
-  // Show loading state for experiences
+  // Show loading state
   if (loadingExperiences) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Text style={styles.loadingText}>Loading experiences...</Text>
-      </View>
-    );
-  }
-
-  // Show loading state for location (only when "Near Me" is selected)
-  if (selectedFilter === 'nearMe' && locationLoading) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.loadingText}>📍 Getting your location...</Text>
-        <Text style={styles.loadingSubtext}>This will help us show experiences near you</Text>
       </View>
     );
   }
@@ -374,11 +337,7 @@ Book this amazing experience on BoredTourist!`;
               <Text style={styles.metaDivider}>•</Text>
               <View style={styles.metaItem}>
                 <MapPin size={14} color={colors.dark.textSecondary} />
-                <Text style={styles.metaText}>
-                  {experience.calculatedDistance !== undefined 
-                    ? formatDistance(experience.calculatedDistance)
-                    : experience.distance}
-                </Text>
+                <Text style={styles.metaText}>{experience.distance}</Text>
               </View>
               <Text style={styles.metaDivider}>•</Text>
               <Text style={styles.price}>
@@ -442,12 +401,6 @@ const styles = StyleSheet.create({
     color: colors.dark.text,
     fontSize: 18,
     fontWeight: '600' as const,
-  },
-  loadingSubtext: {
-    color: colors.dark.textSecondary,
-    fontSize: 14,
-    textAlign: 'center' as const,
-    marginTop: 8,
   },
   errorText: {
     color: '#FF6B6B',

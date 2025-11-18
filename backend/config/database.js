@@ -12,7 +12,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 // Database path from environment or default
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../bored_tourist.db');
+const DB_PATH = process.env.DB_PATH || '/Users/francisalbu/Documents/Bored New Backend/bored_tourist.db';
 
 let db;
 
@@ -21,28 +21,29 @@ let db;
  */
 function initDB() {
   return new Promise((resolve, reject) => {
-    console.log('🔄 Attempting to connect to database at:', DB_PATH);
-    
-    db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READWRITE, (err) => {
+    db = new sqlite3.Database(DB_PATH, (err) => {
       if (err) {
         console.error('❌ Error connecting to database:', err.message);
         reject(err);
       } else {
-        console.log('✅ Connected to SQLite database');
+        console.log('✅ Connected to SQLite database:', DB_PATH);
         
-        // Simple configuration without WAL mode
-        db.configure('busyTimeout', 5000);
+        // Configure database for better concurrency
+        db.configure('busyTimeout', 10000); // Wait up to 10 seconds when database is locked
         
-        // Test query to ensure database is working
-        db.get('SELECT 1 as test', (testErr) => {
-          if (testErr) {
-            console.error('❌ Database test query failed:', testErr.message);
-            reject(testErr);
+        // Try to enable WAL mode for better concurrency (multiple readers, one writer)
+        // But don't fail if it's locked by another process
+        db.run('PRAGMA journal_mode = WAL;', (walErr) => {
+          if (walErr) {
+            console.warn('⚠️ Could not enable WAL mode (database may be open in another program)');
+            console.warn('⚠️ Please close DB Browser or any other SQLite tool');
           } else {
-            console.log('✅ Database is ready');
-            resolve(db);
+            console.log('✅ WAL mode enabled for better concurrency');
           }
         });
+        
+        // Resolve immediately so server can start
+        resolve(db);
       }
     });
   });

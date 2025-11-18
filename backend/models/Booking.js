@@ -9,21 +9,12 @@
  * - Validates slot capacity before booking
  */
 
-// Lazy load database helpers to avoid circular dependency
-function getDBHelpers() {
-  const db = require('../config/database');
-  return {
-    query: db.query,
-    get: db.get,
-    run: db.run
-  };
-}
+const { query, get, run, db } = require('../config/database');
 
 /**
  * Safe rollback - ignores errors if no transaction is active
  */
 async function safeRollback() {
-  const { run } = getDBHelpers();
   try {
     await run('ROLLBACK');
   } catch (error) {
@@ -44,7 +35,6 @@ function generateBookingReference() {
  * Check if slot is available for requested participants
  */
 async function checkSlotAvailability(slotId, requestedParticipants) {
-  const { get } = getDBHelpers();
   const slot = await get(`
     SELECT 
       id,
@@ -79,7 +69,6 @@ async function checkSlotAvailability(slotId, requestedParticipants) {
  * Check for duplicate booking (same user, same slot)
  */
 async function checkDuplicateBooking(userId, slotId) {
-  const { get } = getDBHelpers();
   const existing = await get(`
     SELECT id FROM bookings
     WHERE user_id = ? AND slot_id = ? AND status != 'cancelled'
@@ -103,7 +92,6 @@ async function createBooking(userId, bookingData) {
   } = bookingData;
   
   return new Promise(async (resolve, reject) => {
-    const { run, get } = getDBHelpers();
     try {
       // Start transaction
       await run('BEGIN IMMEDIATE TRANSACTION');
@@ -199,7 +187,6 @@ async function getBookingById(bookingId, userId = null) {
     params.push(userId);
   }
   
-  const { get } = getDBHelpers();
   return await get(sql, params);
 }
 
@@ -245,7 +232,6 @@ async function getUserBookings(userId, filters = {}) {
   console.log('📝 SQL Query:', sql);
   console.log('📝 Params:', params);
   
-  const { query } = getDBHelpers();
   const results = await query(sql, params);
   console.log(`✅ Query returned ${results.length} bookings`);
   
@@ -283,7 +269,6 @@ async function updateBooking(bookingId, userId, updates) {
   
   updateValues.push(bookingId);
   
-  const { run } = getDBHelpers();
   await run(`
     UPDATE bookings
     SET ${updateFields.join(', ')}, updated_at = datetime('now')
@@ -298,7 +283,6 @@ async function updateBooking(bookingId, userId, updates) {
  */
 async function cancelBooking(bookingId, userId) {
   return new Promise(async (resolve, reject) => {
-    const { run } = getDBHelpers();
     try {
       await run('BEGIN IMMEDIATE TRANSACTION');
       
@@ -364,7 +348,6 @@ async function deleteBooking(bookingId, userId) {
     throw new Error('Can only delete cancelled bookings. Please cancel first.');
   }
   
-  const { run } = getDBHelpers();
   await run('DELETE FROM bookings WHERE id = ?', [bookingId]);
   
   return { success: true, message: 'Booking deleted permanently' };
@@ -374,7 +357,6 @@ async function deleteBooking(bookingId, userId) {
  * Get upcoming bookings count for user
  */
 async function getUpcomingBookingsCount(userId) {
-  const { get } = getDBHelpers();
   const result = await get(`
     SELECT COUNT(*) as count
     FROM bookings b

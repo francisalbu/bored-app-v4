@@ -4,9 +4,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { BookingsProvider } from '@/contexts/BookingsContext';
+
+// Stripe publishable key
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_51Qe0O1JwIDoL5bobJjmXtc84YbeYprPx35DcRALLIlqumUqrUxGY86bsxdq8xTEf7hgzjVRDAOAnlHFQkC1YW2Sx00JRhjovcc';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,15 +40,21 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BookingsProvider>
-          <FavoritesProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <RootLayoutNav />
-            </GestureHandlerRootView>
-          </FavoritesProvider>
-        </BookingsProvider>
-      </AuthProvider>
+      <StripeProvider
+        publishableKey={STRIPE_PUBLISHABLE_KEY}
+        urlScheme="boredtravel"
+        merchantIdentifier="merchant.app.rork.bored-explorer"
+      >
+        <AuthProvider>
+          <BookingsProvider>
+            <FavoritesProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <RootLayoutNav />
+              </GestureHandlerRootView>
+            </FavoritesProvider>
+          </BookingsProvider>
+        </AuthProvider>
+      </StripeProvider>
     </QueryClientProvider>
   );
 }

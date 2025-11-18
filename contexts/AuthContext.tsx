@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadStoredAuth();
     
     // Listen for auth state changes (token refresh, logout, OAuth, etc.)
-    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔄 [AUTH STATE CHANGE]:', event);
       
       if (event === 'SIGNED_IN' && session) {
@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Cleanup listener on unmount
     return () => {
-      data.subscription.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
   }, []);
 

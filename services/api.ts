@@ -1,7 +1,7 @@
 // API Configuration
 // Use your computer's IP address for iOS Simulator to connect to local backend
 const API_BASE_URL = __DEV__ 
-  ? 'http://192.168.1.137:3000/api' 
+  ? 'http://192.168.1.64:3000/api' 
   : 'https://your-production-api.com/api';
 
 interface ApiResponse<T> {
@@ -145,10 +145,6 @@ class ApiService {
 
   async getTrendingExperiences() {
     return this.request('/experiences/trending');
-  }
-
-  async getNearbyExperiences(lat: number, lon: number, radius: number = 50) {
-    return this.request(`/experiences/nearby?lat=${lat}&lon=${lon}&radius=${radius}`);
   }
 
   // Booking APIs

@@ -14,16 +14,15 @@ const router = express.Router();
 const { body, param, validationResult } = require('express-validator');
 const Booking = require('../models/Booking');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
-const { sendBookingConfirmation, sendBookingCancellation } = require('../services/emailService');
 
 /**
  * POST /api/bookings
- * Create a new booking
- * Requires: authentication, valid slot with availability
+ * Create a new booking (supports both authenticated and guest checkout)
+ * Requires: valid slot with availability
  * Prevents: double-booking, overbooking
+ * Note: Authentication is optional to allow guest checkout
  */
 router.post('/',
-  authenticateSupabase,
   [
     body('experience_id').isInt({ min: 1 }).withMessage('Valid experience ID required'),
     body('slot_id').isInt({ min: 1 }).withMessage('Valid slot ID required'),
@@ -53,14 +52,38 @@ router.post('/',
         customer_phone: req.body.customer_phone
       };
       
-      // Create booking with transaction safety
-      const booking = await Booking.createBooking(req.user.id, bookingData);
+      // Try to authenticate user if token is present (optional)
+      let userId = null;
+      const authHeader = req.headers.authorization;
       
-      // Send confirmation email (don't wait for it, don't block the response)
-      sendBookingConfirmation(booking).catch(err => {
-        console.error('⚠️  Failed to send confirmation email:', err);
-        // Don't fail the booking if email fails
-      });
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          // Attempt to verify token via Supabase
+          const { authenticateSupabase } = require('../middleware/supabaseAuth');
+          const { createClient } = require('@supabase/supabase-js');
+          const SUPABASE_URL = process.env.SUPABASE_URL || 'https://hnivuisqktlrusyqywaz.supabase.co';
+          const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
+          const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          
+          const { data: { user }, error } = await supabase.auth.getUser(token);
+          if (user && !error) {
+            // User is authenticated, find their local user ID
+            const { syncUserToLocalDB } = require('../middleware/supabaseAuth');
+            userId = await syncUserToLocalDB(user);
+            console.log('✅ Authenticated booking for user:', user.email, '| Local ID:', userId);
+          }
+        } catch (authError) {
+          console.log('ℹ️ Guest checkout (authentication failed):', authError.message);
+        }
+      }
+      
+      if (!userId) {
+        console.log('ℹ️ Guest checkout for:', bookingData.customer_email);
+      }
+      
+      // Create booking with transaction safety (userId can be null for guest checkout)
+      const booking = await Booking.createBooking(userId, bookingData);
       
       res.status(201).json({
         success: true,
@@ -262,11 +285,6 @@ router.put('/:id/cancel',
       
       const { id } = req.params;
       const booking = await Booking.cancelBooking(id, req.user.id);
-      
-      // Send cancellation email (don't wait for it)
-      sendBookingCancellation(booking).catch(err => {
-        console.error('⚠️  Failed to send cancellation email:', err);
-      });
       
       res.json({
         success: true,

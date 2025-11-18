@@ -34,7 +34,6 @@ export interface Experience {
   whatToBring?: string[];
   cancellationPolicy?: string;
   importantInfo?: string;
-  calculatedDistance?: number; // Distance in km (calculated from user location)
 }
 
 export const EXPERIENCES: Experience[] = [
@@ -58,8 +57,8 @@ export const EXPERIENCES: Experience[] = [
       require('@/assets/images/lxtours3.png'),
       require('@/assets/images/lxtours4.png'),
     ],
-    category: 'Adventure',
-    tags: ['Quad Bikes', 'Beach', 'Off-Road', 'Nature', 'Outdoor'],
+    category: 'Outdoors',
+    tags: ['Quad Bikes', 'Beach', 'Off-Road', 'Nature', 'Sports', 'Outdoors'],
     description: 'Explore the wild side of Lisbon on a relaxed and guided quad bike tour. Embark on an immersive adventure and discover secret places, unknown stories and local culture. Navigate quiet roads to build confidence on your quad bike. Feel the wind in your face as you head to an abandoned WWI military complex built to protect the gates of Europe.',
     highlights: [
       'Explore the wild side of Lisbon',
@@ -111,8 +110,8 @@ export const EXPERIENCES: Experience[] = [
       require('@/assets/images/puppy3.webp'),
       require('@/assets/images/puppy4.webp'),
     ],
-    category: 'Workshop',
-    tags: ['Yoga', 'Animals', 'Wellness', 'Relax', 'Unique'],
+    category: 'Mind & Body',
+    tags: ['Yoga', 'Animals', 'Wellness', 'Relax', 'Unique', 'Sports', 'Mind & Body', 'Do Good'],
     description: 'O Puppy Yoga junta o melhor de dois mundos: os benefícios do yoga e a alegria contagiante dos cachorros. É uma experiência diferente, perfeita para relaxares, melhorares o teu bem-estar e viveres momentos cheios de carinho.',
     highlights: [
       'Reduzir o stress e a ansiedade através de técnicas de respiração e relaxamento',
@@ -162,8 +161,8 @@ export const EXPERIENCES: Experience[] = [
       require('@/assets/images/escala253.jpg'),
       require('@/assets/images/escala254.jpg'),
     ],
-    category: 'Adventure',
-    tags: ['Climbing', 'Outdoor', 'Sports', 'Adrenaline', 'Bridge'],
+    category: 'Outdoors',
+    tags: ['Climbing', 'Outdoor', 'Sports', 'Adrenaline', 'Bridge', 'Outdoors'],
     description: 'Visite uma das principais aventuras ao ar livre de Lisboa e suba a uma das estruturas mais emblemáticas da cidade, a Ponte 25 de Abril. Aprenda o básico de escalada, boulder e auto-segurança, ou participe do curso de nível médio e melhore seu conhecimento sobre o trabalho com nós.',
     highlights: [
       'Sinta a adrenalina de subir a imponente Ponte 25 de Abril em Lisboa',
@@ -369,10 +368,14 @@ export const EXPERIENCES: Experience[] = [
 
 export const CATEGORIES = [
   { id: 'all', name: 'All', icon: '🎯' },
-  { id: 'workshop', name: 'Workshops', icon: '🎨' },
-  { id: 'adventure', name: 'Adventure', icon: '⚡' },
-  { id: 'food', name: 'Food & Drink', icon: '🍷' },
-  { id: 'culture', name: 'Culture', icon: '🎭' },
-  { id: 'nature', name: 'Nature', icon: '🌿' },
-  { id: 'nightlife', name: 'Nightlife', icon: '🌙' },
+  { id: 'local-cooking', name: 'Local Cooking', icon: '🍳' },
+  { id: 'culture-dive', name: 'Culture Dive', icon: '🎭' },
+  { id: 'outdoors', name: 'Outdoors', icon: '�️' },
+  { id: 'sports', name: 'Sports', icon: '⚽' },
+  { id: 'micro-adventures', name: 'Micro Adventures', icon: '🗺️' },
+  { id: 'night-explorer', name: 'Night Explorer', icon: '🌙' },
+  { id: 'do-good', name: 'Do Good', icon: '❤️' },
+  { id: 'mind-body', name: 'Mind & Body', icon: '🧘' },
+  { id: 'learn-create', name: 'Learn & Create', icon: '�' },
+  { id: 'time-stories', name: 'Time Stories', icon: '📖' },
 ];

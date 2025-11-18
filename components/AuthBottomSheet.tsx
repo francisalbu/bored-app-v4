@@ -22,13 +22,8 @@ import { supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
 
-// Warm up the browser on iOS
 WebBrowser.maybeCompleteAuthSession();
-if (Platform.OS === 'ios') {
-  WebBrowser.warmUpAsync();
-}
 
 interface AuthBottomSheetProps {
   visible: boolean;
@@ -37,7 +32,6 @@ interface AuthBottomSheetProps {
 
 export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetProps) {
   const router = useRouter();
-  const { refreshUser } = useAuth();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
@@ -49,120 +43,44 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
 
       // Check if Google is configured in Supabase
       console.log('🔐 Starting Google Sign-In...');
-      console.log('📍 Platform:', Platform.OS);
+      console.log('📱 Platform:', Platform.OS);
       
-      // Use the custom scheme defined in app.json
-      const redirectUrl = 'rork-app://auth/callback';
-      console.log('🔗 Redirect URL:', redirectUrl);
+      const redirectUrl = Linking.createURL('auth/callback');
+      console.log('🔗 Redirect URL created:', redirectUrl);
+      console.log('🔗 Expected format: boredtravel://auth/callback');
       
-      console.log('🌐 Calling Supabase signInWithOAuth...');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
           skipBrowserRedirect: false,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
         },
       });
-      
-      console.log('📦 Supabase OAuth response:', { hasData: !!data, hasError: !!error });
 
       if (error) {
         console.error('❌ OAuth error:', error);
+        console.error('❌ Error details:', JSON.stringify(error, null, 2));
         Alert.alert(
-          'Erro de configuração',
-          'Google Sign-In não está configurado no Supabase. Por favor, siga as instruções no GOOGLE_SIGNIN_SETUP.md'
+          'Erro OAuth',
+          `${error.message}\n\nVerifique:\n1. Google OAuth configurado no Supabase\n2. Redirect URL: ${redirectUrl}`
         );
         throw error;
       }
 
       if (data.url) {
         console.log('🌐 Opening OAuth URL:', data.url);
-        console.log('🔗 Redirect URL for browser:', redirectUrl);
-        
-        // Try opening in browser with more options
+        console.log('🔄 Will redirect back to:', redirectUrl);
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          redirectUrl,
-          {
-            showInRecents: true,
-            createTask: false,
-          }
+          redirectUrl
         );
 
         console.log('📱 OAuth result:', result);
-        console.log('📱 OAuth result type:', result.type);
 
-        if (result.type === 'success' && result.url) {
+        if (result.type === 'success') {
           console.log('✅ OAuth success! URL:', result.url);
-          
-          // Extract tokens from URL hash fragment
-          if (result.url.includes('#')) {
-            const hashPart = result.url.split('#')[1];
-            const hashParams = new URLSearchParams(hashPart);
-            
-            const accessToken = hashParams.get('access_token');
-            const refreshToken = hashParams.get('refresh_token');
-            
-            console.log('🔑 Access token found:', accessToken ? 'YES' : 'NO');
-            console.log('🔄 Refresh token found:', refreshToken ? 'YES' : 'NO');
-            
-            if (accessToken && refreshToken) {
-              console.log('✅ Setting session with extracted tokens...');
-              const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              
-              if (sessionError) {
-                console.error('❌ Error setting session:', sessionError);
-                throw sessionError;
-              }
-              
-              console.log('✅ Session set successfully!');
-              console.log('📧 Email:', sessionData.session?.user.email);
-              console.log('👤 Supabase User ID:', sessionData.session?.user.id);
-              
-              // Sync with backend
-              console.log('🔄 Syncing with backend...');
-              try {
-                await refreshUser();
-                console.log('✅ User synced with backend!');
-              } catch (syncError) {
-                console.error('❌ Backend sync error:', syncError);
-                // Continue anyway - user can still use the app
-                console.log('⚠️ Continuing without backend sync...');
-              }
-              
-              // Small delay for UI
-              await new Promise(resolve => setTimeout(resolve, 500));
-              
-              // Close modal and navigate
-              onClose();
-              console.log('🏠 Navigating to home...');
-              router.replace('/(tabs)');
-              
-              return;
-            }
-          }
-          
-          // Fallback: wait for Supabase to auto-process
-          console.log('⚠️ No tokens in URL, waiting for auto-process...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          const { data: { session }, error } = await supabase.auth.getSession();
-          
-          if (session) {
-            console.log('✅ Session established! Redirecting to home...');
-            onClose();
-            router.replace('/(tabs)');
-          } else {
-            console.log('⚠️ No session found, please try again');
-            Alert.alert('Erro', 'Não foi possível completar o login. Tente novamente.');
-          }
+          onClose();
+          // Navigation will be handled by app/auth/callback.tsx
         } else if (result.type === 'cancel') {
           console.log('⚠️ OAuth cancelled by user');
           Alert.alert('Cancelado', 'Login com Google cancelado');
@@ -235,20 +153,13 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
 
             {/* Social Sign In Buttons */}
             <View style={styles.socialButtons}>
-              {/* Apple Sign In */}
+              {/* Apple Sign In - TEMPORARIAMENTE DESATIVADO */}
               <Pressable
-                style={[styles.socialButton, styles.appleButton]}
-                onPress={handleAppleSignIn}
-                disabled={isLoading}
+                style={[styles.socialButton, styles.appleButton, { opacity: 0.5 }]}
+                disabled={true}
               >
-                {loadingProvider === 'apple' ? (
-                  <ActivityIndicator color={colors.dark.background} />
-                ) : (
-                  <>
-                    <Text style={styles.appleIcon}></Text>
-                    <Text style={styles.socialButtonText}>Continuar com a Apple</Text>
-                  </>
-                )}
+                <Text style={styles.appleIcon}></Text>
+                <Text style={styles.socialButtonText}>Continuar com a Apple (em breve)</Text>
               </Pressable>
 
               {/* Google Sign In */}
@@ -269,22 +180,15 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
                 )}
               </Pressable>
 
-              {/* Facebook Sign In */}
+              {/* Facebook Sign In - TEMPORARIAMENTE DESATIVADO */}
               <Pressable
-                style={[styles.socialButton, styles.facebookButton]}
-                onPress={handleFacebookSignIn}
-                disabled={isLoading}
+                style={[styles.socialButton, styles.facebookButton, { opacity: 0.5 }]}
+                disabled={true}
               >
-                {loadingProvider === 'facebook' ? (
-                  <ActivityIndicator color={colors.dark.text} />
-                ) : (
-                  <>
-                    <Text style={styles.facebookIcon}>f</Text>
-                    <Text style={[styles.socialButtonText, styles.facebookButtonText]}>
-                      Continuar com o Facebook
-                    </Text>
-                  </>
-                )}
+                <Text style={styles.facebookIcon}>f</Text>
+                <Text style={[styles.socialButtonText, styles.facebookButtonText]}>
+                  Continuar com o Facebook (em breve)
+                </Text>
               </Pressable>
             </View>
 
