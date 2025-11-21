@@ -1,11 +1,11 @@
 /**
  * User Model
  * 
- * Handles user database operations
+ * Handles user database operations using Supabase
  * Assumes existing users table with fields: id, email, password, name, google_id, apple_id, etc.
  */
 
-const { get, run } = require('../config/database');
+const { from } = require('../config/database');
 const bcrypt = require('bcrypt');
 
 const SALT_ROUNDS = 10;
@@ -14,14 +14,26 @@ const SALT_ROUNDS = 10;
  * Find user by email
  */
 async function findByEmail(email) {
-  return await get('SELECT * FROM users WHERE email = ?', [email]);
+  const { data, error } = await from('users')
+    .select('*')
+    .eq('email', email)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error; // PGRST116 = not found, which is ok
+  return data;
 }
 
 /**
  * Find user by ID
  */
 async function findById(id) {
-  return await get('SELECT id, email, name, created_at FROM users WHERE id = ?', [id]);
+  const { data, error } = await from('users')
+    .select('id, email, name, created_at')
+    .eq('id', id)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  return data;
 }
 
 /**
@@ -38,12 +50,18 @@ async function createUser(email, password, name) {
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
   
   // Insert user
-  const result = await run(`
-    INSERT INTO users (email, password, name, email_verified, created_at)
-    VALUES (?, ?, ?, 0, datetime('now'))
-  `, [email, hashedPassword, name]);
+  const { data, error } = await from('users')
+    .insert({
+      email,
+      password: hashedPassword,
+      name,
+      email_verified: false
+    })
+    .select('id, email, name, created_at')
+    .single();
   
-  return await findById(result.lastID);
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -73,29 +91,26 @@ async function verifyPassword(email, password) {
 async function updateProfile(userId, updates) {
   const allowedFields = ['name', 'bio', 'avatar_url'];
   
-  const fields = [];
-  const values = [];
+  const updateData = {};
   
   Object.keys(updates).forEach(key => {
     if (allowedFields.includes(key)) {
-      fields.push(`${key} = ?`);
-      values.push(updates[key]);
+      updateData[key] = updates[key];
     }
   });
   
-  if (fields.length === 0) {
+  if (Object.keys(updateData).length === 0) {
     throw new Error('No valid fields to update');
   }
   
-  values.push(userId);
+  const { data, error } = await from('users')
+    .update(updateData)
+    .eq('id', userId)
+    .select('id, email, name, created_at')
+    .single();
   
-  await run(`
-    UPDATE users 
-    SET ${fields.join(', ')}, updated_at = datetime('now')
-    WHERE id = ?
-  `, values);
-  
-  return await findById(userId);
+  if (error) throw error;
+  return data;
 }
 
 module.exports = {

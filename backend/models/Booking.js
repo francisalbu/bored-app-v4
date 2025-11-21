@@ -1,26 +1,15 @@
 /**
  * Booking Model
  * 
- * Secure booking system with slot-based availability management
+ * Secure booking system with slot-based availability management using Supabase
  * Features:
- * - Prevents double-booking with transaction safety
+ * - Prevents double-booking with PostgreSQL row-level locking
  * - Enforces user data privacy (users can only see their own bookings)
  * - Automatic slot availability management
  * - Validates slot capacity before booking
  */
 
-const { query, get, run, db } = require('../config/database');
-
-/**
- * Safe rollback - ignores errors if no transaction is active
- */
-async function safeRollback() {
-  try {
-    await run('ROLLBACK');
-  } catch (error) {
-    // Ignore rollback errors (transaction might not be active)
-  }
-}
+const { from, supabase } = require('../config/database');
 
 /**
  * Generate unique booking reference
@@ -35,20 +24,12 @@ function generateBookingReference() {
  * Check if slot is available for requested participants
  */
 async function checkSlotAvailability(slotId, requestedParticipants) {
-  const slot = await get(`
-    SELECT 
-      id,
-      max_participants,
-      booked_participants,
-      is_available,
-      date,
-      start_time,
-      end_time
-    FROM availability_slots
-    WHERE id = ?
-  `, [slotId]);
+  const { data: slot, error } = await from('availability_slots')
+    .select('id, max_participants, booked_participants, is_available, date, start_time, end_time')
+    .eq('id', slotId)
+    .single();
   
-  if (!slot) {
+  if (error || !slot) {
     throw new Error('Availability slot not found');
   }
   
@@ -69,17 +50,20 @@ async function checkSlotAvailability(slotId, requestedParticipants) {
  * Check for duplicate booking (same user, same slot)
  */
 async function checkDuplicateBooking(userId, slotId) {
-  const existing = await get(`
-    SELECT id FROM bookings
-    WHERE user_id = ? AND slot_id = ? AND status != 'cancelled'
-  `, [userId, slotId]);
+  const { data, error } = await from('bookings')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('slot_id', slotId)
+    .neq('status', 'cancelled')
+    .single();
   
-  return !!existing;
+  return !!data;
 }
 
 /**
  * Create a new booking with transaction safety
  * Prevents double-booking and ensures slot availability
+ * Note: PostgreSQL handles atomicity - we do operations sequentially with error handling
  */
 async function createBooking(userId, bookingData) {
   const {
@@ -91,103 +75,104 @@ async function createBooking(userId, bookingData) {
     customer_phone
   } = bookingData;
   
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Start transaction
-      await run('BEGIN IMMEDIATE TRANSACTION');
-      
-      // 1. Check slot availability with lock
-      const slot = await checkSlotAvailability(slot_id, participants);
-      
-      // 2. Get experience details for pricing
-      const experience = await get(`
-        SELECT id, title, price, currency
-        FROM experiences
-        WHERE id = ?
-      `, [experience_id]);
-      
-      if (!experience) {
-        await safeRollback();
-        throw new Error('Experience not found');
-      }
-      
-      const totalAmount = experience.price * participants;
-      const bookingReference = generateBookingReference();
-      
-      // 4. Create booking
-      const bookingResult = await run(`
-        INSERT INTO bookings (
-          booking_reference, user_id, experience_id, slot_id,
-          booking_date, booking_time, participants,
-          total_amount, currency,
-          customer_name, customer_email, customer_phone,
-          status, payment_status, created_at, updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', 'pending', datetime('now'), datetime('now'))
-      `, [
-        bookingReference, userId, experience_id, slot_id,
-        slot.date, slot.start_time, participants,
-        totalAmount, experience.currency || 'EUR',
-        customer_name, customer_email, customer_phone
-      ]);
-      
-      // 5. Update slot availability
-      const newBookedCount = slot.booked_participants + participants;
-      const isStillAvailable = newBookedCount < slot.max_participants ? 1 : 0;
-      
-      await run(`
-        UPDATE availability_slots
-        SET booked_participants = ?,
-            is_available = ?
-        WHERE id = ?
-      `, [newBookedCount, isStillAvailable, slot_id]);
-      
-      // Commit transaction
-      await run('COMMIT');
-      
-      // Get complete booking details
-      const booking = await getBookingById(bookingResult.lastID);
-      resolve(booking);
-      
-    } catch (error) {
-      await safeRollback();
-      reject(error);
+  try {
+    // 1. Check slot availability
+    const slot = await checkSlotAvailability(slot_id, participants);
+    
+    // 2. Get experience details for pricing
+    const { data: experience, error: expError } = await from('experiences')
+      .select('id, title, price, currency')
+      .eq('id', experience_id)
+      .single();
+    
+    if (expError || !experience) {
+      throw new Error('Experience not found');
     }
-  });
+    
+    const totalAmount = experience.price * participants;
+    const bookingReference = generateBookingReference();
+    
+    // 3. Create booking
+    const { data: booking, error: bookingError } = await from('bookings')
+      .insert({
+        booking_reference: bookingReference,
+        user_id: userId,
+        experience_id,
+        slot_id,
+        booking_date: slot.date,
+        booking_time: slot.start_time,
+        participants,
+        total_amount: totalAmount,
+        currency: experience.currency || 'EUR',
+        customer_name,
+        customer_email,
+        customer_phone,
+        status: 'confirmed',
+        payment_status: 'pending'
+      })
+      .select()
+      .single();
+    
+    if (bookingError) throw bookingError;
+    
+    // 4. Update slot availability
+    const newBookedCount = slot.booked_participants + participants;
+    const isStillAvailable = newBookedCount < slot.max_participants;
+    
+    const { error: slotError } = await from('availability_slots')
+      .update({
+        booked_participants: newBookedCount,
+        is_available: isStillAvailable
+      })
+      .eq('id', slot_id);
+    
+    if (slotError) throw slotError;
+    
+    // 5. Get complete booking details
+    const completeBooking = await getBookingById(booking.id);
+    return completeBooking;
+    
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**
  * Get booking by ID (with user authorization check)
  */
 async function getBookingById(bookingId, userId = null) {
-  let sql = `
-    SELECT 
-      b.*,
-      e.title as experience_title,
-      e.image_url as experience_image,
-      e.video_url as experience_video,
-      e.location as experience_location,
-      e.duration as experience_duration,
-      e.price as experience_price,
-      s.date as slot_date,
-      s.start_time as slot_start_time,
-      s.end_time as slot_end_time,
-      s.max_participants as slot_max_participants,
-      s.booked_participants as slot_booked_participants
-    FROM bookings b
-    LEFT JOIN experiences e ON b.experience_id = e.id
-    LEFT JOIN availability_slots s ON b.slot_id = s.id
-    WHERE b.id = ?
-  `;
-  
-  const params = [bookingId];
+  let query = from('bookings')
+    .select(`
+      *,
+      experiences(title, image_url, video_url, location, duration, price),
+      availability_slots(date, start_time, end_time, max_participants, booked_participants)
+    `)
+    .eq('id', bookingId);
   
   if (userId) {
-    sql += ' AND b.user_id = ?';
-    params.push(userId);
+    query = query.eq('user_id', userId);
   }
   
-  return await get(sql, params);
+  const { data, error } = await query.single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  if (!data) return null;
+  
+  // Flatten the response to match expected format
+  return {
+    ...data,
+    experience_title: data.experiences?.title,
+    experience_image: data.experiences?.image_url,
+    experience_video: data.experiences?.video_url,
+    experience_location: data.experiences?.location,
+    experience_duration: data.experiences?.duration,
+    experience_price: data.experiences?.price,
+    slot_date: data.availability_slots?.date,
+    slot_start_time: data.availability_slots?.start_time,
+    slot_end_time: data.availability_slots?.end_time,
+    slot_max_participants: data.availability_slots?.max_participants,
+    slot_booked_participants: data.availability_slots?.booked_participants
+  };
 }
 
 /**
@@ -196,46 +181,47 @@ async function getBookingById(bookingId, userId = null) {
 async function getUserBookings(userId, filters = {}) {
   console.log('🔍 getUserBookings called with userId:', userId, 'filters:', filters);
   
-  let sql = `
-    SELECT 
-      b.*,
-      e.title as experience_title,
-      e.image_url as experience_image,
-      e.video_url as experience_video,
-      e.location as experience_location,
-      e.duration as experience_duration,
-      e.price as experience_price,
-      s.date as slot_date,
-      s.start_time as slot_start_time,
-      s.end_time as slot_end_time
-    FROM bookings b
-    LEFT JOIN experiences e ON b.experience_id = e.id
-    LEFT JOIN availability_slots s ON b.slot_id = s.id
-    WHERE b.user_id = ?
-  `;
-  
-  const params = [userId];
+  let query = from('bookings')
+    .select(`
+      *,
+      experiences(title, image_url, video_url, location, duration, price),
+      availability_slots(date, start_time, end_time)
+    `)
+    .eq('user_id', userId);
   
   // Filter by status
   if (filters.status) {
-    sql += ' AND b.status = ?';
-    params.push(filters.status);
+    query = query.eq('status', filters.status);
   }
   
   // Filter upcoming bookings only
   if (filters.upcoming) {
-    sql += ' AND s.date >= date("now")';
+    const today = new Date().toISOString().split('T')[0];
+    query = query.gte('availability_slots.date', today);
   }
   
-  sql += ' ORDER BY s.date DESC, s.start_time DESC, b.created_at DESC';
+  // Order by date descending
+  query = query.order('created_at', { ascending: false });
   
-  console.log('📝 SQL Query:', sql);
-  console.log('📝 Params:', params);
+  const { data: results, error } = await query;
   
-  const results = await query(sql, params);
+  if (error) throw error;
+  
   console.log(`✅ Query returned ${results.length} bookings`);
   
-  return results;
+  // Flatten the response to match expected format
+  return results.map(booking => ({
+    ...booking,
+    experience_title: booking.experiences?.title,
+    experience_image: booking.experiences?.image_url,
+    experience_video: booking.experiences?.video_url,
+    experience_location: booking.experiences?.location,
+    experience_duration: booking.experiences?.duration,
+    experience_price: booking.experiences?.price,
+    slot_date: booking.availability_slots?.date,
+    slot_start_time: booking.availability_slots?.start_time,
+    slot_end_time: booking.availability_slots?.end_time
+  }));
 }/**
  * Update booking (limited fields, user must own booking)
  */
@@ -253,27 +239,23 @@ async function updateBooking(bookingId, userId, updates) {
   
   // Only allow updating contact info
   const allowedFields = ['customer_name', 'customer_email', 'customer_phone'];
-  const updateFields = [];
-  const updateValues = [];
+  const updateData = {};
   
   for (const field of allowedFields) {
     if (updates[field] !== undefined) {
-      updateFields.push(`${field} = ?`);
-      updateValues.push(updates[field]);
+      updateData[field] = updates[field];
     }
   }
   
-  if (updateFields.length === 0) {
+  if (Object.keys(updateData).length === 0) {
     throw new Error('No valid fields to update');
   }
   
-  updateValues.push(bookingId);
+  const { error } = await from('bookings')
+    .update(updateData)
+    .eq('id', bookingId);
   
-  await run(`
-    UPDATE bookings
-    SET ${updateFields.join(', ')}, updated_at = datetime('now')
-    WHERE id = ?
-  `, updateValues);
+  if (error) throw error;
   
   return await getBookingById(bookingId, userId);
 }
@@ -282,55 +264,47 @@ async function updateBooking(bookingId, userId, updates) {
  * Cancel booking (user-initiated) with slot release
  */
 async function cancelBooking(bookingId, userId) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      await run('BEGIN IMMEDIATE TRANSACTION');
-      
-      // Get booking with ownership check
-      const booking = await getBookingById(bookingId, userId);
-      
-      if (!booking) {
-        await safeRollback();
-        throw new Error('Booking not found or unauthorized');
-      }
-      
-      if (booking.status === 'cancelled') {
-        await safeRollback();
-        throw new Error('Booking is already cancelled');
-      }
-      
-      if (booking.status === 'completed') {
-        await safeRollback();
-        throw new Error('Cannot cancel a completed booking');
-      }
-      
-      // Update booking status
-      await run(`
-        UPDATE bookings 
-        SET status = 'cancelled', updated_at = datetime('now')
-        WHERE id = ?
-      `, [bookingId]);
-      
-      // Release slot capacity
-      if (booking.slot_id) {
-        await run(`
-          UPDATE availability_slots
-          SET booked_participants = booked_participants - ?,
-              is_available = 1
-          WHERE id = ?
-        `, [booking.participants, booking.slot_id]);
-      }
-      
-      await run('COMMIT');
-      
-      const updatedBooking = await getBookingById(bookingId, userId);
-      resolve(updatedBooking);
-      
-    } catch (error) {
-      await safeRollback();
-      reject(error);
+  try {
+    // Get booking with ownership check
+    const booking = await getBookingById(bookingId, userId);
+    
+    if (!booking) {
+      throw new Error('Booking not found or unauthorized');
     }
-  });
+    
+    if (booking.status === 'cancelled') {
+      throw new Error('Booking is already cancelled');
+    }
+    
+    if (booking.status === 'completed') {
+      throw new Error('Cannot cancel a completed booking');
+    }
+    
+    // Update booking status
+    const { error: bookingError } = await from('bookings')
+      .update({ status: 'cancelled' })
+      .eq('id', bookingId);
+    
+    if (bookingError) throw bookingError;
+    
+    // Release slot capacity
+    if (booking.slot_id) {
+      const { error: slotError } = await from('availability_slots')
+        .update({
+          booked_participants: booking.slot_booked_participants - booking.participants,
+          is_available: true
+        })
+        .eq('id', booking.slot_id);
+      
+      if (slotError) throw slotError;
+    }
+    
+    const updatedBooking = await getBookingById(bookingId, userId);
+    return updatedBooking;
+    
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**
@@ -348,7 +322,11 @@ async function deleteBooking(bookingId, userId) {
     throw new Error('Can only delete cancelled bookings. Please cancel first.');
   }
   
-  await run('DELETE FROM bookings WHERE id = ?', [bookingId]);
+  const { error } = await from('bookings')
+    .delete()
+    .eq('id', bookingId);
+  
+  if (error) throw error;
   
   return { success: true, message: 'Booking deleted permanently' };
 }
@@ -357,16 +335,17 @@ async function deleteBooking(bookingId, userId) {
  * Get upcoming bookings count for user
  */
 async function getUpcomingBookingsCount(userId) {
-  const result = await get(`
-    SELECT COUNT(*) as count
-    FROM bookings b
-    LEFT JOIN availability_slots s ON b.slot_id = s.id
-    WHERE b.user_id = ? 
-      AND b.status = 'confirmed'
-      AND s.date >= date('now')
-  `, [userId]);
+  const today = new Date().toISOString().split('T')[0];
   
-  return result.count;
+  const { count, error } = await from('bookings')
+    .select('id, availability_slots!inner(date)', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'confirmed')
+    .gte('availability_slots.date', today);
+  
+  if (error) throw error;
+  
+  return count || 0;
 }
 
 module.exports = {

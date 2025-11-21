@@ -1,124 +1,74 @@
 /**
- * Database Configuration
+ * Database Configuration - Supabase PostgreSQL
  * 
- * Connects to the existing SQLite database (bored_tourist.db)
- * The database already contains:
- * - users table (id, email, password, name, etc.)
- * - experiences table (id, title, description, location, price, media URLs, etc.)
- * - bookings table (id, user_id, experience_id, date, status, etc.)
+ * Uses Supabase as the main database for production
  */
 
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
-// Database path from environment or default
-const DB_PATH = process.env.DB_PATH || '/Users/francisalbu/Documents/Bored New Backend/bored_tourist.db';
+// Supabase configuration
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-let db;
+let supabase;
 
 /**
- * Initialize database connection
+ * Initialize Supabase connection
  */
 function initDB() {
-  return new Promise((resolve, reject) => {
-    db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) {
-        console.error('❌ Error connecting to database:', err.message);
-        reject(err);
-      } else {
-        console.log('✅ Connected to SQLite database:', DB_PATH);
-        
-        // Configure database for better concurrency
-        db.configure('busyTimeout', 10000); // Wait up to 10 seconds when database is locked
-        
-        // Try to enable WAL mode for better concurrency (multiple readers, one writer)
-        // But don't fail if it's locked by another process
-        db.run('PRAGMA journal_mode = WAL;', (walErr) => {
-          if (walErr) {
-            console.warn('⚠️ Could not enable WAL mode (database may be open in another program)');
-            console.warn('⚠️ Please close DB Browser or any other SQLite tool');
-          } else {
-            console.log('✅ WAL mode enabled for better concurrency');
-          }
-        });
-        
-        // Resolve immediately so server can start
-        resolve(db);
-      }
-    });
-  });
-}
-
-/**
- * Get database instance
- */
-function getDB() {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDB() first.');
+  console.log('🔍 Checking Supabase credentials...');
+  console.log('SUPABASE_URL:', SUPABASE_URL ? '✅ Set' : '❌ Missing');
+  console.log('SUPABASE_SERVICE_ROLE_KEY:', SUPABASE_SERVICE_KEY ? '✅ Set' : '❌ Missing');
+  
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    return Promise.reject(new Error('❌ Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env'));
   }
-  return db;
-}
-
-/**
- * Helper to run queries with promises
- */
-function query(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
-}
-
-/**
- * Helper to get single row
- */
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-}
-
-/**
- * Helper to run insert/update/delete
- */
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
-}
-
-/**
- * Close database connection
- */
-function closeDB() {
-  return new Promise((resolve, reject) => {
-    if (db) {
-      db.close((err) => {
-        if (err) reject(err);
-        else {
-          console.log('Database connection closed');
-          resolve();
-        }
-      });
-    } else {
-      resolve();
+  
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
     }
   });
+  
+  console.log('✅ Connected to Supabase PostgreSQL:', SUPABASE_URL);
+  return Promise.resolve(supabase);
 }
 
+/**
+ * Get Supabase client instance
+ */
+function getDB() {
+  if (!supabase) {
+    throw new Error('Database not initialized. Call initDB() first.');
+  }
+  return supabase;
+}
+
+/**
+ * Helper function to query Supabase tables
+ * Returns Supabase query builder
+ */
+function from(tableName) {
+  if (!supabase) {
+    throw new Error('Database not initialized. Call initDB() first.');
+  }
+  return supabase.from(tableName);
+}
+
+/**
+ * Close database connection (no-op for Supabase, kept for compatibility)
+ */
+function closeDB() {
+  console.log('Supabase connection closed');
+  return Promise.resolve();
+}
+
+// Export Supabase client and helper functions
 module.exports = {
   initDB,
   getDB,
-  query,
-  get,
-  run,
-  closeDB
+  from,
+  closeDB,
+  supabase: () => supabase
 };

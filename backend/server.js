@@ -10,7 +10,7 @@
  * - User profiles
  * - Media URLs from Google Cloud Storage
  * 
- * Database: SQLite (bored_tourist.db)
+ * Database: Supabase PostgreSQL
  * Auth: JWT tokens with bcrypt password hashing
  * Server listens on 0.0.0.0:3000 for network access
  */
@@ -113,7 +113,7 @@ initDB().then(() => {
     console.log(`🌐 Local: http://localhost:${PORT}`);
     console.log(`📱 Network: http://0.0.0.0:${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🗄️  Database: ${process.env.DB_PATH || './bored_tourist.db'}`);
+    console.log(`🗄️  Database: Supabase PostgreSQL`);
     console.log('='.repeat(50) + '\n');
     console.log('API Endpoints:');
     console.log('  POST   /api/auth/register');

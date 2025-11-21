@@ -1,23 +1,11 @@
 /**
  * Experience Model
  * 
- * Handles experience database operations
- * Matches the actual database schema with operator_id, video_url, image_url, etc.
+ * Handles experience database operations using Supabase
+ * Matches the PostgreSQL schema with operator_id, video_url, image_url, etc.
  */
 
-const { query, get, run } = require('../config/database');
-
-/**
- * Parse JSON fields safely
- */
-function parseJSON(field) {
-  if (!field) return [];
-  try {
-    return typeof field === 'string' ? JSON.parse(field) : field;
-  } catch (e) {
-    return [];
-  }
-}
+const { from } = require('../config/database');
 
 /**
  * Get all experiences (for feed)
@@ -25,38 +13,62 @@ function parseJSON(field) {
  * Calculates real-time rating and review count from reviews table
  */
 async function getAllExperiences(limit = 50, offset = 0) {
-  const experiences = await query(`
-    SELECT 
-      e.id, e.title, e.description, e.location, e.address,
-      e.meeting_point, e.latitude, e.longitude, e.distance,
-      e.price, e.currency, e.duration, e.max_group_size,
-      e.category, e.tags, e.video_url, e.image_url, e.images,
-      e.provider_logo, e.highlights, e.included, e.what_to_bring,
-      e.languages, e.cancellation_policy, e.important_info,
-      e.instant_booking, e.available_today, e.verified,
-      e.created_at,
-      o.company_name as operator_name, o.logo_url as operator_logo,
-      COALESCE(ROUND(AVG(r.rating), 1), 0) as rating,
-      COUNT(r.id) as review_count
-    FROM experiences e
-    LEFT JOIN operators o ON e.operator_id = o.id
-    LEFT JOIN reviews r ON e.id = r.experience_id
-    WHERE e.is_active = 1
-    GROUP BY e.id
-    ORDER BY e.created_at DESC
-    LIMIT ? OFFSET ?
-  `, [limit, offset]);
+  const { data: experiences, error } = await from('experiences')
+    .select(`
+      *,
+      operators(company_name, logo_url),
+      reviews(rating, id)
+    `)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
   
-  // Parse JSON fields
-  return experiences.map(exp => ({
-    ...exp,
-    images: parseJSON(exp.images),
-    tags: parseJSON(exp.tags),
-    highlights: parseJSON(exp.highlights),
-    included: parseJSON(exp.included),
-    what_to_bring: parseJSON(exp.what_to_bring),
-    languages: parseJSON(exp.languages)
-  }));
+  if (error) throw error;
+  
+  // Process and format experiences
+  return experiences.map(exp => {
+    // Calculate rating and review count from reviews array
+    const reviews = exp.reviews || [];
+    const rating = reviews.length > 0 
+      ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
+      : 0;
+    
+    return {
+      id: exp.id,
+      title: exp.title,
+      description: exp.description,
+      location: exp.location,
+      address: exp.address,
+      meeting_point: exp.meeting_point,
+      latitude: exp.latitude,
+      longitude: exp.longitude,
+      distance: exp.distance,
+      price: exp.price,
+      currency: exp.currency,
+      duration: exp.duration,
+      max_group_size: exp.max_group_size,
+      category: exp.category,
+      tags: exp.tags || [],
+      video_url: exp.video_url,
+      image_url: exp.image_url,
+      images: exp.images || [],
+      provider_logo: exp.provider_logo,
+      highlights: exp.highlights || [],
+      included: exp.included || [],
+      what_to_bring: exp.what_to_bring || [],
+      languages: exp.languages || [],
+      cancellation_policy: exp.cancellation_policy,
+      important_info: exp.important_info,
+      instant_booking: exp.instant_booking,
+      available_today: exp.available_today,
+      verified: exp.verified,
+      created_at: exp.created_at,
+      operator_name: exp.operators?.company_name,
+      operator_logo: exp.operators?.logo_url,
+      rating,
+      review_count: reviews.length
+    };
+  });
 }
 
 /**
@@ -65,39 +77,40 @@ async function getAllExperiences(limit = 50, offset = 0) {
  * Calculates real-time rating and review count from reviews table
  */
 async function getExperienceById(id) {
-  const experience = await get(`
-    SELECT 
-      e.*, o.company_name as operator_name, o.logo_url as operator_logo,
-      o.phone as operator_phone
-    FROM experiences e
-    LEFT JOIN operators o ON e.operator_id = o.id
-    WHERE e.id = ? AND e.is_active = 1
-  `, [id]);
+  const { data: experience, error } = await from('experiences')
+    .select(`
+      *,
+      operators(company_name, logo_url, phone),
+      reviews(rating, id)
+    `)
+    .eq('id', id)
+    .eq('is_active', true)
+    .single();
   
-  if (!experience) {
+  if (error || !experience) {
     return null;
   }
   
-  // Calculate real rating and review count from reviews table
-  const reviewStats = await get(`
-    SELECT 
-      COUNT(*) as review_count,
-      ROUND(AVG(rating), 1) as average_rating
-    FROM reviews
-    WHERE experience_id = ?
-  `, [id]);
+  // Calculate rating and review count from reviews array
+  const reviews = experience.reviews || [];
+  const rating = reviews.length > 0 
+    ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
+    : 0;
   
-  // Parse JSON fields
+  // Return formatted experience
   return {
     ...experience,
-    rating: reviewStats?.average_rating || experience.rating || 0,
-    review_count: reviewStats?.review_count || 0,
-    images: parseJSON(experience.images),
-    tags: parseJSON(experience.tags),
-    highlights: parseJSON(experience.highlights),
-    included: parseJSON(experience.included),
-    what_to_bring: parseJSON(experience.what_to_bring),
-    languages: parseJSON(experience.languages)
+    operator_name: experience.operators?.company_name,
+    operator_logo: experience.operators?.logo_url,
+    operator_phone: experience.operators?.phone,
+    rating,
+    review_count: reviews.length,
+    images: experience.images || [],
+    tags: experience.tags || [],
+    highlights: experience.highlights || [],
+    included: experience.included || [],
+    what_to_bring: experience.what_to_bring || [],
+    languages: experience.languages || []
   };
 }
 
@@ -105,74 +118,119 @@ async function getExperienceById(id) {
  * Search experiences by query
  */
 async function searchExperiences(searchQuery, limit = 50) {
-  const searchTerm = `%${searchQuery}%`;
+  const { data: experiences, error } = await from('experiences')
+    .select(`
+      id, title, description, location, price, duration,
+      video_url, image_url, images, category,
+      latitude, longitude, created_at,
+      operators(company_name),
+      reviews(rating, id)
+    `)
+    .eq('is_active', true)
+    .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`)
+    .limit(limit);
   
-  const experiences = await query(`
-    SELECT 
-      e.id, e.title, e.description, e.location, e.price, e.duration,
-      e.video_url, e.image_url, e.images, e.category,
-      e.rating, e.review_count, e.latitude, e.longitude, e.created_at,
-      o.company_name as operator_name
-    FROM experiences e
-    LEFT JOIN operators o ON e.operator_id = o.id
-    WHERE e.is_active = 1 AND (e.title LIKE ? OR e.description LIKE ? OR e.location LIKE ?)
-    ORDER BY e.rating DESC, e.review_count DESC
-    LIMIT ?
-  `, [searchTerm, searchTerm, searchTerm, limit]);
+  if (error) throw error;
   
-  return experiences.map(exp => ({
-    ...exp,
-    images: parseJSON(exp.images),
-    tags: parseJSON(exp.tags)
-  }));
+  // Calculate ratings and sort
+  return experiences
+    .map(exp => {
+      const reviews = exp.reviews || [];
+      const rating = reviews.length > 0 
+        ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
+        : 0;
+      
+      return {
+        ...exp,
+        operator_name: exp.operators?.company_name,
+        rating,
+        review_count: reviews.length,
+        images: exp.images || [],
+        tags: exp.tags || []
+      };
+    })
+    .sort((a, b) => {
+      if (b.rating !== a.rating) return b.rating - a.rating;
+      return b.review_count - a.review_count;
+    });
 }
 
 /**
  * Get experiences by category
  */
 async function getExperiencesByCategory(category, limit = 50) {
-  const experiences = await query(`
-    SELECT 
-      e.id, e.title, e.description, e.location, e.price, e.duration,
-      e.video_url, e.image_url, e.images, e.category,
-      e.rating, e.review_count, e.latitude, e.longitude, e.created_at,
-      o.company_name as operator_name
-    FROM experiences e
-    LEFT JOIN operators o ON e.operator_id = o.id
-    WHERE e.is_active = 1 AND e.category = ?
-    ORDER BY e.rating DESC
-    LIMIT ?
-  `, [category, limit]);
+  const { data: experiences, error } = await from('experiences')
+    .select(`
+      id, title, description, location, price, duration,
+      video_url, image_url, images, category,
+      latitude, longitude, created_at,
+      operators(company_name),
+      reviews(rating, id)
+    `)
+    .eq('is_active', true)
+    .eq('category', category)
+    .limit(limit);
   
-  return experiences.map(exp => ({
-    ...exp,
-    images: parseJSON(exp.images),
-    tags: parseJSON(exp.tags)
-  }));
+  if (error) throw error;
+  
+  // Calculate ratings and sort by rating
+  return experiences
+    .map(exp => {
+      const reviews = exp.reviews || [];
+      const rating = reviews.length > 0 
+        ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
+        : 0;
+      
+      return {
+        ...exp,
+        operator_name: exp.operators?.company_name,
+        rating,
+        review_count: reviews.length,
+        images: exp.images || [],
+        tags: exp.tags || []
+      };
+    })
+    .sort((a, b) => b.rating - a.rating);
 }
 
 /**
  * Get trending experiences (most reviewed/rated)
  */
 async function getTrendingExperiences(limit = 20) {
-  const experiences = await query(`
-    SELECT 
-      e.id, e.title, e.description, e.location, e.price, e.duration,
-      e.video_url, e.image_url, e.images, e.category,
-      e.rating, e.review_count, e.latitude, e.longitude, e.created_at,
-      o.company_name as operator_name
-    FROM experiences e
-    LEFT JOIN operators o ON e.operator_id = o.id
-    WHERE e.is_active = 1
-    ORDER BY e.review_count DESC, e.rating DESC
-    LIMIT ?
-  `, [limit]);
+  const { data: experiences, error } = await from('experiences')
+    .select(`
+      id, title, description, location, price, duration,
+      video_url, image_url, images, category,
+      latitude, longitude, created_at,
+      operators(company_name),
+      reviews(rating, id)
+    `)
+    .eq('is_active', true)
+    .limit(limit);
   
-  return experiences.map(exp => ({
-    ...exp,
-    images: parseJSON(exp.images),
-    tags: parseJSON(exp.tags)
-  }));
+  if (error) throw error;
+  
+  // Calculate ratings and sort by review count, then rating
+  return experiences
+    .map(exp => {
+      const reviews = exp.reviews || [];
+      const rating = reviews.length > 0 
+        ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
+        : 0;
+      
+      return {
+        ...exp,
+        operator_name: exp.operators?.company_name,
+        rating,
+        review_count: reviews.length,
+        images: exp.images || [],
+        tags: exp.tags || []
+      };
+    })
+    .sort((a, b) => {
+      if (b.review_count !== a.review_count) return b.review_count - a.review_count;
+      return b.rating - a.rating;
+    });
 }
 
 /**
