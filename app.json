@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Bored Explorer",
-    "slug": "bored-explorer",
+    "name": "Bored Tourist",
+    "slug": "bored-tourist",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "boredtravel",
+    "scheme": "boredtourist",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

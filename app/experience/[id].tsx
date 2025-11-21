@@ -10,7 +10,7 @@ import {
   MapPin,
   Star,
 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, Dimensions, FlatList, Linking, Alert, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,6 +29,8 @@ export default function ExperienceDetailScreen() {
   const [showAIChat, setShowAIChat] = useState(false);
   const [experience, setExperience] = useState<Experience | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   
   const { toggleSave, isSaved } = useFavorites();
   const { isAuthenticated } = useAuth();
@@ -96,6 +98,27 @@ export default function ExperienceDetailScreen() {
       fetchExperience();
     }
   }, [id]);
+
+  // Fetch reviews when experience is loaded
+  React.useEffect(() => {
+    const fetchReviews = async () => {
+      if (!experience?.id) return;
+      
+      setReviewsLoading(true);
+      try {
+        const response: any = await apiService.getExperienceReviews(experience.id);
+        if (response.success) {
+          setReviews(Array.isArray(response.data) ? response.data.slice(0, 3) : []);
+        }
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [experience?.id]);
 
   if (loading) {
     return (
@@ -210,24 +233,19 @@ Book this amazing experience on BoredTourist!`;
     );
   };
 
-  const reviews = [
-    {
-      id: '1',
-      author: 'Sarah M.',
-      rating: 5,
-      date: '2 days ago',
-      text: 'Absolutely loved this experience! The instructor was so knowledgeable and patient.',
-      image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80',
-    },
-    {
-      id: '2',
-      author: 'John D.',
-      rating: 5,
-      date: '1 week ago',
-      text: 'One of the best activities. Highly recommend!',
-      image: 'https://images.unsplash.com/photo-1580674684081-7617fbf3d745?w=400&q=80',
-    },
-  ];
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+  };
 
   // Prepare images for carousel - use images array or fallback to single image
   const carouselImages = experience.images && experience.images.length > 0 
@@ -381,31 +399,55 @@ Book this amazing experience on BoredTourist!`;
                 </View>
               </View>
 
-              {reviews.map((review) => (
-                <View key={review.id} style={styles.reviewCard}>
-                  <Image
-                    source={{ uri: review.image }}
-                    style={styles.reviewImage}
-                    contentFit="cover"
-                  />
-                  <View style={styles.reviewContent}>
-                    <View style={styles.reviewHeader}>
-                      <View style={styles.reviewAvatar}>
-                        <Text style={styles.reviewAvatarText}>{review.author[0]}</Text>
+              {reviewsLoading ? (
+                <Text style={styles.loadingText}>Loading reviews...</Text>
+              ) : reviews.length === 0 ? (
+                <Text style={styles.noReviewsText}>No reviews yet</Text>
+              ) : (
+                reviews.map((review) => (
+                  <View key={review.id} style={styles.reviewCard}>
+                    <View style={styles.reviewContent}>
+                      <View style={styles.reviewHeader}>
+                        <View style={styles.reviewAvatar}>
+                          <Text style={styles.reviewAvatarText}>
+                            {review.author.name[0].toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.reviewAuthor}>
+                          <View style={styles.reviewAuthorRow}>
+                            <Text style={styles.reviewName}>{review.author.name}</Text>
+                            {review.source === 'google' && (
+                              <View style={styles.googleBadge}>
+                                <Text style={styles.googleBadgeText}>Google</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.reviewDate}>{formatDate(review.created_at)}</Text>
+                        </View>
+                        <View style={styles.reviewRating}>
+                          <Star size={14} color="#FFB800" fill="#FFB800" />
+                          <Text style={styles.reviewRatingText}>{review.rating}</Text>
+                        </View>
                       </View>
-                      <View style={styles.reviewAuthor}>
-                        <Text style={styles.reviewName}>{review.author}</Text>
-                        <Text style={styles.reviewDate}>{review.date}</Text>
-                      </View>
-                      <View style={styles.reviewRating}>
-                        <Star size={14} color="#FFB800" fill="#FFB800" />
-                        <Text style={styles.reviewRatingText}>{review.rating}</Text>
-                      </View>
+                      <Text style={styles.reviewText}>{review.comment}</Text>
+                      {review.verified_purchase && (
+                        <View style={styles.verifiedBadge}>
+                          <Text style={styles.verifiedText}>✓ Verified Purchase</Text>
+                        </View>
+                      )}
                     </View>
-                    <Text style={styles.reviewText}>{review.text}</Text>
                   </View>
-                </View>
-              ))}
+                ))
+              )}
+
+              {reviews.length > 0 && (
+                <Pressable 
+                  style={styles.viewAllReviews}
+                  onPress={() => router.push(`/reviews/${experience.id}`)}
+                >
+                  <Text style={styles.viewAllReviewsText}>View All Reviews</Text>
+                </Pressable>
+              )}
             </View>
 
             <View style={{ height: 120 }} />
@@ -672,6 +714,57 @@ const styles = StyleSheet.create({
     color: colors.dark.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  loadingText: {
+    color: colors.dark.textSecondary,
+    fontSize: 14,
+    textAlign: 'center' as const,
+    padding: 20,
+  },
+  noReviewsText: {
+    color: colors.dark.textSecondary,
+    fontSize: 14,
+    textAlign: 'center' as const,
+    padding: 20,
+  },
+  reviewAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  googleBadge: {
+    backgroundColor: '#4285F4',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  googleBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600' as const,
+  },
+  verifiedBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start' as const,
+  },
+  verifiedText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  viewAllReviews: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center' as const,
+    backgroundColor: colors.dark.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  viewAllReviewsText: {
+    color: colors.dark.primary,
+    fontSize: 14,
+    fontWeight: '600' as const,
   },
   bottomBar: {
     position: 'absolute' as const,

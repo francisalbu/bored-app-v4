@@ -24,13 +24,14 @@ const errorHandler = require('./middleware/errorHandler');
 
 // Import routes
 const authRoutes = require('./routes/auth');
-// TEMPORARILY DISABLED - const supabaseAuthRoutes = require('./routes/supabaseAuth');
+const supabaseAuthRoutes = require('./routes/supabaseAuth');
 const experienceRoutes = require('./routes/experiences');
 const bookingRoutes = require('./routes/bookings');
 const profileRoutes = require('./routes/profile');
 const favoritesRoutes = require('./routes/favorites');
 const availabilityRoutes = require('./routes/availability');
 const paymentsRoutes = require('./routes/payments');
+const reviewsRoutes = require('./routes/reviews');
 
 // Initialize Express app
 const app = express();
@@ -77,13 +78,14 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-// TEMPORARILY DISABLED - app.use('/api/auth/supabase', supabaseAuthRoutes);
+app.use('/api/auth/supabase', supabaseAuthRoutes);
 app.use('/api/experiences', experienceRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 // 404 handler
 app.use((req, res) => {

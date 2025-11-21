@@ -23,7 +23,7 @@ import { useBookings } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 
-const API_URL = 'http://192.168.1.64:3000';
+const API_URL = 'http://192.168.1.136:3000';
 
 // Lista de países com códigos de telefone
 const COUNTRIES = [
@@ -71,7 +71,7 @@ export default function PaymentScreen() {
   
   const insets = useSafeAreaInsets();
   const { createBooking } = useBookings();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   
   const [couponCode, setCouponCode] = useState('');
@@ -576,7 +576,25 @@ export default function PaymentScreen() {
       </View>
       
       {/* Auth Bottom Sheet for Guest Sign In */}
-      <AuthBottomSheet visible={showAuthSheet} onClose={() => setShowAuthSheet(false)} />
+      <AuthBottomSheet 
+        visible={showAuthSheet} 
+        onClose={() => setShowAuthSheet(false)}
+        onSuccess={async () => {
+          console.log('🎉 Auth successful! Staying on payment screen...');
+          // Navigate back to this payment screen with all params
+          router.replace({
+            pathname: '/booking/payment',
+            params: {
+              experienceId,
+              slotId,
+              date,
+              time,
+              adults,
+              price,
+            },
+          });
+        }}
+      />
       
       {/* Country Selector Modal */}
       <Modal

@@ -34,14 +34,16 @@ export function useExperiences() {
       console.log('✅ Experiences fetched:', apiData.length || 0);
       
       // Transform API data to match frontend Experience type
-      const transformedExperiences = apiData.map((exp: any) => ({
-        id: exp.id.toString(),
-        title: exp.title,
-        provider: exp.operator_name || 'Local Provider',
-        providerLogo: exp.operator_logo || exp.provider_logo,
-        rating: exp.rating || 0,
-        reviewCount: exp.review_count || 0,
-        location: exp.location,
+      const transformedExperiences = apiData.map((exp: any) => {
+        console.log(`🔍 Experience ${exp.id} provider_logo:`, exp.provider_logo);
+        return {
+          id: exp.id.toString(),
+          title: exp.title,
+          provider: exp.operator_name || 'Local Provider',
+          providerLogo: exp.provider_logo || exp.operator_logo,
+          rating: exp.rating || 0,
+          reviewCount: exp.review_count || 0,
+          location: exp.location,
         distance: exp.distance || '0km away',
         price: exp.price,
         currency: exp.currency || 'EUR',
@@ -65,8 +67,9 @@ export function useExperiences() {
         latitude: exp.latitude || 0,
         longitude: exp.longitude || 0,
         maxGroupSize: exp.max_group_size,
-      }));
+      }});
       
+      console.log('✅ Transformed experiences with logos:', transformedExperiences.map(e => ({id: e.id, logo: e.providerLogo})));
       setExperiences(transformedExperiences);
     } catch (err: any) {
       console.error('❌ Error fetching experiences:', err);

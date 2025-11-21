@@ -1,7 +1,7 @@
 // API Configuration
 // Use your computer's IP address for iOS Simulator to connect to local backend
 const API_BASE_URL = __DEV__ 
-  ? 'http://192.168.1.64:3000/api' 
+  ? 'http://192.168.1.136:3000/api' 
   : 'https://your-production-api.com/api';
 
 interface ApiResponse<T> {
@@ -177,7 +177,7 @@ class ApiService {
 
   // Review APIs
   async getExperienceReviews(experienceId: string) {
-    return this.request(`/reviews/experience/${experienceId}`);
+    return this.request(`/reviews/${experienceId}`);
   }
 
   async createReview(reviewData: {

@@ -28,9 +28,10 @@ WebBrowser.maybeCompleteAuthSession();
 interface AuthBottomSheetProps {
   visible: boolean;
   onClose: () => void;
+  onSuccess?: () => void; // Optional callback for successful auth
 }
 
-export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetProps) {
+export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBottomSheetProps) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,58 +42,64 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
       setLoadingProvider('google');
       setIsLoading(true);
 
-      // Check if Google is configured in Supabase
       console.log('🔐 Starting Google Sign-In...');
       console.log('📱 Platform:', Platform.OS);
       
+      // Use the exact scheme from app.json
       const redirectUrl = Linking.createURL('auth/callback');
-      console.log('🔗 Redirect URL created:', redirectUrl);
-      console.log('🔗 Expected format: boredtravel://auth/callback');
+      console.log('🔗 Redirect URL:', redirectUrl);
       
+      // Start the OAuth flow
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: false,
+          skipBrowserRedirect: true, // We'll handle the redirect
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 
       if (error) {
         console.error('❌ OAuth error:', error);
-        console.error('❌ Error details:', JSON.stringify(error, null, 2));
         Alert.alert(
-          'Erro OAuth',
-          `${error.message}\n\nVerifique:\n1. Google OAuth configurado no Supabase\n2. Redirect URL: ${redirectUrl}`
+          'Configuration Error',
+          'Google OAuth is not configured in Supabase.\n\nPlease configure Google OAuth in Supabase Dashboard first.'
         );
         throw error;
       }
 
-      if (data.url) {
-        console.log('🌐 Opening OAuth URL:', data.url);
-        console.log('🔄 Will redirect back to:', redirectUrl);
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl
-        );
-
-        console.log('📱 OAuth result:', result);
-
-        if (result.type === 'success') {
-          console.log('✅ OAuth success! URL:', result.url);
-          onClose();
-          // Navigation will be handled by app/auth/callback.tsx
-        } else if (result.type === 'cancel') {
-          console.log('⚠️ OAuth cancelled by user');
-          Alert.alert('Cancelado', 'Login com Google cancelado');
-        } else {
-          console.log('⚠️ OAuth result type:', result.type);
-        }
+      if (!data?.url) {
+        console.error('❌ No OAuth URL returned');
+        Alert.alert('Error', 'Unable to start authentication.');
+        return;
       }
+
+      console.log('🌐 Opening OAuth URL...');
+      console.log('📍 URL:', data.url.substring(0, 100) + '...');
+      
+      // Close the modal immediately
+      onClose();
+      
+      // Store the callback for later use
+      if (onSuccess) {
+        // Store in a way that the callback screen can access it
+        (global as any).__authSuccessCallback = onSuccess;
+      }
+      
+      // Open in Safari/Chrome - the redirect will be handled by app/auth/callback.tsx
+      await Linking.openURL(data.url);
+      
+      console.log('✅ Opened OAuth URL in browser');
+      console.log('⏳ Waiting for redirect to app/auth/callback.tsx...');
+      
     } catch (error: any) {
       console.error('❌ Google sign in error:', error);
       Alert.alert(
-        'Erro', 
-        error.message || 'Falha ao entrar com Google. Verifique se o Google OAuth está configurado no Supabase.'
+        'Error', 
+        error.message || 'Failed to sign in with Google.'
       );
     } finally {
       setIsLoading(false);
@@ -101,16 +108,16 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
   };
 
   const handleAppleSignIn = async () => {
-    Alert.alert('Em breve', 'Apple sign in estará disponível em breve!');
+    Alert.alert('Coming Soon', 'Apple sign in will be available soon!');
   };
 
   const handleFacebookSignIn = async () => {
-    Alert.alert('Em breve', 'Facebook sign in estará disponível em breve!');
+    Alert.alert('Coming Soon', 'Facebook sign in will be available soon!');
   };
 
   const handleEmailContinue = () => {
     if (!email) {
-      Alert.alert('Erro', 'Por favor insira o seu email');
+      Alert.alert('Error', 'Please enter your email');
       return;
     }
 
@@ -141,25 +148,25 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
             <Pressable onPress={onClose} style={styles.closeButton}>
               <X size={24} color={colors.dark.text} />
             </Pressable>
-            <Text style={styles.headerTitle}>Entrar ou cadastrar-se</Text>
+            <Text style={styles.headerTitle}>Sign in or sign up</Text>
             <View style={{ width: 40 }} />
           </View>
 
           {/* Content */}
           <View style={styles.content}>
             <Text style={styles.subtitle}>
-              Confira ou acesse seus ingressos com mais facilidade de qualquer dispositivo com sua conta Bored Tourist.
+              Access your tickets easily from any device with your Bored Tourist account.
             </Text>
 
             {/* Social Sign In Buttons */}
             <View style={styles.socialButtons}>
-              {/* Apple Sign In - TEMPORARIAMENTE DESATIVADO */}
+              {/* Apple Sign In - TEMPORARILY DISABLED */}
               <Pressable
                 style={[styles.socialButton, styles.appleButton, { opacity: 0.5 }]}
                 disabled={true}
               >
                 <Text style={styles.appleIcon}></Text>
-                <Text style={styles.socialButtonText}>Continuar com a Apple (em breve)</Text>
+                <Text style={styles.socialButtonText}>Continue with Apple (coming soon)</Text>
               </Pressable>
 
               {/* Google Sign In */}
@@ -174,20 +181,20 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
                   <>
                     <Text style={styles.googleIcon}>G</Text>
                     <Text style={[styles.socialButtonText, styles.googleButtonText]}>
-                      Continuar com o Google
+                      Continue with Google
                     </Text>
                   </>
                 )}
               </Pressable>
 
-              {/* Facebook Sign In - TEMPORARIAMENTE DESATIVADO */}
+              {/* Facebook Sign In - TEMPORARILY DISABLED */}
               <Pressable
                 style={[styles.socialButton, styles.facebookButton, { opacity: 0.5 }]}
                 disabled={true}
               >
                 <Text style={styles.facebookIcon}>f</Text>
                 <Text style={[styles.socialButtonText, styles.facebookButtonText]}>
-                  Continuar com o Facebook (em breve)
+                  Continue with Facebook (coming soon)
                 </Text>
               </Pressable>
             </View>
@@ -195,7 +202,7 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
             {/* Divider */}
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ou</Text>
+              <Text style={styles.dividerText}>or</Text>
               <View style={styles.dividerLine} />
             </View>
 
@@ -203,7 +210,7 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
             <View style={styles.emailSection}>
               <TextInput
                 style={styles.input}
-                placeholder="Endereço de e-mail"
+                placeholder="Email address"
                 placeholderTextColor={colors.dark.textTertiary}
                 value={email}
                 onChangeText={setEmail}
@@ -218,7 +225,7 @@ export default function AuthBottomSheet({ visible, onClose }: AuthBottomSheetPro
                 onPress={handleEmailContinue}
                 disabled={!email || isLoading}
               >
-                <Text style={styles.continueButtonText}>Continuar com e-mail</Text>
+                <Text style={styles.continueButtonText}>Continue with email</Text>
               </Pressable>
             </View>
           </View>

@@ -22,14 +22,64 @@ export default function AuthCallbackScreen() {
 
   const handleCallback = async () => {
     try {
-      console.log('🔄 Auth Callback - Checking session...');
-      console.log('📍 Current URL params:', params);
+      console.log('🔄 Auth Callback - Processing OAuth redirect...');
+      console.log('📍 URL params:', JSON.stringify(params, null, 2));
       
-      // Wait a bit longer for Supabase to process the OAuth redirect
-      console.log('⏳ Waiting for Supabase to process...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Extract tokens from URL params if they exist
+      const accessToken = params.access_token as string;
+      const refreshToken = params.refresh_token as string;
+      const errorParam = params.error as string;
+      const errorDescription = params.error_description as string;
       
-      // Try to get the session multiple times if needed
+      // Check for OAuth errors
+      if (errorParam) {
+        console.error('❌ OAuth error:', errorParam);
+        console.error('❌ Error description:', errorDescription);
+        router.replace('/(tabs)/profile');
+        return;
+      }
+      
+      if (accessToken && refreshToken) {
+        console.log('🔑 Tokens found in URL params!');
+        console.log('🔄 Setting session...');
+        
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        
+        if (sessionError) {
+          console.error('❌ Error setting session:', sessionError);
+          throw sessionError;
+        }
+        
+        if (sessionData?.session) {
+          console.log('✅ Session established!');
+          console.log('📧 Email:', sessionData.session.user.email);
+          console.log('👤 User ID:', sessionData.session.user.id);
+          
+          // Sync with backend (optional, continue even if it fails)
+          try {
+            await refreshUser();
+            console.log('✅ User synced with backend!');
+          } catch (syncError) {
+            console.log('⚠️ Backend sync failed (continuing):', syncError);
+          }
+          
+          // Redirect to home
+          console.log('🏠 Redirecting to home...');
+          router.replace('/(tabs)');
+          return;
+        }
+      }
+      
+      // Fallback: No tokens in URL, check if Supabase already has a session
+      console.log('⏳ No tokens in URL, checking for existing session...');
+      
+      // Wait a moment for Supabase to process the callback
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Try to get the session multiple times
       let session = null;
       let attempts = 0;
       const maxAttempts = 3;
@@ -50,31 +100,40 @@ export default function AuthCallbackScreen() {
         }
         
         if (attempts < maxAttempts) {
-          console.log('⏳ No session yet, waiting 1s...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          console.log('⏳ No session yet, waiting 500ms...');
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
       if (session) {
-        console.log('✅ OAuth session established!');
+        console.log('✅ Found existing session!');
         console.log('📧 Email:', session.user.email);
-        console.log('👤 Supabase User ID:', session.user.id);
-        console.log('🔑 Token (first 20 chars):', session.access_token.substring(0, 20) + '...');
         
-        // Refresh user data to sync with backend
-        console.log('🔄 Syncing with backend...');
+        // Sync with backend
         try {
           await refreshUser();
-          console.log('✅ User synced! Redirecting to home...');
-          router.replace('/(tabs)');
+          console.log('✅ User synced!');
         } catch (syncError) {
-          console.error('❌ Sync error:', syncError);
-          console.log('⚠️ Continuing anyway, user may need to refresh...');
+          console.log('⚠️ Backend sync failed (continuing):', syncError);
+        }
+        
+        // Check if there's a success callback from the auth flow (e.g., from payment screen)
+        const successCallback = (global as any).__authSuccessCallback;
+        if (successCallback) {
+          console.log('📞 Found auth success callback, calling it...');
+          delete (global as any).__authSuccessCallback;
+          successCallback();
+          // Don't navigate - let the callback handle navigation
+        } else {
+          console.log('🏠 No callback found, navigating to home');
           router.replace('/(tabs)');
         }
       } else {
         console.log('⚠️ No session found after', maxAttempts, 'attempts');
-        console.log('🔍 Redirecting to profile to try manual login...');
+        console.log('🔍 This might mean:');
+        console.log('  - OAuth callback failed');
+        console.log('  - Google OAuth not configured in Supabase');
+        console.log('  - Redirect URL mismatch');
         router.replace('/(tabs)/profile');
       }
     } catch (error) {
@@ -86,7 +145,7 @@ export default function AuthCallbackScreen() {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.dark.primary} />
-      <Text style={styles.text}>A processar autenticação...</Text>
+      <Text style={styles.text}>Processing authentication...</Text>
     </View>
   );
 }

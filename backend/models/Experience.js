@@ -22,6 +22,7 @@ function parseJSON(field) {
 /**
  * Get all experiences (for feed)
  * Includes all media URLs for video display
+ * Calculates real-time rating and review count from reviews table
  */
 async function getAllExperiences(limit = 50, offset = 0) {
   const experiences = await query(`
@@ -33,11 +34,15 @@ async function getAllExperiences(limit = 50, offset = 0) {
       e.provider_logo, e.highlights, e.included, e.what_to_bring,
       e.languages, e.cancellation_policy, e.important_info,
       e.instant_booking, e.available_today, e.verified,
-      e.rating, e.review_count, e.created_at,
-      o.company_name as operator_name, o.logo_url as operator_logo
+      e.created_at,
+      o.company_name as operator_name, o.logo_url as operator_logo,
+      COALESCE(ROUND(AVG(r.rating), 1), 0) as rating,
+      COUNT(r.id) as review_count
     FROM experiences e
     LEFT JOIN operators o ON e.operator_id = o.id
+    LEFT JOIN reviews r ON e.id = r.experience_id
     WHERE e.is_active = 1
+    GROUP BY e.id
     ORDER BY e.created_at DESC
     LIMIT ? OFFSET ?
   `, [limit, offset]);
@@ -57,6 +62,7 @@ async function getAllExperiences(limit = 50, offset = 0) {
 /**
  * Get single experience by ID
  * Returns all details including media URLs
+ * Calculates real-time rating and review count from reviews table
  */
 async function getExperienceById(id) {
   const experience = await get(`
@@ -72,9 +78,20 @@ async function getExperienceById(id) {
     return null;
   }
   
+  // Calculate real rating and review count from reviews table
+  const reviewStats = await get(`
+    SELECT 
+      COUNT(*) as review_count,
+      ROUND(AVG(rating), 1) as average_rating
+    FROM reviews
+    WHERE experience_id = ?
+  `, [id]);
+  
   // Parse JSON fields
   return {
     ...experience,
+    rating: reviewStats?.average_rating || experience.rating || 0,
+    review_count: reviewStats?.review_count || 0,
     images: parseJSON(experience.images),
     tags: parseJSON(experience.tags),
     highlights: parseJSON(experience.highlights),

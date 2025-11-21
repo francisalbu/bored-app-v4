@@ -259,7 +259,7 @@ function generateBookingConfirmationHTML(booking) {
                       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                           <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            🕐 Horário
+                            🕐 Time
                           </td>
                           <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
                             ${formatTime(booking.slot_start_time)} - ${formatTime(booking.slot_end_time)}
@@ -275,7 +275,7 @@ function generateBookingConfirmationHTML(booking) {
                       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                           <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            ⏱️ Duração
+                            ⏱️ Duration
                           </td>
                           <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
                             ${booking.experience_duration}
@@ -291,10 +291,10 @@ function generateBookingConfirmationHTML(booking) {
                       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                           <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            👥 Participantes
+                            👥 Participants
                           </td>
                           <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
-                            ${booking.participants} pessoa${booking.participants > 1 ? 's' : ''}
+                            ${booking.participants} person${booking.participants > 1 ? 's' : ''}
                           </td>
                         </tr>
                       </table>
@@ -307,7 +307,7 @@ function generateBookingConfirmationHTML(booking) {
                       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                           <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #00FF8C; font-weight: 700;">
-                            💰 Valor Total
+                            💰 Total Amount
                           </td>
                           <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; color: #00FF8C; font-weight: 700;">
                             ${booking.total_amount}€
@@ -328,12 +328,12 @@ function generateBookingConfirmationHTML(booking) {
                   <tr>
                     <td style="padding: 20px;">
                       <p style="margin: 0 0 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #92400e; font-weight: 700;">
-                        📝 Informações Importantes
+                        📝 Important Information
                       </p>
                       <ul style="margin: 0; padding-left: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 22px; color: #78350f;">
-                        <li style="margin-bottom: 8px;">Chegue <strong>15 minutos antes</strong> do horário marcado</li>
-                        <li style="margin-bottom: 8px;">Guarde esta referência: <strong>${booking.booking_reference}</strong></li>
-                        <li>Em caso de dúvidas, contacte-nos através de <strong>boredtouristt@gmail.com</strong></li>
+                        <li style="margin-bottom: 8px;">Arrive <strong>15 minutes early</strong> for your scheduled time</li>
+                        <li style="margin-bottom: 8px;">Save this reference: <strong>${booking.booking_reference}</strong></li>
+                        <li>If you have any questions, contact us at <strong>boredtouristt@gmail.com</strong></li>
                       </ul>
                     </td>
                   </tr>
@@ -349,13 +349,13 @@ function generateBookingConfirmationHTML(booking) {
       <tr>
         <td style="background-color: #ffffff; padding: 30px; text-align: center; border-radius: 0 0 16px 16px; border-top: 1px solid #e2e8f0;">
           <p style="margin: 0 0 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #1a202c; font-weight: 600;">
-            Obrigado por escolher a Bored Tourist! 🎊
+            Thank you for choosing Bored Tourist! 🎊
           </p>
           <p style="margin: 0 0 16px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 20px; color: #718096;">
-            Estamos aqui para tornar a sua experiência inesquecível
+            We're here to make your experience unforgettable
           </p>
           <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #cbd5e0;">
-            © 2025 Bored Tourist. Todos os direitos reservados.
+            © 2025 Bored Tourist. All rights reserved.
           </p>
         </td>
       </tr>
@@ -398,24 +398,24 @@ async function sendBookingConfirmation(booking) {
         address: process.env.EMAIL_USER
       },
       to: booking.customer_email,
-      subject: `✅ Reserva Confirmada - ${booking.experience_title}`,
+      subject: `✅ Booking Confirmed - ${booking.experience_title}`,
       html: generateBookingConfirmationHTML(booking),
       // Plain text fallback
       text: `
-Olá ${booking.customer_name},
+Hello ${booking.customer_name},
 
-A sua reserva foi confirmada com sucesso!
+Your booking has been confirmed successfully!
 
-Experiência: ${booking.experience_title}
-Referência: ${booking.booking_reference}
-Data: ${formatDate(booking.slot_date)}
-Horário: ${formatTime(booking.slot_start_time)} - ${formatTime(booking.slot_end_time)}
-Participantes: ${booking.participants}
-Valor Total: ${booking.total_amount}€
+Experience: ${booking.experience_title}
+Reference: ${booking.booking_reference}
+Date: ${formatDate(booking.slot_date)}
+Time: ${formatTime(booking.slot_start_time)} - ${formatTime(booking.slot_end_time)}
+Participants: ${booking.participants}
+Total Amount: ${booking.total_amount}€
 
-Chegue 15 minutos antes do horário marcado.
+Please arrive 15 minutes before your scheduled time.
 
-Obrigado por escolher a Bored Tourist!
+Thank you for choosing Bored Tourist!
       `
     };
     

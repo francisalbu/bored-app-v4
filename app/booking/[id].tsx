@@ -77,42 +77,42 @@ export default function BookingScreen() {
     try {
       setIsLoading(true);
       
-      // Fetch availability for the next 6 days starting from selected date
       const schedules: DaySchedule[] = [];
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       
-      for (let i = 0; i < 6; i++) {
+      // Load next 5 days starting from selected date
+      for (let i = 0; i < 5; i++) {
         const date = new Date(selectedDate);
         date.setDate(date.getDate() + i);
         const dateStr = date.toISOString().split('T')[0];
         
-        // Fetch slots for this date
-        const response = await api.get<any>(
-          `/availability/${experience.id}?date=${dateStr}`
-        );
-        
-        console.log('API Response for', dateStr, ':', response);
-        
-        if (response.success && response.data) {
-          const apiSlots = response.data;
+        try {
+          const response = await api.get<any>(
+            `/availability/${experience.id}?date=${dateStr}`
+          );
           
-          // Transform API slots to TimeSlot format
-          const slots: TimeSlot[] = apiSlots.map((slot: any) => ({
-            id: slot.id,
-            time: formatTimeRange(slot.start_time, slot.end_time),
-            price: typeof experience.price === 'string' ? parseFloat(experience.price) : experience.price,
-            spotsAvailable: slot.available_spots,
-            startTime: slot.start_time,
-            endTime: slot.end_time,
-          }));
+          console.log('📅 Availability for', dateStr, ':', response);
           
-          if (slots.length > 0) {
+          if (response.success && response.data && response.data.length > 0) {
+            const apiSlots = response.data;
+            
+            const slots: TimeSlot[] = apiSlots.map((slot: any) => ({
+              id: slot.id,
+              time: formatTimeRange(slot.start_time, slot.end_time),
+              price: typeof experience.price === 'string' ? parseFloat(experience.price) : experience.price,
+              spotsAvailable: slot.available_spots,
+              startTime: slot.start_time,
+              endTime: slot.end_time,
+            }));
+            
             schedules.push({
               date,
               dayName: dayNames[date.getDay()],
               slots,
             });
           }
+        } catch (error) {
+          console.error(`Error loading ${dateStr}:`, error);
         }
       }
       
@@ -120,42 +120,13 @@ export default function BookingScreen() {
       setShowCalendar(false);
       
       if (schedules.length === 0) {
-        Alert.alert('No Availability', 'No time slots available for the selected dates. Please try different dates.');
+        Alert.alert('No Availability', 'No time slots available for the next 5 days starting from selected date.');
       }
     } catch (error) {
       console.error('Error fetching availability:', error);
       Alert.alert('Error', 'Failed to load availability. Please try again.');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleSelectSlot = (schedule: DaySchedule, slot: TimeSlot) => {
-    setSelectedSlot({ schedule, slot });
-  };
-
-  const handleBook = () => {
-    if (selectedSlot) {
-      // Validate that adults doesn't exceed available spots
-      if (adults > selectedSlot.slot.spotsAvailable) {
-        Alert.alert(
-          'Not Enough Spots',
-          `Sorry, only ${selectedSlot.slot.spotsAvailable} spot${selectedSlot.slot.spotsAvailable > 1 ? 's are' : ' is'} available for this time slot. Please select fewer guests or choose a different time.`
-        );
-        return;
-      }
-
-      router.push({
-        pathname: '/booking/payment' as any,
-        params: {
-          experienceId: experience.id,
-          slotId: selectedSlot.slot.id.toString(),
-          date: selectedSlot.schedule.date.toISOString(),
-          time: selectedSlot.slot.time,
-          adults: adults.toString(),
-          price: selectedSlot.slot.price.toString(),
-        },
-      });
     }
   };
 
@@ -169,12 +140,10 @@ export default function BookingScreen() {
 
     const days: (number | null)[] = [];
     
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
     
-    // Add all days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
@@ -225,6 +194,35 @@ export default function BookingScreen() {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
 
+  const handleSelectSlot = (schedule: DaySchedule, slot: TimeSlot) => {
+    setSelectedSlot({ schedule, slot });
+  };
+
+  const handleBook = () => {
+    if (selectedSlot) {
+      // Validate that adults doesn't exceed available spots
+      if (adults > selectedSlot.slot.spotsAvailable) {
+        Alert.alert(
+          'Not Enough Spots',
+          `Sorry, only ${selectedSlot.slot.spotsAvailable} spot${selectedSlot.slot.spotsAvailable > 1 ? 's are' : ' is'} available for this time slot. Please select fewer guests or choose a different time.`
+        );
+        return;
+      }
+
+      router.push({
+        pathname: '/booking/payment' as any,
+        params: {
+          experienceId: experience.id,
+          slotId: selectedSlot.slot.id.toString(),
+          date: selectedSlot.schedule.date.toISOString(),
+          time: selectedSlot.slot.time,
+          adults: adults.toString(),
+          price: selectedSlot.slot.price.toString(),
+        },
+      });
+    }
+  };
+
   const days = getDaysInMonth(currentMonth);
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -240,6 +238,8 @@ export default function BookingScreen() {
               router.back();
             } else {
               setShowCalendar(true);
+              setAvailability([]);
+              setSelectedSlot(null);
             }
           }} 
           style={styles.backButton}
@@ -261,10 +261,7 @@ export default function BookingScreen() {
             <View style={styles.section}>
               <View style={styles.sectionRow}>
                 <View>
-                  <Text style={styles.adultsLabel}>1 adult</Text>
-                  <Pressable>
-                    <Text style={styles.addChildren}>Add children</Text>
-                  </Pressable>
+                  <Text style={styles.adultsLabel}>{adults} adult{adults > 1 ? 's' : ''}</Text>
                 </View>
                 <View style={styles.counter}>
                   <Pressable
@@ -403,7 +400,7 @@ export default function BookingScreen() {
       {!showCalendar && selectedSlot && (
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <Pressable style={styles.bookButton} onPress={handleBook}>
-            <Text style={styles.bookButtonText}>Continue</Text>
+            <Text style={styles.bookButtonText}>Continue - €{selectedSlot.slot.price * adults}</Text>
           </Pressable>
         </View>
       )}
@@ -665,6 +662,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
     color: colors.dark.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.dark.textSecondary,
+    marginTop: 12,
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: colors.dark.textSecondary,
+    textAlign: 'center',
   },
   errorText: {
     fontSize: 16,

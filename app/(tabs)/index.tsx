@@ -1,10 +1,10 @@
-import { Image } from 'expo-image';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
 import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -19,6 +19,7 @@ import {
   Platform,
   ViewToken,
   Share,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,6 +28,7 @@ import { type Experience } from '@/constants/experiences';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExperiences } from '@/hooks/useExperiences';
+import apiService from '@/services/api';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -95,7 +97,7 @@ export default function FeedScreen() {
           isActive={index === currentIndex}
           isSaved={isSaved(item.id)}
           onAIChatPress={() => setShowAIChat(true)}
-          onReviewsPress={() => router.push(`/reviews/${item.id}`)}
+          onReviewsPress={() => setShowReviews(true)}
           onSavePress={() => handleSave(item.id)}
         />
       </View>
@@ -266,7 +268,7 @@ Book this amazing experience on BoredTourist!`;
       {experience.video ? (
         <>
           {!videoReady && (
-            <Image
+            <ExpoImage
               source={{ uri: experience.image }}
               style={styles.cardImage}
               contentFit="cover"
@@ -292,7 +294,7 @@ Book this amazing experience on BoredTourist!`;
           />
         </>
       ) : (
-        <Image
+        <ExpoImage
           source={{ uri: experience.image }}
           style={styles.cardImage}
           contentFit="cover"
@@ -313,9 +315,11 @@ Book this amazing experience on BoredTourist!`;
             <View style={styles.providerRow}>
               {experience.providerLogo ? (
                 <Image
-                  source={experience.providerLogo}
+                  source={{ uri: experience.providerLogo }}
                   style={styles.providerLogoImage}
-                  contentFit="cover"
+                  resizeMode="cover"
+                  onError={(e) => console.log('❌ Logo failed to load:', experience.providerLogo, e.nativeEvent.error)}
+                  onLoad={() => console.log('✅ Logo loaded:', experience.providerLogo)}
                 />
               ) : (
                 <View style={styles.providerAvatar}>
@@ -681,11 +685,48 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     fontSize: 14,
   },
+  statsContainer: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
+  },
+  averageRatingBox: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  averageRatingNumber: {
+    fontSize: 48,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  totalReviewsText: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyReviewsText: {
+    color: colors.dark.textSecondary,
+    fontSize: 16,
+  },
   reviewsContainer: {
     padding: 16,
   },
   reviewCard: {
     marginBottom: 20,
+    padding: 16,
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
   },
   reviewImage: {
     width: '100%',
@@ -697,7 +738,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   reviewAvatar: {
     width: 40,
@@ -715,6 +756,11 @@ const styles = StyleSheet.create({
   reviewAuthor: {
     flex: 1,
   },
+  reviewAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   reviewName: {
     color: colors.dark.text,
     fontSize: 15,
@@ -723,6 +769,7 @@ const styles = StyleSheet.create({
   reviewDate: {
     color: colors.dark.textSecondary,
     fontSize: 12,
+    marginTop: 2,
   },
   reviewRating: {
     flexDirection: 'row',
@@ -737,6 +784,27 @@ const styles = StyleSheet.create({
   reviewText: {
     color: colors.dark.textSecondary,
     fontSize: 14,
+    lineHeight: 20,
+  },
+  googleBadge: {
+    backgroundColor: '#4285F4',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  googleBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600' as const,
+  },
+  verifiedBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  verifiedText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '600' as const,
     lineHeight: 20,
   },
   // AI Modal Styles
@@ -1319,32 +1387,44 @@ interface ReviewsModalProps {
 }
 
 function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
-  const reviews = [
-    {
-      id: '1',
-      author: 'Sarah M.',
-      rating: 5,
-      date: '2 days ago',
-      text: 'Absolutely loved this experience! The instructor was so knowledgeable and patient. I created something I am really proud of.',
-      image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80',
-    },
-    {
-      id: '2',
-      author: 'John D.',
-      rating: 5,
-      date: '1 week ago',
-      text: 'One of the best activities I have done in Lisbon. Highly recommend to anyone visiting!',
-      image: 'https://images.unsplash.com/photo-1580674684081-7617fbf3d745?w=400&q=80',
-    },
-    {
-      id: '3',
-      author: 'Emma K.',
-      rating: 4,
-      date: '2 weeks ago',
-      text: 'Great experience overall. The location was easy to find and the whole process was smooth.',
-      image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80',
-    },
-  ];
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    if (visible && experience.id) {
+      fetchReviews();
+    }
+  }, [visible, experience.id]);
+
+  const fetchReviews = async () => {
+    setLoading(true);
+    try {
+      const response: any = await apiService.getExperienceReviews(experience.id);
+      if (response.success) {
+        setReviews(Array.isArray(response.data) ? response.data : []);
+        setStats(response.stats || null);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+  };
 
   return (
     <Modal
@@ -1358,36 +1438,77 @@ function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              Reviews ({experience.reviewCount})
+              Reviews ({stats?.total_reviews || experience.reviewCount || 0})
             </Text>
             <Pressable style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>✕</Text>
             </Pressable>
           </View>
-          <ScrollView style={styles.reviewsContainer}>
-            {reviews.map((review) => (
-              <View key={review.id} style={styles.reviewCard}>
-                <Image
-                  source={{ uri: review.image }}
-                  style={styles.reviewImage}
-                  contentFit="cover"
-                />
-                <View style={styles.reviewHeader}>
-                  <View style={styles.reviewAvatar}>
-                    <Text style={styles.reviewAvatarText}>{review.author[0]}</Text>
-                  </View>
-                  <View style={styles.reviewAuthor}>
-                    <Text style={styles.reviewName}>{review.author}</Text>
-                    <Text style={styles.reviewDate}>{review.date}</Text>
-                  </View>
-                  <View style={styles.reviewRating}>
-                    <Star size={16} color="#FFB800" fill="#FFB800" />
-                    <Text style={styles.reviewRatingText}>{review.rating}</Text>
-                  </View>
+
+          {stats && (
+            <View style={styles.statsContainer}>
+              <View style={styles.averageRatingBox}>
+                <Text style={styles.averageRatingNumber}>{stats.average_rating}</Text>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star 
+                      key={star} 
+                      size={16} 
+                      color="#FFB800" 
+                      fill={star <= Math.round(stats.average_rating) ? "#FFB800" : "transparent"} 
+                    />
+                  ))}
                 </View>
-                <Text style={styles.reviewText}>{review.text}</Text>
+                <Text style={styles.totalReviewsText}>
+                  {stats.total_reviews} review{stats.total_reviews !== 1 ? 's' : ''}
+                </Text>
               </View>
-            ))}
+            </View>
+          )}
+
+          <ScrollView style={styles.reviewsContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading reviews...</Text>
+              </View>
+            ) : reviews.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyReviewsText}>No reviews yet</Text>
+              </View>
+            ) : (
+              reviews.map((review) => (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewAvatar}>
+                      <Text style={styles.reviewAvatarText}>
+                        {review.author.name[0].toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.reviewAuthor}>
+                      <View style={styles.reviewAuthorRow}>
+                        <Text style={styles.reviewName}>{review.author.name}</Text>
+                        {review.source === 'google' && (
+                          <View style={styles.googleBadge}>
+                            <Text style={styles.googleBadgeText}>Google</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.reviewDate}>{formatDate(review.created_at)}</Text>
+                    </View>
+                    <View style={styles.reviewRating}>
+                      <Star size={16} color="#FFB800" fill="#FFB800" />
+                      <Text style={styles.reviewRatingText}>{review.rating}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.reviewText}>{review.comment}</Text>
+                  {review.verified_purchase && (
+                    <View style={styles.verifiedBadge}>
+                      <Text style={styles.verifiedText}>✓ Verified Purchase</Text>
+                    </View>
+                  )}
+                </View>
+              ))
+            )}
           </ScrollView>
         </View>
       </View>
