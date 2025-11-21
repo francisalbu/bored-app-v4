@@ -7,7 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const { param, validationResult } = require('express-validator');
-const { query, get } = require('../config/database');
+const { from } = require('../config/database');
 
 /**
  * GET /api/availability/:experienceId
@@ -33,55 +33,50 @@ router.get('/:experienceId',
       }
       
       const { experienceId } = req.params;
-      const { date, from, to } = req.query;
+      const { date, from: fromDate, to: toDate } = req.query;
       
-      console.log('📅 Availability request:', { experienceId, date, from, to });
+      console.log('📅 Availability request:', { experienceId, date, fromDate, toDate });
       
-      let sql = `
-        SELECT 
-          id,
-          experience_id,
-          date,
-          start_time,
-          end_time,
-          max_participants,
-          booked_participants,
-          (max_participants - booked_participants) as available_spots,
-          is_available
-        FROM availability_slots
-        WHERE experience_id = ?
-      `;
-      
-      const params = [experienceId];
+      // Build Supabase query
+      let query = from('availability_slots')
+        .select('id, experience_id, date, start_time, end_time, max_participants, booked_participants, is_available')
+        .eq('experience_id', experienceId)
+        .eq('is_available', true);
       
       // Filter by specific date
       if (date) {
-        sql += ' AND date = ?';
-        params.push(date);
+        query = query.eq('date', date);
       }
       // Filter by date range
-      else if (from && to) {
-        sql += ' AND date BETWEEN ? AND ?';
-        params.push(from, to);
+      else if (fromDate && toDate) {
+        query = query.gte('date', fromDate).lte('date', toDate);
       }
       // Default: only show future slots
       else {
-        sql += ' AND date >= date("now")';
+        const today = new Date().toISOString().split('T')[0];
+        query = query.gte('date', today);
       }
       
-      // Only show available slots
-      sql += ' AND is_available = 1';
+      query = query.order('date', { ascending: true }).order('start_time', { ascending: true });
       
-      sql += ' ORDER BY date ASC, start_time ASC';
+      console.log('🔍 Fetching from Supabase...');
       
-      console.log('🔍 Executing SQL:', sql);
-      console.log('🔍 With params:', params);
+      const { data: slots, error } = await query;
       
-      const slots = await query(sql, params);
+      if (error) {
+        console.error('❌ Supabase error:', error);
+        throw error;
+      }
       
-      console.log('✅ Found slots:', slots.length);
-      if (slots.length > 0) {
-        console.log('📋 First slot:', slots[0]);
+      // Calculate available_spots for each slot
+      const slotsWithSpots = slots.map(slot => ({
+        ...slot,
+        available_spots: slot.max_participants - slot.booked_participants
+      }));
+      
+      console.log('✅ Found slots:', slotsWithSpots.length);
+      if (slotsWithSpots.length > 0) {
+        console.log('📋 First slot:', slotsWithSpots[0]);
       }
       
       // Filter out slots that are less than 3 hours from now
@@ -90,7 +85,7 @@ router.get('/:experienceId',
       const now = new Date();
       const THREE_HOURS_IN_MS = 3 * 60 * 60 * 1000;
       
-      const availableSlots = slots.filter(slot => {
+      const availableSlots = slotsWithSpots.filter(slot => {
         // Combine date and start_time to get the full datetime
         const slotDateTime = new Date(`${slot.date}T${slot.start_time}`);
         const timeUntilSlot = slotDateTime - now;
@@ -139,28 +134,34 @@ router.get('/slot/:slotId',
       
       const { slotId } = req.params;
       
-      const slot = await get(`
-        SELECT 
-          s.*,
-          (s.max_participants - s.booked_participants) as available_spots,
-          e.title as experience_title,
-          e.price as experience_price,
-          e.currency as experience_currency
-        FROM availability_slots s
-        LEFT JOIN experiences e ON s.experience_id = e.id
-        WHERE s.id = ?
-      `, [slotId]);
+      const { data: slot, error } = await from('availability_slots')
+        .select(`
+          *,
+          experiences(title, price, currency)
+        `)
+        .eq('id', slotId)
+        .single();
       
-      if (!slot) {
+      if (error || !slot) {
         return res.status(404).json({
           success: false,
           message: 'Availability slot not found'
         });
       }
       
+      // Calculate available spots and flatten experience data
+      const formattedSlot = {
+        ...slot,
+        available_spots: slot.max_participants - slot.booked_participants,
+        experience_title: slot.experiences?.title,
+        experience_price: slot.experiences?.price,
+        experience_currency: slot.experiences?.currency
+      };
+      delete formattedSlot.experiences; // Remove nested object
+      
       res.json({
         success: true,
-        data: slot
+        data: formattedSlot
       });
     } catch (error) {
       next(error);

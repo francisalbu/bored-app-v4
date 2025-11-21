@@ -87,10 +87,26 @@ export default function PaymentScreen() {
   const [guestPhone, setGuestPhone] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]); // Portugal por defeito
   const [showCountryModal, setShowCountryModal] = useState(false);
-  const [showGuestForm, setShowGuestForm] = useState(false);
   
   // Auth bottom sheet
   const [showAuthSheet, setShowAuthSheet] = useState(false);
+  
+  // Auto-fill user info when logged in
+  useEffect(() => {
+    if (user) {
+      setGuestName(user.name || '');
+      setGuestEmail(user.email || '');
+      setGuestPhone(user.phone?.replace(/^\+\d+/, '') || ''); // Remove country code
+      
+      // Try to find user's country from phone
+      if (user.phone) {
+        const matchedCountry = COUNTRIES.find(c => user.phone?.startsWith(c.dialCode));
+        if (matchedCountry) {
+          setSelectedCountry(matchedCountry);
+        }
+      }
+    }
+  }, [user]);
   
   // Validation states with debounce
   const [emailError, setEmailError] = useState('');
@@ -465,13 +481,32 @@ export default function PaymentScreen() {
           <Text style={styles.totalValue}>€{totalPrice.toFixed(2)}</Text>
         </View>
 
-        {/* Guest Checkout Form */}
-        {!user && (
-          <View style={styles.guestSection}>
+        {/* Contact Information Form */}
+        <View style={styles.guestSection}>
+          <View style={styles.sectionHeader}>
             <Text style={styles.guestTitle}>Contact Information</Text>
-            <Text style={styles.guestSubtitle}>
-              We'll send your booking confirmation to this email
-            </Text>
+            {user && (
+              <View style={styles.authBadge}>
+                <Text style={styles.authBadgeText}>✓ Signed in</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.guestSubtitle}>
+            {user 
+              ? 'Your booking will be saved to your account' 
+              : "We'll send your booking confirmation to this email"}
+          </Text>
+          
+          {!user && (
+            <View style={styles.loginPromptTop}>
+              <Text style={styles.loginPromptText}>
+                Already have an account?{' '}
+              </Text>
+              <Pressable onPress={() => setShowAuthSheet(true)}>
+                <Text style={styles.loginLink}>Sign in</Text>
+              </Pressable>
+            </View>
+          )}
             
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Full Name *</Text>
@@ -533,17 +568,7 @@ export default function PaymentScreen() {
                 <Text style={styles.validationError}>{phoneError}</Text>
               )}
             </View>
-
-            <View style={styles.loginPrompt}>
-              <Text style={styles.loginPromptText}>
-                Already have an account?{' '}
-              </Text>
-              <Pressable onPress={() => setShowAuthSheet(true)}>
-                <Text style={styles.loginLink}>Sign in</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
+        </View>
 
         {/* Info */}
         <View style={styles.infoBox}>
@@ -856,6 +881,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#EF4444',
     marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  authBadge: {
+    backgroundColor: colors.dark.primary + '20',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  authBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.dark.primary,
+  },
+  loginPromptTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.dark.border,
   },
   loginPrompt: {
     flexDirection: 'row',
