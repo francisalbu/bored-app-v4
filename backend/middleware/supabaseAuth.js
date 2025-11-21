@@ -1,10 +1,10 @@
 /**
  * Supabase Authentication Middleware
- * Validates Supabase JWT tokens and syncs users with local database
+ * Validates Supabase JWT tokens and syncs users with Supabase database
  */
 
 const { createClient } = require('@supabase/supabase-js');
-const { getDB } = require('../config/database');
+const { from } = require('../config/database');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://hnivuisqktlrusyqywaz.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
@@ -31,110 +31,86 @@ async function verifySupabaseToken(token) {
 }
 
 /**
- * Sync Supabase user with local database
- * Creates or updates user in bored_tourist.db
+ * Sync Supabase user with Supabase database
+ * Creates or updates user in users table
  */
 async function syncUserToLocalDB(supabaseUser) {
-  console.log('🔄 [SYNC START] Syncing user to local DB');
+  console.log('🔄 [SYNC START] Syncing user to Supabase DB');
   console.log('🔄 [SYNC] Supabase User ID:', supabaseUser.id);
   console.log('🔄 [SYNC] Email:', supabaseUser.email);
   console.log('🔄 [SYNC] User Metadata:', JSON.stringify(supabaseUser.user_metadata));
   
-  return new Promise((resolve, reject) => {
-    console.log('🔄 [SYNC] Promise created, about to query database...');
+  try {
+    // Check if user exists by supabase_uid
+    const { data: existingUser, error: fetchError } = await from('users')
+      .select('*')
+      .eq('supabase_uid', supabaseUser.id)
+      .single();
     
-    const db = getDB(); // Get database instance
-    console.log('🔄 [SYNC] Got database instance');
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('❌ [SYNC ERROR] Error checking user:', fetchError);
+      throw fetchError;
+    }
     
-    // Check if user exists in local DB by supabase_uid
-    console.log('🔄 [SYNC] Executing db.get() with supabase_uid:', supabaseUser.id);
-    
-    db.get(
-      'SELECT * FROM users WHERE supabase_uid = ?',
-      [supabaseUser.id],
-      (err, existingUser) => {
-        console.log('🔄 [SYNC] db.get() callback fired!');
-        
-        if (err) {
-          console.error('❌ [SYNC ERROR] Error checking user in local DB:', err);
-          console.error('❌ [SYNC ERROR] Error message:', err.message);
-          console.error('❌ [SYNC ERROR] Error stack:', err.stack);
-          return reject(err);
-        }
-
-        console.log('🔄 [SYNC] Query successful. Existing user:', existingUser ? 'YES' : 'NO');
-        
-        if (existingUser) {
-          console.log('✅ [SYNC] User exists - updating last login for ID:', existingUser.id);
-          
-          // User exists - update last login
-          db.run(
-            'UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [existingUser.id],
-            (updateErr) => {
-              console.log('🔄 [SYNC] db.run() UPDATE callback fired!');
-              
-              if (updateErr) {
-                console.error('❌ [SYNC ERROR] Error updating user:', updateErr);
-                console.error('❌ [SYNC ERROR] Update error message:', updateErr.message);
-                return reject(updateErr);
-              }
-              
-              console.log('✅ [SYNC SUCCESS] User synced from local DB:', existingUser.email);
-              resolve(existingUser);
-            }
-          );
-        } else {
-          console.log('📝 [SYNC] User does not exist - creating new user');
-          
-          // User doesn't exist - create in local DB
-          const email = supabaseUser.email;
-          const name = supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0];
-          const phone = supabaseUser.user_metadata?.phone || null;
-
-          console.log('📝 [SYNC] Prepared user data:', { 
-            email, 
-            name, 
-            phone, 
-            supabase_uid: supabaseUser.id 
-          });
-          console.log('📝 [SYNC] About to execute INSERT statement...');
-
-          db.run(
-            `INSERT INTO users (supabase_uid, email, name, phone, password, created_at, updated_at) 
-             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-            [supabaseUser.id, email, name, phone, 'SUPABASE_AUTH'],
-            function(insertErr) {
-              console.log('🔄 [SYNC] db.run() INSERT callback fired!');
-              console.log('🔄 [SYNC] this.lastID:', this.lastID);
-              console.log('🔄 [SYNC] this.changes:', this.changes);
-              
-              if (insertErr) {
-                console.error('❌ [SYNC ERROR] Error creating user in local DB:', insertErr);
-                console.error('❌ [SYNC ERROR] Insert error message:', insertErr.message);
-                console.error('❌ [SYNC ERROR] Insert error code:', insertErr.code);
-                console.error('❌ [SYNC ERROR] Insert error stack:', insertErr.stack);
-                return reject(insertErr);
-              }
-
-              const newUser = {
-                id: this.lastID,
-                supabase_uid: supabaseUser.id,
-                email,
-                name,
-                phone
-              };
-
-              console.log('✅ [SYNC SUCCESS] User created in local DB!');
-              console.log('✅ [SYNC SUCCESS] Email:', newUser.email);
-              console.log('✅ [SYNC SUCCESS] Local DB ID:', newUser.id);
-              resolve(newUser);
-            }
-          );
-        }
+    if (existingUser) {
+      console.log('✅ [SYNC] User exists - updating last login for ID:', existingUser.id);
+      
+      // User exists - update timestamp
+      const { error: updateError } = await from('users')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', existingUser.id);
+      
+      if (updateError) {
+        console.error('❌ [SYNC ERROR] Error updating user:', updateError);
+        throw updateError;
       }
-    );
-  });
+      
+      console.log('✅ [SYNC SUCCESS] User synced from database:', existingUser.email);
+      return existingUser;
+    } else {
+      console.log('📝 [SYNC] User does not exist - creating new user');
+      
+      // User doesn't exist - create in Supabase
+      const email = supabaseUser.email;
+      const name = supabaseUser.user_metadata?.full_name || 
+                   supabaseUser.user_metadata?.name || 
+                   supabaseUser.email?.split('@')[0];
+      const phone = supabaseUser.user_metadata?.phone || null;
+      
+      console.log('📝 [SYNC] Prepared user data:', { 
+        email, 
+        name, 
+        phone, 
+        supabase_uid: supabaseUser.id 
+      });
+      
+      const { data: newUser, error: insertError } = await from('users')
+        .insert({
+          supabase_uid: supabaseUser.id,
+          email,
+          name,
+          phone,
+          password: 'SUPABASE_AUTH',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('❌ [SYNC ERROR] Error creating user:', insertError);
+        throw insertError;
+      }
+      
+      console.log('✅ [SYNC SUCCESS] User created in database!');
+      console.log('✅ [SYNC SUCCESS] Email:', newUser.email);
+      console.log('✅ [SYNC SUCCESS] DB ID:', newUser.id);
+      return newUser;
+    }
+  } catch (error) {
+    console.error('❌ [SYNC ERROR] Unexpected error:', error);
+    throw error;
+  }
 }
 
 /**
