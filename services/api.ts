@@ -2,7 +2,7 @@
 // Use your computer's IP address for iOS Simulator to connect to local backend
 const API_BASE_URL = __DEV__ 
   ? 'http://192.168.1.136:3000/api' 
-  : 'https://your-production-api.com/api';
+  : 'https://bored-tourist-api.onrender.com/api';
 
 interface ApiResponse<T> {
   success: boolean;

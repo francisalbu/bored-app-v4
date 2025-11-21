@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const backendURL = __DEV__ 
             ? 'http://192.168.1.136:3000/api' 
-            : 'https://your-production-api.com/api';
+            : 'https://bored-tourist-api.onrender.com/api';
 
           const response = await fetch(`${backendURL}/auth/supabase/me`, {
             method: 'GET',
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const backendURL = __DEV__ 
             ? 'http://192.168.1.136:3000/api' 
-            : 'https://your-production-api.com/api';
+            : 'https://bored-tourist-api.onrender.com/api';
 
           const response = await fetch(`${backendURL}/auth/supabase/me`, {
             method: 'GET',
@@ -208,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabaseToken = authData.session.access_token;
       const backendURL = __DEV__ 
         ? 'http://192.168.1.136:3000/api' 
-        : 'https://your-production-api.com/api';
+        : 'https://bored-tourist-api.onrender.com/api';
       
       console.log('📡 Calling backend:', `${backendURL}/auth/supabase/login`);
 
@@ -292,7 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const backendURL = __DEV__ 
         ? 'http://192.168.1.136:3000/api' 
-        : 'https://your-production-api.com/api';
+        : 'https://bored-tourist-api.onrender.com/api';
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
@@ -453,7 +453,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Sync with backend
       const backendURL = __DEV__ 
         ? 'http://192.168.1.136:3000/api' 
-        : 'https://your-production-api.com/api';
+        : 'https://bored-tourist-api.onrender.com/api';
 
       console.log('📡 Calling backend:', `${backendURL}/auth/supabase/me`);
 
