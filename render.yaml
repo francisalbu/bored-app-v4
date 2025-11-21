@@ -1,0 +1,25 @@
+services:
+  # Backend API Server
+  - type: web
+    name: bored-tourist-api
+    env: node
+    region: frankfurt  # ou oregon, singapore
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_PATH
+        value: /opt/render/project/src/backend/bored_tourist.db
+      - key: SUPABASE_URL
+        sync: false  # Configurar manualmente no dashboard
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false  # Configurar manualmente no dashboard
+      - key: JWT_SECRET
+        generateValue: true  # Render gera automaticamente
+      - key: CORS_ORIGIN
+        value: "*"  # Ou específico: "exp://your-app"
+    healthCheckPath: /api/experiences
