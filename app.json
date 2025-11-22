@@ -2,14 +2,14 @@
   "expo": {
     "name": "Bored Tourist",
     "slug": "bored-tourist",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "https://storage.googleapis.com/bored_tourist_media/images/Icons/appstore.png",
     "scheme": "boredtourist",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "https://storage.googleapis.com/bored_tourist_media/images/Icons/appstore.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
