@@ -23,8 +23,8 @@ import { useBookings } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 
-const API_URL = __DEV__ 
-  ? 'http://192.168.1.136:3000' 
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__
+  ? 'http://192.168.1.145:3000' 
   : 'https://bored-tourist-api.onrender.com';
 
 // Lista de países com códigos de telefone

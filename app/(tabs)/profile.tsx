@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   logoutButton: {
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.error,
   },
   content: {
@@ -401,12 +401,12 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     fontSize: 40,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   name: {
     fontSize: 24,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 4,
   },
@@ -434,12 +434,12 @@ const styles = StyleSheet.create({
   },
   levelText: {
     fontSize: 14,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   title: {
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.accent,
   },
   progressContainer: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 24,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
     marginBottom: 4,
   },
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
   },
   sectionCount: {
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
   },
   savedButtonTitle: {
     fontSize: 16,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 4,
   },
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
   },
   badgeName: {
     fontSize: 13,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 4,
     textAlign: 'center' as const,
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.dark.primary,
     marginTop: 4,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
   },
   lockedText: {
     fontSize: 10,
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
   },
   statRowValue: {
     fontSize: 16,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   emptyState: {
@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
   },
   guestContainer: {
@@ -662,7 +662,7 @@ const styles = StyleSheet.create({
   },
   guestTitle: {
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 12,
   },

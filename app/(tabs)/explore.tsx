@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 16,
     paddingHorizontal: 16,
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 13,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.textSecondary,
   },
   categoryNameActive: {
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   },
   trendingBadgeText: {
     fontSize: 10,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.background,
   },
   trendingContent: {
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   trendingTitle: {
     fontSize: 16,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 6,
   },
@@ -313,12 +313,12 @@ const styles = StyleSheet.create({
   },
   trendingRating: {
     fontSize: 13,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
   },
   trendingPrice: {
     fontSize: 16,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   grid: {
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 4,
     height: 36,
@@ -359,12 +359,12 @@ const styles = StyleSheet.create({
   },
   cardRating: {
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
   },
   cardPrice: {
     fontSize: 14,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   centerContainer: {

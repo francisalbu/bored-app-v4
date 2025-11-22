@@ -24,6 +24,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import colors from '@/constants/colors';
+import typography from '@/constants/typography';
 import { type Experience } from '@/constants/experiences';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -350,11 +351,11 @@ Book this amazing experience on BoredTourist!`;
               </Text>
             </View>
             
-            <Pressable 
+            <Pressable
               style={styles.bookButton}
               onPress={() => router.push(`/booking/${experience.id}`)}
             >
-              <Text style={styles.bookButtonText}>Book Now</Text>
+              <Text style={styles.bookButtonText}>BOOK NOW</Text>
             </Pressable>
           </Pressable>
 
@@ -404,12 +405,12 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.dark.text,
     fontSize: 18,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   errorText: {
     color: '#FF6B6B',
     fontSize: 18,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
     textAlign: 'center' as const,
     marginBottom: 8,
   },
@@ -421,7 +422,7 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.dark.text,
     fontSize: 18,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
     textAlign: 'center' as const,
     marginBottom: 8,
   },
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
   filterText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
   },
   filterTextActive: {
     color: 'rgba(255, 255, 255, 1)',
@@ -504,7 +505,9 @@ const styles = StyleSheet.create({
   infoCard: {
     backgroundColor: 'transparent',
     borderRadius: 16,
-    padding: 10,
+    paddingTop: 220,
+    paddingHorizontal: 10,
+    paddingBottom: 10,
     marginBottom: 12,
   },
   sideActions: {
@@ -517,8 +520,8 @@ const styles = StyleSheet.create({
   },
   sideActionLabel: {
     color: colors.dark.text,
-    fontSize: 10,
-    fontWeight: '600' as const,
+    fontSize: 11,
+    fontWeight: '900' as const,
     textShadowColor: 'rgba(0, 0, 0, 0.7)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -526,13 +529,14 @@ const styles = StyleSheet.create({
   providerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    gap: 6,
+    marginBottom: 8,
+    marginTop: 8,
   },
   providerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.dark.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -540,27 +544,27 @@ const styles = StyleSheet.create({
     borderColor: colors.dark.text,
   },
   providerLogoImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.dark.text,
   },
   providerInitial: {
     color: colors.dark.background,
-    fontSize: 14,
-    fontWeight: '700' as const,
+    fontSize: 12,
+    fontWeight: '900' as const,
   },
   providerName: {
     color: colors.dark.text,
-    fontSize: 14,
-    fontWeight: '700' as const,
+    fontSize: 13,
+    fontWeight: '900' as const,
   },
   title: {
-    fontSize: 15,
-    fontWeight: '600' as const,
+    fontSize: 18,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 6,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   metaRow: {
     flexDirection: 'row',
@@ -576,32 +580,34 @@ const styles = StyleSheet.create({
   metaText: {
     color: colors.dark.textSecondary,
     fontSize: 12,
-    fontWeight: '500' as const,
+    fontFamily: typography.fonts.regular,
   },
   metaDivider: {
     color: colors.dark.textTertiary,
     fontSize: 12,
   },
   price: {
-    color: '#00FF8C',
-    fontSize: 16,
-    fontWeight: '700' as const,
+    color: colors.dark.primary,
+    fontSize: 20,
+    fontWeight: '900' as const,
   },
   priceUnit: {
-    fontSize: 11,
-    color: '#00FF8C',
-    fontWeight: '600' as const,
+    fontSize: 13,
+    color: colors.dark.primary,
+    fontWeight: '700' as const,
   },
   bookButton: {
     backgroundColor: colors.dark.primary,
-    paddingVertical: 12,
-    borderRadius: 22,
+    paddingVertical: 14,
+    borderRadius: 25,
     alignItems: 'center',
   },
   bookButtonText: {
     color: colors.dark.background,
-    fontSize: 14,
-    fontWeight: '700' as const,
+    fontSize: 15,
+    fontWeight: '900' as const,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
   },
   noExperiences: {
     color: colors.dark.textSecondary,
@@ -682,7 +688,7 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: colors.dark.background,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
     fontSize: 14,
   },
   statsContainer: {
@@ -764,7 +770,7 @@ const styles = StyleSheet.create({
   reviewName: {
     color: colors.dark.text,
     fontSize: 15,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   reviewDate: {
     color: colors.dark.textSecondary,
@@ -779,7 +785,7 @@ const styles = StyleSheet.create({
   reviewRatingText: {
     color: '#FFB800',
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   reviewText: {
     color: colors.dark.textSecondary,
@@ -795,7 +801,7 @@ const styles = StyleSheet.create({
   googleBadgeText: {
     color: 'white',
     fontSize: 10,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   verifiedBadge: {
     marginTop: 8,
@@ -804,7 +810,7 @@ const styles = StyleSheet.create({
   verifiedText: {
     color: '#10B981',
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
     lineHeight: 20,
   },
   // AI Modal Styles
@@ -871,7 +877,7 @@ const styles = StyleSheet.create({
   aiCloseButtonText: {
     fontSize: 20,
     color: colors.dark.textSecondary,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   aiChatContainer: {
     paddingHorizontal: 20,
@@ -893,7 +899,7 @@ const styles = StyleSheet.create({
   },
   quickQuestionsTitle: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
     color: colors.dark.text,
     marginBottom: 12,
   },
@@ -911,7 +917,7 @@ const styles = StyleSheet.create({
   quickQuestionText: {
     fontSize: 15,
     color: colors.dark.text,
-    fontWeight: '500' as const,
+    fontFamily: typography.fonts.regular,
   },
   aiChatBubble: {
     paddingHorizontal: 16,
@@ -1049,7 +1055,7 @@ const styles = StyleSheet.create({
   authButtonAppleText: {
     color: colors.dark.background,
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   authButtonSocial: {
     backgroundColor: colors.dark.backgroundSecondary,
@@ -1075,7 +1081,7 @@ const styles = StyleSheet.create({
   authButtonSocialText: {
     color: colors.dark.text,
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   authDividerContainer: {
     flexDirection: 'row',
@@ -1091,7 +1097,7 @@ const styles = StyleSheet.create({
     color: colors.dark.textSecondary,
     fontSize: 14,
     paddingHorizontal: 12,
-    fontWeight: '500' as const,
+    fontFamily: typography.fonts.regular,
   },
   authEmailInput: {
     backgroundColor: colors.dark.backgroundSecondary,
@@ -1117,7 +1123,7 @@ const styles = StyleSheet.create({
   authButtonEmailText: {
     color: colors.dark.text,
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
 });
 

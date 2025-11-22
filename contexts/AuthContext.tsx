@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Sync user with backend
         try {
-          const backendURL = __DEV__ 
+          const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
             ? 'http://192.168.1.136:3000/api' 
             : 'https://bored-tourist-api.onrender.com/api';
 
@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Sync with backend immediately
         try {
-          const backendURL = __DEV__ 
+          const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
             ? 'http://192.168.1.136:3000/api' 
             : 'https://bored-tourist-api.onrender.com/api';
 
@@ -206,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Step 2: Sync with backend (gets/creates user in bored_tourist.db)
       const supabaseToken = authData.session.access_token;
-      const backendURL = __DEV__ 
+      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
         ? 'http://192.168.1.136:3000/api' 
         : 'https://bored-tourist-api.onrender.com/api';
       
@@ -290,7 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // This avoids the "User already registered" bug
       console.log('📡 Calling backend to create user...');
       
-      const backendURL = __DEV__ 
+      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
         ? 'http://192.168.1.136:3000/api' 
         : 'https://bored-tourist-api.onrender.com/api';
 
@@ -451,7 +451,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔑 Token (first 20 chars):', session.access_token.substring(0, 20) + '...');
 
       // Sync with backend
-      const backendURL = __DEV__ 
+      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
         ? 'http://192.168.1.136:3000/api' 
         : 'https://bored-tourist-api.onrender.com/api';
 

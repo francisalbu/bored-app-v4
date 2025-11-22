@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
   },
   loadingContainer: {
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginTop: 16,
   },
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   exploreButtonText: {
     fontSize: 16,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.background,
   },
   listContent: {
@@ -237,17 +237,17 @@ const styles = StyleSheet.create({
   },
   providerInitial: {
     fontSize: 14,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.background,
   },
   providerName: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.textSecondary,
   },
   title: {
     fontSize: 18,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 12,
     lineHeight: 24,
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   priceUnit: {

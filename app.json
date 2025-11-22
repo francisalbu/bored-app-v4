@@ -18,7 +18,8 @@
       "bundleIdentifier": "app.rork.bored-explorer",
       "config": {
         "googleMapsApiKey": "YOUR_IOS_API_KEY"
-      }
+      },
+      "runtimeVersion": "1.0.0"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,6 +31,15 @@
         "googleMaps": {
           "apiKey": "YOUR_ANDROID_API_KEY"
         }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "web": {
@@ -60,6 +70,18 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://rork.com/"
+      },
+      "eas": {
+        "projectId": "cd4bc13b-fb4a-4d0d-82ed-3faf6e991bba"
+      }
+    },
+    "owner": "boredtourist",
+    "updates": {
+      "url": "https://u.expo.dev/cd4bc13b-fb4a-4d0d-82ed-3faf6e991bba"
     }
   }
 }

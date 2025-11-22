@@ -1,7 +1,7 @@
 // API Configuration
 // Use your computer's IP address for iOS Simulator to connect to local backend
-const API_BASE_URL = __DEV__ 
-  ? 'http://192.168.1.136:3000/api' 
+const API_BASE_URL = process.env.NODE_ENV === 'development' || __DEV__
+  ? 'http://192.168.1.145:3000/api' 
   : 'https://bored-tourist-api.onrender.com/api';
 
 interface ApiResponse<T> {
@@ -43,7 +43,7 @@ class ApiService {
       console.log('API Request:', `${this.baseURL}${endpoint}`, options.method || 'GET');
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout for cold starts
 
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         ...options,

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import colors from '@/constants/colors';
+import typography from '@/constants/typography';
 import { type Experience } from '@/constants/experiences';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -120,15 +121,7 @@ export default function ExperienceDetailScreen() {
     fetchReviews();
   }, [experience?.id]);
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.errorText}>Loading...</Text>
-      </View>
-    );
-  }
-
-  if (!experience) {
+  if (!experience && !loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={styles.errorText}>Experience not found</Text>
@@ -136,9 +129,10 @@ export default function ExperienceDetailScreen() {
     );
   }
 
-  const saved = isSaved(experience.id);
+  const saved = experience ? isSaved(experience.id) : false;
 
   const handleSave = async () => {
+    if (!experience) return;
     if (!isAuthenticated) {
       Alert.alert(
         'Sign In Required',
@@ -154,6 +148,7 @@ export default function ExperienceDetailScreen() {
   };
 
   const handleShare = async () => {
+    if (!experience) return;
     try {
       const shareMessage = `🎉 ${experience.title}
 
@@ -182,6 +177,7 @@ Book this amazing experience on BoredTourist!`;
   };
 
   const handleOpenMap = async () => {
+    if (!experience) return;
     const googleMapsUrl = experience.id === '0' 
       ? 'https://maps.app.goo.gl/zKktCEzgxqerFxKT6'
       : `https://www.google.com/maps/search/?api=1&query=${experience.latitude},${experience.longitude}`;
@@ -248,9 +244,11 @@ Book this amazing experience on BoredTourist!`;
   };
 
   // Prepare images for carousel - use images array or fallback to single image
-  const carouselImages = experience.images && experience.images.length > 0 
-    ? experience.images 
-    : [experience.image];
+  const carouselImages = loading 
+    ? ['https://via.placeholder.com/800x400/1a1a1a/444444?text=Loading...'] 
+    : experience?.images && experience.images.length > 0 
+      ? experience.images 
+      : [experience?.image || 'https://via.placeholder.com/800x400'];
 
   return (
     <>
@@ -282,7 +280,7 @@ Book this amazing experience on BoredTourist!`;
               keyExtractor={(item, index) => `image-${index}`}
             />
 
-            {carouselImages.length > 1 && (
+            {!loading && carouselImages.length > 1 && (
               <View style={styles.imageIndicatorContainer}>
                 {carouselImages.map((_, index) => (
                   <View
@@ -322,82 +320,97 @@ Book this amazing experience on BoredTourist!`;
           </View>
 
           <View style={styles.content}>
-            <Text style={styles.title}>{experience.title}</Text>
+            <Text style={styles.title}>{experience?.title || 'Loading...'}</Text>
 
-            <View style={styles.hostInfo}>
-              <View style={styles.hostAvatar}>
-                <Text style={styles.hostInitial}>{experience.provider[0]}</Text>
-              </View>
-              <Text style={styles.hostName}>Hosted by {experience.provider}</Text>
-            </View>
-
-            <View style={styles.locationRow}>
-              <MapPin size={16} color={colors.dark.textSecondary} />
-              <Text style={styles.locationText}>
-                {experience.location} • {experience.distance}
-              </Text>
-            </View>
-
-            <View style={styles.ratingRow}>
-              <Star size={16} color="#FFB800" fill="#FFB800" />
-              <Text style={styles.ratingText}>
-                {experience.rating} ({experience.reviewCount} reviews)
-              </Text>
-            </View>
-
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Clock size={24} color={colors.dark.primary} />
-                <Text style={styles.statLabel}>Duration</Text>
-                <Text style={styles.statValue}>{experience.duration}</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Users size={24} color={colors.dark.primary} />
-                <Text style={styles.statLabel}>Group size</Text>
-                <Text style={styles.statValue}>Max {experience.maxGroupSize || 12}</Text>
-              </View>
-              <Pressable style={styles.statCard} onPress={handleOpenMap}>
-                <MapPin size={24} color={colors.dark.primary} />
-                <Text style={styles.statLabel}>View on Map</Text>
-                <Text style={styles.statValue}>{experience.location}</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>About this experience</Text>
-              <Text style={styles.descriptionText}>{experience.description}</Text>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Highlights</Text>
-              {experience.highlights.map((highlight, index) => (
-                <View key={index} style={styles.listItem}>
-                  <View style={styles.bullet} />
-                  <Text style={styles.listItemText}>{highlight}</Text>
+            {experience && (
+              <View style={styles.hostInfo}>
+                <View style={styles.hostAvatar}>
+                  <Text style={styles.hostInitial}>{experience.provider[0]}</Text>
                 </View>
-              ))}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What&apos;s included</Text>
-              {experience.included.map((item, index) => (
-                <View key={index} style={styles.listItem}>
-                  <View style={styles.bullet} />
-                  <Text style={styles.listItemText}>{item}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.section}>
-              <View style={styles.reviewsHeader}>
-                <Text style={styles.sectionTitle}>Reviews</Text>
-                <View style={styles.reviewsBadge}>
-                  <Star size={16} color="#FFB800" fill="#FFB800" />
-                  <Text style={styles.reviewsBadgeText}>
-                    {experience.rating} ({experience.reviewCount})
-                  </Text>
-                </View>
+                <Text style={styles.hostName}>Hosted by {experience.provider}</Text>
               </View>
+            )}
+
+            {experience && (
+              <View style={styles.locationRow}>
+                <MapPin size={16} color={colors.dark.textSecondary} />
+                <Text style={styles.locationText}>
+                  {experience.location} • {experience.distance}
+                </Text>
+              </View>
+            )}
+
+            {experience && (
+              <View style={styles.ratingRow}>
+                <Star size={16} color="#FFB800" fill="#FFB800" />
+                <Text style={styles.ratingText}>
+                  {experience.rating} ({experience.reviewCount} reviews)
+                </Text>
+              </View>
+            )}
+
+            {experience && (
+              <View style={styles.statsContainer}>
+                <View style={styles.statCard}>
+                  <Clock size={24} color={colors.dark.primary} />
+                  <Text style={styles.statLabel}>Duration</Text>
+                  <Text style={styles.statValue}>{experience.duration}</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Users size={24} color={colors.dark.primary} />
+                  <Text style={styles.statLabel}>Group size</Text>
+                  <Text style={styles.statValue}>Max {experience.maxGroupSize || 12}</Text>
+                </View>
+                <Pressable style={styles.statCard} onPress={handleOpenMap}>
+                  <MapPin size={24} color={colors.dark.primary} />
+                  <Text style={styles.statLabel}>View on Map</Text>
+                  <Text style={styles.statValue}>{experience.location}</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {experience && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About this experience</Text>
+                <Text style={styles.descriptionText}>{experience.description}</Text>
+              </View>
+            )}
+
+            {experience && experience.highlights.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Highlights</Text>
+                {experience.highlights.map((highlight, index) => (
+                  <View key={index} style={styles.listItem}>
+                    <View style={styles.bullet} />
+                    <Text style={styles.listItemText}>{highlight}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {experience && experience.included.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>What&apos;s included</Text>
+                {experience.included.map((item, index) => (
+                  <View key={index} style={styles.listItem}>
+                    <View style={styles.bullet} />
+                    <Text style={styles.listItemText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {experience && (
+              <View style={styles.section}>
+                <View style={styles.reviewsHeader}>
+                  <Text style={styles.sectionTitle}>Reviews</Text>
+                  <View style={styles.reviewsBadge}>
+                    <Star size={16} color="#FFB800" fill="#FFB800" />
+                    <Text style={styles.reviewsBadgeText}>
+                      {experience.rating} ({experience.reviewCount})
+                    </Text>
+                  </View>
+                </View>
 
               {reviewsLoading ? (
                 <Text style={styles.loadingText}>Loading reviews...</Text>
@@ -440,7 +453,7 @@ Book this amazing experience on BoredTourist!`;
                 ))
               )}
 
-              {reviews.length > 0 && (
+              {reviews.length > 0 && experience && (
                 <Pressable 
                   style={styles.viewAllReviews}
                   onPress={() => router.push(`/reviews/${experience.id}`)}
@@ -448,27 +461,30 @@ Book this amazing experience on BoredTourist!`;
                   <Text style={styles.viewAllReviewsText}>View All Reviews</Text>
                 </Pressable>
               )}
-            </View>
+              </View>
+            )}
 
             <View style={{ height: 120 }} />
           </View>
         </ScrollView>
 
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={styles.priceSection}>
-            <Text style={styles.price}>
-              {experience.currency}
-              {experience.price}
-            </Text>
-            <Text style={styles.priceLabel}>per person</Text>
+        {experience && (
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.priceSection}>
+              <Text style={styles.price}>
+                {experience.currency}
+                {experience.price}
+              </Text>
+              <Text style={styles.priceLabel}>per person</Text>
+            </View>
+            <Pressable 
+              style={styles.bookButton}
+              onPress={() => router.push(`/booking/${experience.id}`)}
+            >
+              <Text style={styles.bookButtonText}>BOOK NOW</Text>
+            </Pressable>
           </View>
-          <Pressable 
-            style={styles.bookButton}
-            onPress={() => router.push(`/booking/${experience.id}`)}
-          >
-            <Text style={styles.bookButtonText}>Book Now</Text>
-          </Pressable>
-        </View>
+        )}
       </View>
     </>
   );
@@ -531,11 +547,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700' as const,
+    fontFamily: typography.fonts.extrabold,
+    fontSize: 32,
     color: colors.dark.text,
     marginBottom: 16,
-    lineHeight: 36,
+    lineHeight: 38,
+    letterSpacing: -0.5,
   },
   hostInfo: {
     flexDirection: 'row',
@@ -554,12 +571,12 @@ const styles = StyleSheet.create({
   hostInitial: {
     color: colors.dark.background,
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontFamily: typography.fonts.extrabold,
   },
   hostName: {
     color: colors.dark.text,
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
   },
   locationRow: {
     flexDirection: 'row',
@@ -599,13 +616,14 @@ const styles = StyleSheet.create({
   statLabel: {
     color: colors.dark.textSecondary,
     fontSize: 11,
+    fontFamily: typography.fonts.regular,
     marginTop: 8,
     textAlign: 'center' as const,
   },
   statValue: {
     color: colors.dark.text,
     fontSize: 13,
-    fontWeight: '600' as const,
+    fontFamily: typography.fonts.semibold,
     marginTop: 4,
     textAlign: 'center' as const,
   },
@@ -613,14 +631,16 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
+    fontSize: 22,
+    fontFamily: typography.fonts.extrabold,
     color: colors.dark.text,
     marginBottom: 16,
+    letterSpacing: -0.3,
   },
   descriptionText: {
     color: colors.dark.textSecondary,
     fontSize: 15,
+    fontFamily: typography.fonts.regular,
     lineHeight: 24,
   },
   listItem: {
@@ -640,6 +660,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.dark.textSecondary,
     fontSize: 15,
+    fontFamily: typography.fonts.regular,
     lineHeight: 22,
   },
   reviewsHeader: {
@@ -785,11 +806,12 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 28,
-    fontWeight: '700' as const,
-    color: '#00FF8C',
+    fontFamily: typography.fonts.extrabold,
+    color: colors.dark.primary,
   },
   priceLabel: {
     fontSize: 13,
+    fontFamily: typography.fonts.regular,
     color: colors.dark.textSecondary,
   },
   bookButton: {
@@ -800,8 +822,9 @@ const styles = StyleSheet.create({
   },
   bookButtonText: {
     color: colors.dark.background,
-    fontSize: 16,
-    fontWeight: '700' as const,
+    fontSize: 17,
+    fontFamily: typography.fonts.extrabold,
+    letterSpacing: 0.5,
   },
   errorText: {
     color: colors.dark.textSecondary,

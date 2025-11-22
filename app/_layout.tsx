@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import { useFonts, Inter_300Light, Inter_400Regular, Inter_600SemiBold, Inter_800ExtraBold, Inter_900Black } from '@expo-google-fonts/inter';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { BookingsProvider } from '@/contexts/BookingsContext';
@@ -35,10 +36,45 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Inter_300Light,
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_800ExtraBold,
+    Inter_900Black,
+  });
+
   useEffect(() => {
     console.log('[Bored App] App is starting...');
-    SplashScreen.hideAsync();
+    
+    // Wake up the backend server (Render free tier sleeps after 15min)
+    const wakeUpServer = async () => {
+      try {
+        const API_URL = (process.env.NODE_ENV === 'development' || __DEV__) 
+          ? 'http://192.168.1.145:3000' 
+          : 'https://bored-tourist-api.onrender.com';
+        
+        console.log('[Bored App] Waking up backend server...');
+        await fetch(`${API_URL}/health`, { method: 'GET' });
+        console.log('[Bored App] Backend server is awake!');
+      } catch (error) {
+        console.log('[Bored App] Failed to wake server (might still be starting):', error);
+      }
+    };
+    
+    wakeUpServer();
   }, []);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      console.log('✅ [Bored App] Inter fonts loaded successfully!');
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

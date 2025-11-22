@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 16,
   },
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   },
   filterText: {
     fontSize: 15,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.textSecondary,
   },
   filterTextActive: {
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 8,
   },
@@ -464,12 +464,12 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     marginBottom: 4,
   },
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   referenceText: {
     fontSize: 13,
-    fontWeight: '600' as const,
+    fontWeight: '900' as const,
     color: colors.dark.textSecondary,
   },
   priceContainer: {
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   actionButton: {
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 15,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.background,
   },
   reviewButton: {
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
   },
   reviewButtonText: {
     fontSize: 15,
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     color: colors.dark.primary,
   },
   headerRow: {
