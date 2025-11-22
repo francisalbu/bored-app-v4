@@ -17,6 +17,26 @@ router.post('/create-intent', async (req, res) => {
 
     console.log('💰 [PAYMENT] Creating payment intent for amount:', amount);
 
+    // Validate Stripe is configured
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error('❌ [PAYMENT] STRIPE_SECRET_KEY not configured!');
+      return res.status(500).json({
+        success: false,
+        error: 'Stripe is not configured on the server'
+      });
+    }
+
+    // Validate amount
+    if (!amount || amount <= 0) {
+      console.error('❌ [PAYMENT] Invalid amount:', amount);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount'
+      });
+    }
+
+    console.log('🔵 [PAYMENT] Stripe key present:', process.env.STRIPE_SECRET_KEY?.substring(0, 10) + '...');
+
     // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
@@ -35,6 +55,7 @@ router.post('/create-intent', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ [PAYMENT] Error:', error.message);
+    console.error('❌ [PAYMENT] Error stack:', error.stack);
     res.status(500).json({
       success: false,
       error: error.message
