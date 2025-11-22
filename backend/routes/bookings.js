@@ -70,7 +70,8 @@ router.post('/',
           if (user && !error) {
             // User is authenticated, find their local user ID
             const { syncUserToLocalDB } = require('../middleware/supabaseAuth');
-            userId = await syncUserToLocalDB(user);
+            const localUser = await syncUserToLocalDB(user);
+            userId = localUser.id; // ✅ Extract just the ID, not the whole object
             console.log('✅ Authenticated booking for user:', user.email, '| Local ID:', userId);
           }
         } catch (authError) {

@@ -10,7 +10,25 @@ function getStripe() {
     if (!process.env.STRIPE_SECRET_KEY) {
       throw new Error('STRIPE_SECRET_KEY not configured in .env file');
     }
-    console.log('🔑 Initializing Stripe with key:', process.env.STRIPE_SECRET_KEY.substring(0, 12) + '...');
+    
+    const key = process.env.STRIPE_SECRET_KEY;
+    const isTestMode = key.startsWith('sk_test_');
+    const isLiveMode = key.startsWith('sk_live_');
+    
+    // Determine mode and show warning
+    if (isTestMode) {
+      console.log('🧪 Stripe initialized in TEST MODE');
+      console.log('💳 Use test cards: https://docs.stripe.com/testing');
+      console.log('   ✅ Success: 4242 4242 4242 4242');
+      console.log('   ❌ Decline: 4000 0000 0000 9995');
+    } else if (isLiveMode) {
+      console.log('💰 Stripe initialized in LIVE MODE');
+      console.log('⚠️  WARNING: Real payments will be processed!');
+    } else {
+      console.log('⚠️  WARNING: Stripe key format not recognized');
+    }
+    
+    console.log('🔑 Key preview:', key.substring(0, 12) + '...');
     stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
   }
   return stripe;

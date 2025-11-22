@@ -116,6 +116,7 @@ export default function PaymentScreen() {
           bookingId: bookingId,
           amount: totalPrice,
           currency: 'eur',
+          returnUrl: 'boredtourist://payment',
         }),
       });
 
@@ -164,7 +165,7 @@ export default function PaymentScreen() {
             placeholderText: colors.dark.textTertiary,
           },
         },
-        returnURL: 'boredtravel://payment-return',
+        returnURL: 'boredtourist://payment',
       });
 
       if (initError) {

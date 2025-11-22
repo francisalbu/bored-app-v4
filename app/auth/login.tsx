@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mail, Lock, ArrowLeft } from 'lucide-react-native';
 import colors from '@/constants/colors';
@@ -21,10 +21,18 @@ export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const params = useLocalSearchParams();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Pre-fill email if provided via params
+  useEffect(() => {
+    if (params.email && typeof params.email === 'string') {
+      setEmail(params.email);
+    }
+  }, [params.email]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -37,7 +45,14 @@ export default function LoginScreen() {
     setIsLoading(false);
 
     if (result.success) {
-      router.replace('/(tabs)');
+      // Navigate to returnTo destination or default to tabs
+      const returnTo = params.returnTo;
+      if (returnTo === 'payment') {
+        // Go back to payment screen which already has all the booking params
+        router.back();
+      } else {
+        router.replace('/(tabs)');
+      }
     } else {
       Alert.alert('Login Failed', result.error || 'Invalid credentials');
     }

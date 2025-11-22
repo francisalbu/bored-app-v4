@@ -254,40 +254,15 @@ export default function PaymentScreen() {
     setIsProcessing(true);
 
     try {
-      // Step 1: Create booking (guest or authenticated)
-      console.log('� [PAYMENT] Step 1: Creating booking...');
-      console.log('🔵 [PAYMENT] Customer:', { name: customerName, email: customerEmail, phone: customerPhone });
-      
-      const bookingResult = await createBooking({
-        experience_id: parseInt(experienceId),
-        slot_id: parseInt(slotId),
-        participants: adultsCount,
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: `${selectedCountry.dialCode}${guestPhone}`.replace(/\s/g, ''),
-      });
-
-      if (!bookingResult.success || !bookingResult.data?.id) {
-        console.log('❌ [PAYMENT] Booking creation failed:', bookingResult.error);
-        Alert.alert('Error', bookingResult.error || 'Failed to create booking');
-        setIsProcessing(false);
-        return;
-      }
-
-      const newBookingId = bookingResult.data.id;
-      console.log('✅ [PAYMENT] Booking created:', newBookingId);
-      setBookingId(newBookingId);
-
-      // Step 2: Create payment intent
-      console.log('🔵 [PAYMENT] Step 2: Creating payment intent...');
+      // Step 1: Create payment intent FIRST (without booking)
+      console.log('� [PAYMENT] Step 1: Creating payment intent...');
       console.log('🔵 [PAYMENT] URL:', `${API_URL}/api/payments/create-intent`);
-      console.log('🔵 [PAYMENT] Body:', { bookingId: newBookingId, amount: totalPrice, currency: 'eur' });
+      console.log('🔵 [PAYMENT] Amount:', totalPrice);
       
       const response = await fetch(`${API_URL}/api/payments/create-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bookingId: newBookingId,
           amount: totalPrice,
           currency: 'eur',
         }),
@@ -305,10 +280,11 @@ export default function PaymentScreen() {
 
       console.log('✅ [PAYMENT] Got clientSecret:', data.clientSecret.substring(0, 20) + '...');
       const secret = data.clientSecret;
+      const paymentIntentId = data.paymentIntentId;
       setClientSecret(secret);
 
-      // Step 3: Initialize payment sheet
-      console.log('🔵 [PAYMENT] Step 3: Initializing payment sheet...');
+      // Step 2: Initialize payment sheet
+      console.log('🔵 [PAYMENT] Step 2: Initializing payment sheet...');
       const { error: initError } = await initPaymentSheet({
         merchantDisplayName: 'Bored Explorer',
         paymentIntentClientSecret: secret,
@@ -316,7 +292,7 @@ export default function PaymentScreen() {
           name: customerName,
           email: customerEmail,
         },
-        returnURL: 'boredtravel://',
+        returnURL: 'boredtourist://payment',
         applePay: {
           merchantCountryCode: 'PT',
         },
@@ -335,29 +311,45 @@ export default function PaymentScreen() {
 
       console.log('✅ [PAYMENT] Payment sheet initialized successfully!');
 
-      // Step 4: Present payment sheet
-      console.log('🔵 [PAYMENT] Step 4: Presenting payment sheet...');
+      // Step 3: Present payment sheet
+      console.log('🔵 [PAYMENT] Step 3: Presenting payment sheet...');
       const { error: presentError } = await presentPaymentSheet();
 
       if (presentError) {
+        console.log('❌ [PAYMENT] presentPaymentSheet error:', presentError);
+        
         if (presentError.code !== 'Canceled') {
           Alert.alert('Payment Failed', presentError.message);
+        } else {
+          console.log('ℹ️ [PAYMENT] User cancelled payment');
         }
         setIsProcessing(false);
         return;
       }
 
-      // Payment successful - confirm on backend
-      console.log('✅ [PAYMENT] Payment successful! Confirming on backend...');
-      try {
-        await fetch(`${API_URL}/api/payments/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            paymentIntentId: secret.split('_secret_')[0],
-            bookingId: newBookingId,
-          }),
-        });
+      // 🎉 Payment successful! NOW create the booking
+      console.log('🎉 [PAYMENT] Payment successful! Creating booking now...');
+      console.log('🔵 [PAYMENT] Customer:', { name: customerName, email: customerEmail, phone: customerPhone });
+      
+      const bookingResult = await createBooking({
+        experience_id: parseInt(experienceId),
+        slot_id: parseInt(slotId),
+        participants: adultsCount,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: `${selectedCountry.dialCode}${guestPhone}`.replace(/\s/g, ''),
+      });
+
+      if (!bookingResult.success || !bookingResult.data?.id) {
+        console.log('❌ [PAYMENT] Booking creation failed after payment:', bookingResult.error);
+        Alert.alert('Warning', 'Payment was successful but booking creation failed. Please contact support with payment ID: ' + paymentIntentId);
+        setIsProcessing(false);
+        return;
+      }
+
+      const newBookingId = bookingResult.data.id;
+      console.log('✅ [PAYMENT] Booking created:', newBookingId);
+      setBookingId(newBookingId);
 
         // Show success message with account creation prompt for guests
         if (isGuest) {
@@ -396,10 +388,6 @@ export default function PaymentScreen() {
             }]
           );
         }
-      } catch (error) {
-        console.error('Payment confirmation error:', error);
-        Alert.alert('Warning', 'Payment was processed but confirmation failed. Please contact support.');
-      }
     } catch (error) {
       console.error('❌ [PAYMENT] Error:', error);
       Alert.alert('Error', 'Failed to process payment');

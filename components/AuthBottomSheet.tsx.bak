@@ -1,6 +1,19 @@
 /**
  * Auth Bottom Sheet Component
- * Bottom sheet with social login options
+ * 
+  // Listen for deep links when app comes back from OAuth
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 DEEP LINK RECEIVED:', event.url);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Check if this is an auth callback (contains code parameter OR auth/callback path)
+      const hasCode = event.url.includes('?code=') || event.url.includes('&code=');
+      const hasAuthPath = event.url.includes('/auth/callback') || event.url.includes('auth/callback');
+      
+      if (hasCode || hasAuthPath) {
+        console.log('✅ Auth callback detected! (hasCode:', hasCode, ', hasAuthPath:', hasAuthPath, ')');ottom sheet with social login options
  */
 
 import React, { useState, useEffect } from 'react';
@@ -11,18 +24,17 @@ import {
   Pressable,
   Modal,
   TextInput,
+  ActivityIndicator,
   Alert,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import colors from '@/constants/colors';
-import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 
-// Complete the auth session when returning to app
 WebBrowser.maybeCompleteAuthSession();
 
 interface AuthBottomSheetProps {
@@ -37,67 +49,123 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
-  // Listen for OAuth callback deep links
+  // Listen for deep links when app comes back from OAuth
   useEffect(() => {
-    // Handler for deep link events
     const handleDeepLink = async (event: { url: string }) => {
-      console.log('🔗 Deep link received:', event.url);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 DEEP LINK RECEIVED:', event.url);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
-      // Check if this is an OAuth callback
-      if (event.url.includes('?code=') || event.url.includes('#access_token=')) {
-        console.log('✅ OAuth callback detected');
+      // Check if this is an auth callback
+      const hasCode = event.url.includes('?code=') || event.url.includes('&code=');
+      const hasCallback = event.url.includes('callback');
+      
+      if (!hasCode && !hasCallback) {
+        console.log('ℹ️ Not an auth callback, ignoring...');
+        return;
+      }
+      
+      console.log('✅ AUTH CALLBACK DETECTED!');
+      
+      try {
+        const url = new URL(event.url);
+        const params = new URLSearchParams(url.search);
+        const code = params.get('code');
         
-        try {
-          const url = new URL(event.url);
-          const code = url.searchParams.get('code');
+        console.log('🔍 Authorization code:', code ? `${code.substring(0, 15)}...` : 'NOT FOUND');
+        
+        if (!code) {
+          console.error('❌ No authorization code in callback URL!');
+          Alert.alert('Authentication Error', 'No authorization code received.');
+          return;
+        }
+        
+        console.log('🔄 Exchanging code for session...');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        
+        if (error) {
+          console.error('❌ Exchange error:', error);
+          Alert.alert('Authentication Error', error.message || 'Failed to complete sign in.');
+          return;
+        }
+        
+        if (data?.session) {
+          console.log('✅✅✅ SESSION ESTABLISHED! ✅✅✅');
+          console.log('📧 User:', data.session.user.email);
+          onClose();
+          if (onSuccess) onSuccess();
+        } else {
+          console.error('❌ No session created after code exchange');
+          Alert.alert('Authentication Error', 'Failed to create session.');
+        }
+      } catch (error) {
+        console.error('❌ Error processing callback:', error);
+        Alert.alert('Authentication Error', 'An error occurred during sign in.');
+      }
           
-          if (code) {
-            console.log('🔄 Exchanging authorization code for session...');
+          console.log('🔑 Token extraction result:', { 
+            hasAccessToken: !!access_token,
+            accessTokenLength: access_token?.length || 0,
+            hasRefreshToken: !!refresh_token,
+            refreshTokenLength: refresh_token?.length || 0
+          });
+          
+          if (access_token && refresh_token) {
+            console.log('🔐 Setting session with tokens...');
             
-            // Exchange the code for a session
-            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+            const { data, error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
             
             if (error) {
-              console.error('❌ Error exchanging code:', error);
-              Alert.alert('Authentication Error', error.message);
-              return;
-            }
-            
-            if (data?.session) {
-              console.log('✅ Session established successfully!');
+              console.error('❌ Error setting session:', error);
+            } else if (data.session) {
+              console.log('✅✅✅ SESSION ESTABLISHED! ✅✅✅');
               console.log('📧 User:', data.session.user.email);
+              console.log('� User ID:', data.session.user.id);
               
-              // Close the auth modal
+              // Close modal and call success callback
               onClose();
-              
-              // Call success callback if provided
               if (onSuccess) {
+                console.log('📞 Calling onSuccess callback...');
                 onSuccess();
               }
             }
+          } else {
+            console.error('❌ No tokens found in URL!');
+            console.log('💡 This might mean:');
+            console.log('   - OAuth failed');
+            console.log('   - Redirect URL mismatch');
+            console.log('   - Supabase configuration issue');
           }
         } catch (error) {
-          console.error('❌ Error processing callback:', error);
-          Alert.alert('Authentication Error', 'Failed to complete sign in.');
+          console.error('❌ Error processing deep link:', error);
         }
+      } else {
+        console.log('ℹ️ Not an auth callback, ignoring...');
       }
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     };
-
-    // Subscribe to URL events
+    
+    // Add event listener
+    console.log('👂 Setting up deep link listener...');
     const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Check if app was opened with a URL (cold start)
+    
+    // Check if app was opened with a URL
     Linking.getInitialURL().then((url) => {
       if (url) {
+        console.log('🚀 App opened with initial URL:', url);
         handleDeepLink({ url });
       }
     });
-
-    // Cleanup subscription
+    
+    // Cleanup
     return () => {
+      console.log('🧹 Cleaning up deep link listener...');
       subscription.remove();
     };
-  }, [onClose, onSuccess]);
+  }, [onSuccess, onClose]);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -105,24 +173,32 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       setIsLoading(true);
 
       console.log('🔐 Starting Google Sign-In...');
+      console.log('📱 Platform:', Platform.OS);
       
-      // Use the custom URL scheme directly (não usar Linking.createURL que gera exp://)
+      // HARDCODED redirect URL to match Supabase configuration exactly
       const redirectUrl = 'boredtourist://auth/callback';
       console.log('🔗 Redirect URL:', redirectUrl);
       
-      // Initiate OAuth flow
+      // Start the OAuth flow with skipBrowserRedirect for mobile
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: true, // We'll handle the redirect manually
+          skipBrowserRedirect: true, // Important for mobile deep linking!
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 
       if (error) {
         console.error('❌ OAuth error:', error);
-        Alert.alert('Error', 'Failed to start Google sign in: ' + error.message);
-        return;
+        Alert.alert(
+          'Configuration Error',
+          'Google OAuth is not configured in Supabase.\n\nPlease configure Google OAuth in Supabase Dashboard first.'
+        );
+        throw error;
       }
 
       if (!data?.url) {
@@ -131,63 +207,91 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
         return;
       }
 
-      console.log('🌐 Opening OAuth URL...');
+      console.log('🌐 Opening OAuth URL in-app browser...');
+      console.log('📍 URL:', data.url.substring(0, 100) + '...');
       
-      // Open the OAuth URL in an in-app browser
+      // Open in-app browser (Safari View Controller)
       const result = await WebBrowser.openAuthSessionAsync(
         data.url,
         redirectUrl
       );
-
-      console.log('🔙 Browser result:', result.type);
-
+      
+      console.log('🔙 WebBrowser closed, result type:', result.type);
+      
       if (result.type === 'success' && result.url) {
-        console.log('✅ OAuth completed, processing callback URL:', result.url);
+        console.log('✅ OAuth success!');
+        console.log('📦 Full result URL:', result.url);
         
-        // Extract the authorization code from the URL
+        // Process the URL directly instead of waiting for deep link
         try {
           const url = new URL(result.url);
-          const code = url.searchParams.get('code');
+          console.log('🔍 URL protocol:', url.protocol);
+          console.log('� URL pathname:', url.pathname);
+          console.log('🔍 URL hash:', url.hash);
+          console.log('🔍 URL search:', url.search);
           
-          if (code) {
-            console.log('🔄 Exchanging authorization code for session...');
+          // Supabase sends tokens in the fragment (#) part
+          let fragment = url.hash;
+          if (fragment.startsWith('#')) {
+            fragment = fragment.substring(1);
+          }
+          
+          console.log('🔍 Fragment to parse:', fragment);
+          const params = new URLSearchParams(fragment);
+          
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          
+          console.log('🔑 Tokens found:', { 
+            hasAccessToken: !!access_token, 
+            hasRefreshToken: !!refresh_token,
+            accessTokenLength: access_token?.length,
+            refreshTokenLength: refresh_token?.length
+          });
+          
+          if (access_token && refresh_token) {
+            console.log('🔐 Setting session with tokens...');
             
-            // Exchange the code for a session
-            const { data: sessionData, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
             
             if (sessionError) {
-              console.error('❌ Error exchanging code:', sessionError);
-              Alert.alert('Authentication Error', sessionError.message);
-              return;
-            }
-            
-            if (sessionData?.session) {
-              console.log('✅✅✅ SESSION ESTABLISHED!');
+              console.error('❌ Error setting session:', sessionError);
+              Alert.alert('Error', 'Failed to establish session: ' + sessionError.message);
+            } else if (sessionData.session) {
+              console.log('✅ Session established!');
               console.log('📧 User:', sessionData.session.user.email);
               
-              // Close the auth modal
+              // Close modal and call success callback
               onClose();
-              
-              // Call success callback if provided
               if (onSuccess) {
                 onSuccess();
               }
+            } else {
+              console.log('⚠️ No session data returned');
             }
           } else {
-            console.error('❌ No authorization code found in URL');
-            Alert.alert('Authentication Error', 'No authorization code received.');
+            console.log('⚠️ No tokens found in URL');
           }
         } catch (urlError) {
-          console.error('❌ Error parsing callback URL:', urlError);
-          Alert.alert('Authentication Error', 'Failed to process callback.');
+          console.error('❌ Error parsing URL:', urlError);
         }
       } else if (result.type === 'cancel') {
         console.log('ℹ️ User cancelled OAuth');
+        onClose();
+      } else {
+        console.log('❌ OAuth did not complete successfully, type:', result.type);
+        onClose();
       }
-
+      
     } catch (error: any) {
       console.error('❌ Google sign in error:', error);
-      Alert.alert('Error', error.message || 'Failed to sign in with Google.');
+      Alert.alert(
+        'Error', 
+        error.message || 'Failed to sign in with Google.'
+      );
     } finally {
       setIsLoading(false);
       setLoadingProvider(null);
