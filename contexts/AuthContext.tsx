@@ -40,7 +40,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' && session) {
         console.log('✅ User signed in (OAuth or email):', session.user.email);
         
-        // Sync user with backend
+        // Create user data from Supabase session
+        const userData = {
+          id: session.user.id,
+          email: session.user.email || '',
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          phone: session.user.phone || undefined,
+        };
+
+        await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
+        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+
+        api.setAuthToken(session.access_token);
+        setUser(userData);
+
+        console.log('✅ User signed in successfully');
+
+        // Try to sync with backend (optional, non-blocking)
         try {
           const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
             ? 'http://192.168.1.136:3000/api' 
@@ -51,28 +67,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
             },
+            signal: AbortSignal.timeout(5000), // 5 second timeout
           });
 
           const backendData = await response.json();
           
           if (backendData.success && backendData.data.user) {
-            const userData = {
-              id: backendData.data.user.id.toString(),
-              email: backendData.data.user.email,
-              name: backendData.data.user.name || session.user.email?.split('@')[0] || 'User',
-              phone: backendData.data.user.phone,
-            };
-
-            await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-            await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
-
-            api.setAuthToken(session.access_token);
-            setUser(userData);
-
-            console.log('✅ User synced with backend after OAuth');
+            console.log('✅ User synced with backend');
           }
         } catch (error) {
-          console.error('❌ Error syncing user with backend:', error);
+          console.warn('⚠️ Could not sync with backend (optional):', error);
         }
       } else if (event === 'TOKEN_REFRESHED' && session) {
         console.log('✅ Token refreshed automatically');

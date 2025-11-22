@@ -60,7 +60,11 @@ export default function ProfileScreen() {
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
         
-        <View style={styles.guestContainer}>
+        <ScrollView 
+          style={styles.guestScrollView}
+          contentContainerStyle={styles.guestContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.guestContent}>
             <Text style={styles.guestTitle}>Access your bookings from anywhere</Text>
             <Text style={styles.guestDescription}>
@@ -71,30 +75,31 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          <AuthBottomSheet
-            visible={showAuthSheet}
-            onClose={() => setShowAuthSheet(false)}
-          />
-
           <View style={styles.guestSettingsSection}>
-            <Text style={styles.guestSectionTitle}>Settings</Text>
+            <Text style={styles.guestSectionTitle}>General</Text>
             
-            <Pressable style={styles.guestSettingItem}>
-              <Text style={styles.guestSettingLabel}>Currency</Text>
-              <Text style={styles.guestSettingValue}>(€) Euro</Text>
+            <Pressable style={styles.guestSettingCard}>
+              <View style={styles.guestSettingInfo}>
+                <Text style={styles.guestSettingLabel}>Currency</Text>
+                <Text style={styles.guestSettingValue}>(€) Euro</Text>
+              </View>
             </Pressable>
             
-            <Pressable style={styles.guestSettingItem}>
-              <Text style={styles.guestSettingLabel}>Language</Text>
-              <Text style={styles.guestSettingValue}>English</Text>
+            <Pressable style={styles.guestSettingCard}>
+              <View style={styles.guestSettingInfo}>
+                <Text style={styles.guestSettingLabel}>Language</Text>
+                <Text style={styles.guestSettingValue}>English</Text>
+              </View>
             </Pressable>
             
-            <Pressable style={styles.guestSettingItem}>
-              <Text style={styles.guestSettingLabel}>Appearance</Text>
-              <Text style={styles.guestSettingValue}>System default</Text>
+            <Pressable style={styles.guestSettingCard}>
+              <View style={styles.guestSettingInfo}>
+                <Text style={styles.guestSettingLabel}>Appearance</Text>
+                <Text style={styles.guestSettingValue}>System default</Text>
+              </View>
             </Pressable>
             
-            <Pressable style={styles.guestSettingItem}>
+            <Pressable style={styles.guestSettingCard}>
               <Text style={styles.guestSettingLabel}>Notifications</Text>
             </Pressable>
           </View>
@@ -102,11 +107,36 @@ export default function ProfileScreen() {
           <View style={styles.guestSettingsSection}>
             <Text style={styles.guestSectionTitle}>Support</Text>
             
-            <Pressable style={styles.guestSettingItem}>
+            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/about' as any)}>
               <Text style={styles.guestSettingLabel}>About Bored Tourist</Text>
             </Pressable>
+            
+            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/help' as any)}>
+              <Text style={styles.guestSettingLabel}>Help Center</Text>
+            </Pressable>
           </View>
-        </View>
+
+          <View style={styles.guestSettingsSection}>
+            <Text style={styles.guestSectionTitle}>Legal</Text>
+            
+            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/terms' as any)}>
+              <Text style={styles.guestSettingLabel}>Terms and Conditions</Text>
+            </Pressable>
+            
+            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/privacy' as any)}>
+              <Text style={styles.guestSettingLabel}>Privacy</Text>
+            </Pressable>
+            
+            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/cancellation' as any)}>
+              <Text style={styles.guestSettingLabel}>Cancellation & Refund Policy</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+
+        <AuthBottomSheet
+          visible={showAuthSheet}
+          onClose={() => setShowAuthSheet(false)}
+        />
       </View>
     );
   }
@@ -115,7 +145,7 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.headerButtons}>
-          <Pressable style={styles.settingsButton}>
+          <Pressable style={styles.settingsButton} onPress={() => router.push('/settings' as any)}>
             <Settings size={24} color={colors.dark.text} />
           </Pressable>
           <Pressable style={styles.logoutButton} onPress={handleLogout}>
@@ -650,9 +680,12 @@ const styles = StyleSheet.create({
     fontWeight: '900' as const,
     color: colors.dark.text,
   },
-  guestContainer: {
+  guestScrollView: {
     flex: 1,
+  },
+  guestContainer: {
     padding: 16,
+    paddingBottom: 100,
   },
   guestContent: {
     backgroundColor: colors.dark.card,
@@ -687,26 +720,54 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   guestSectionTitle: {
-    fontSize: 18,
-    fontWeight: '700' as const,
+    fontSize: 20,
+    fontWeight: '900' as const,
     color: colors.dark.text,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  guestSettingItem: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+  guestSettingCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  guestSettingInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   guestSettingLabel: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '700' as const,
     color: colors.dark.text,
   },
   guestSettingValue: {
     fontSize: 14,
+    fontWeight: '500' as const,
     color: colors.dark.textSecondary,
+  },
+  settingsListContainer: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
+  },
+  settingLabel: {
+    fontSize: 14,
+    color: colors.dark.text,
+  },
+  settingArrow: {
+    fontSize: 24,
+    color: colors.dark.textSecondary,
+    fontWeight: '300' as const,
   },
 });

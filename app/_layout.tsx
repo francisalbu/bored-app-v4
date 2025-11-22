@@ -30,6 +30,12 @@ function RootLayoutNav() {
         <Stack.Screen name="auth/verify-email" options={{ headerShown: false }} />
         <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="saved-experiences" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="info/about" options={{ headerShown: false }} />
+        <Stack.Screen name="info/help" options={{ headerShown: false }} />
+        <Stack.Screen name="info/terms" options={{ headerShown: false }} />
+        <Stack.Screen name="info/privacy" options={{ headerShown: false }} />
+        <Stack.Screen name="info/cancellation" options={{ headerShown: false }} />
       </Stack>
     </>
   );
