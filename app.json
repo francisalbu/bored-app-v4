@@ -4,14 +4,14 @@
     "slug": "bored-tourist",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "https://storage.googleapis.com/bored_tourist_media/images/Icons/appstore.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "boredtourist",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "https://storage.googleapis.com/bored_tourist_media/images/Icons/appstore.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F4E04D"
     },
     "ios": {
       "supportsTablet": true,
