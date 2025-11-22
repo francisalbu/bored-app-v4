@@ -15,113 +15,119 @@ router.get('/:experienceId', async (req, res) => {
 
     const db = getDB();
 
-    let query = `
-      SELECT 
-        r.id,
-        r.experience_id,
-        r.rating,
-        r.comment,
-        r.source,
-        r.author_name,
-        r.author_avatar,
-        r.verified_purchase,
-        r.helpful_count,
-        r.operator_response,
-        r.response_date,
-        r.created_at,
-        u.name as user_name,
-        u.email as user_email
-      FROM reviews r
-      LEFT JOIN users u ON r.user_id = u.id
-      WHERE r.experience_id = ?
-    `;
-
-    const params = [experienceId];
+    // Build query for Supabase
+    let query = db
+      .from('reviews')
+      .select(`
+        id,
+        experience_id,
+        rating,
+        comment,
+        source,
+        author_name,
+        author_avatar,
+        verified_purchase,
+        helpful_count,
+        operator_response,
+        response_date,
+        created_at,
+        users:user_id (
+          name,
+          email
+        )
+      `)
+      .eq('experience_id', experienceId)
+      .order('created_at', { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
 
     // Filter by source if specified
     if (source) {
-      query += ' AND r.source = ?';
-      params.push(source);
+      query = query.eq('source', source);
     }
 
-    query += ' ORDER BY r.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
+    const { data: reviews, error } = await query;
 
-    db.all(query, params, (err, reviews) => {
-      if (err) {
-        console.error('❌ Error fetching reviews:', err);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to fetch reviews'
-        });
-      }
-
-      // Get statistics
-      const statsQuery = `
-        SELECT 
-          COUNT(*) as total_reviews,
-          AVG(rating) as average_rating,
-          SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END) as five_star,
-          SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END) as four_star,
-          SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as three_star,
-          SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END) as two_star,
-          SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as one_star,
-          SUM(CASE WHEN source = 'google' THEN 1 ELSE 0 END) as google_reviews,
-          SUM(CASE WHEN source = 'internal' THEN 1 ELSE 0 END) as internal_reviews
-        FROM reviews
-        WHERE experience_id = ?
-      `;
-
-      db.get(statsQuery, [experienceId], (err, stats) => {
-        if (err) {
-          console.error('❌ Error fetching stats:', err);
-        }
-
-        // Format reviews
-        const formattedReviews = reviews.map(review => ({
-          id: review.id,
-          author: {
-            name: review.author_name || review.user_name || 'Anonymous',
-            avatar: review.author_avatar || null,
-            email: review.user_email || null
-          },
-          rating: review.rating,
-          comment: review.comment,
-          source: review.source,
-          verified_purchase: review.verified_purchase === 1,
-          helpful_count: review.helpful_count,
-          operator_response: review.operator_response,
-          response_date: review.response_date,
-          created_at: review.created_at
-        }));
-
-        console.log(`✅ Found ${reviews.length} reviews`);
-
-        res.json({
-          success: true,
-          data: formattedReviews,
-          stats: {
-            total_reviews: stats?.total_reviews || 0,
-            average_rating: parseFloat((stats?.average_rating || 0).toFixed(1)),
-            rating_distribution: {
-              5: stats?.five_star || 0,
-              4: stats?.four_star || 0,
-              3: stats?.three_star || 0,
-              2: stats?.two_star || 0,
-              1: stats?.one_star || 0
-            },
-            sources: {
-              google: stats?.google_reviews || 0,
-              internal: stats?.internal_reviews || 0
-            }
-          },
-          meta: {
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            count: reviews.length
-          }
-        });
+    if (error) {
+      console.error('❌ Error fetching reviews:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch reviews'
       });
+    }
+
+    // Get statistics
+    const { data: stats, error: statsError } = await db
+      .from('reviews')
+      .select('rating, source')
+      .eq('experience_id', experienceId);
+
+    let reviewStats = {
+      total_reviews: 0,
+      average_rating: 0,
+      five_star: 0,
+      four_star: 0,
+      three_star: 0,
+      two_star: 0,
+      one_star: 0,
+      google_reviews: 0,
+      internal_reviews: 0
+    };
+
+    if (!statsError && stats) {
+      reviewStats.total_reviews = stats.length;
+      reviewStats.average_rating = stats.reduce((sum, r) => sum + r.rating, 0) / stats.length || 0;
+      reviewStats.five_star = stats.filter(r => r.rating === 5).length;
+      reviewStats.four_star = stats.filter(r => r.rating === 4).length;
+      reviewStats.three_star = stats.filter(r => r.rating === 3).length;
+      reviewStats.two_star = stats.filter(r => r.rating === 2).length;
+      reviewStats.one_star = stats.filter(r => r.rating === 1).length;
+      reviewStats.google_reviews = stats.filter(r => r.source === 'google').length;
+      reviewStats.internal_reviews = stats.filter(r => r.source === 'internal').length;
+    }
+
+    // Format reviews
+    const formattedReviews = reviews.map(review => ({
+      id: review.id,
+      author: {
+        name: review.author_name || review.users?.name || 'Anonymous',
+        avatar: review.author_avatar || null,
+        email: review.users?.email || null
+      },
+      rating: review.rating,
+      comment: review.comment,
+      source: review.source,
+      verified_purchase: review.verified_purchase,
+      helpful_count: review.helpful_count,
+      operator_response: review.operator_response,
+      response_date: review.response_date,
+      created_at: review.created_at
+    }));
+
+    console.log(`✅ Found ${reviews.length} reviews`);
+
+    res.json({
+      success: true,
+      data: formattedReviews,
+      stats: {
+        total_reviews: reviewStats.total_reviews,
+        average_rating: parseFloat(reviewStats.average_rating.toFixed(1)),
+        rating_distribution: {
+          5: reviewStats.five_star,
+          4: reviewStats.four_star,
+          3: reviewStats.three_star,
+          2: reviewStats.two_star,
+          1: reviewStats.one_star
+        },
+        sources: {
+          google: reviewStats.google_reviews,
+          internal: reviewStats.internal_reviews
+        }
+      },
+      meta: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        count: reviews.length
+      }
     });
   } catch (error) {
     console.error('❌ Error in reviews route:', error);
