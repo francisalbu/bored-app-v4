@@ -1,144 +1,220 @@
-import { Bookmark, MapPin, Star, Clock } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import { Sparkles, Send, MapPin } from 'lucide-react-native';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  TextInput,
   Pressable,
+  ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFonts, PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
 
 import colors from '@/constants/colors';
-import { useFavorites } from '@/contexts/FavoritesContext';
-import { useExperiences } from '@/hooks/useExperiences';
-import type { Experience } from '@/constants/experiences';
+import { getVibeCheckRecommendation, type VibeCheckResponse } from '@/services/boredAI';
 
-export default function SavedTab() {
+interface VibeResponse {
+  id: string;
+  vibe: string;
+  recommendation: VibeCheckResponse;
+  timestamp: Date;
+}
+
+export default function BoredAITab() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const { savedExperiences, isLoading: favLoading, refreshSaved, toggleSave } = useFavorites();
-  const { experiences, loading: expLoading } = useExperiences();
+  const [userVibe, setUserVibe] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentResponse, setCurrentResponse] = useState<VibeResponse | null>(null);
 
-  useEffect(() => {
-    refreshSaved();
-  }, []);
+  const [fontsLoaded] = useFonts({
+    PermanentMarker_400Regular,
+  });
 
-  const isLoading = favLoading || expLoading;
+  const moods = [
+    { emoji: '🎉', label: 'Chaos', vibe: 'chaotic energy, need something wild' },
+    { emoji: '😌', label: 'Chill', vibe: 'relaxed vibes, nothing too crazy' },
+    { emoji: '🤘', label: 'Rave', vibe: 'party mode, show me the nightlife' },
+    { emoji: '🏛️', label: 'History', vibe: 'history nerd mode, make it fun though' },
+    { emoji: '🍕', label: 'Food', vibe: 'foodie vibes, best eats in town' },
+    { emoji: '🏄', label: 'Surf', vibe: 'beach and surf culture' },
+  ];
 
-  // Get full experience details for saved IDs from API data
-  const savedExperienceDetails = experiences.filter(exp => 
-    savedExperiences.includes(exp.id)
-  );
-
-  const handleRemoveFavorite = async (experienceId: string, event: any) => {
-    // Prevent navigation to experience detail
-    event.stopPropagation();
-    await toggleSave(experienceId);
+  const handleMoodPress = async (vibe: string) => {
+    setUserVibe(vibe);
+    await handleSubmit(vibe);
   };
 
-  const renderExperience = ({ item }: { item: Experience }) => (
-    <Pressable
-      style={styles.card}
-      onPress={() => router.push(`/experience/${item.id}` as any)}
-    >
-      <Image
-        source={item.images && item.images.length > 0 ? item.images[0] : { uri: item.image }}
-        style={styles.cardImage}
-        contentFit="cover"
-      />
-      
-      <View style={styles.cardContent}>
-        <View style={styles.providerRow}>
-          {item.providerLogo ? (
-            <Image
-              source={item.providerLogo}
-              style={styles.providerLogo}
-              contentFit="cover"
-            />
-          ) : (
-            <View style={styles.providerAvatar}>
-              <Text style={styles.providerInitial}>{item.provider[0]}</Text>
-            </View>
-          )}
-          <Text style={styles.providerName}>{item.provider}</Text>
-        </View>
+  const handleSubmit = async (customVibe?: string) => {
+    const vibeToCheck = customVibe || userVibe;
+    if (!vibeToCheck.trim()) return;
 
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
+    setIsLoading(true);
+    setCurrentResponse(null); // Clear previous response
+    try {
+      const recommendation = await getVibeCheckRecommendation(vibeToCheck);
+      const newResponse: VibeResponse = {
+        id: Date.now().toString(),
+        vibe: vibeToCheck,
+        recommendation,
+        timestamp: new Date(),
+      };
+      setCurrentResponse(newResponse); // Only show current response
+      if (!customVibe) setUserVibe('');
+    } catch (error) {
+      console.error('Error getting vibe check:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Star size={14} color={colors.dark.accent} fill={colors.dark.accent} />
-            <Text style={styles.metaText}>{item.rating}</Text>
-          </View>
-          <Text style={styles.metaDivider}>•</Text>
-          <View style={styles.metaItem}>
-            <Clock size={14} color={colors.dark.textSecondary} />
-            <Text style={styles.metaText}>{item.duration}</Text>
-          </View>
-          <Text style={styles.metaDivider}>•</Text>
-          <View style={styles.metaItem}>
-            <MapPin size={14} color={colors.dark.textSecondary} />
-            <Text style={styles.metaText}>{item.distance}</Text>
-          </View>
-        </View>
+  const handleOpenMaps = async (mapsUrl: string) => {
+    try {
+      const supported = await Linking.canOpenURL(mapsUrl);
+      if (supported) {
+        await Linking.openURL(mapsUrl);
+      }
+    } catch (error) {
+      console.error('Error opening maps:', error);
+    }
+  };
 
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>
-            {item.currency}{item.price}
-            <Text style={styles.priceUnit}>/person</Text>
-          </Text>
-          <Pressable 
-            style={styles.bookmarkBadge}
-            onPress={(e) => handleRemoveFavorite(item.id, e)}
-          >
-            <Bookmark size={16} color={colors.dark.accent} fill={colors.dark.accent} />
-          </Pressable>
-        </View>
-      </View>
-    </Pressable>
-  );
+  const renderTextWithHighlight = (text: string, placeName?: string) => {
+    if (!placeName) return text;
+    
+    // Find the place name in the text (it might have ** around it or not)
+    const placePattern = new RegExp(`\\*\\*${placeName}\\*\\*|${placeName}`, 'gi');
+    const parts = text.split(placePattern);
+    const matches = text.match(placePattern) || [];
+    
+    return parts.map((part, index) => {
+      const match = matches[index];
+      if (match) {
+        const cleanMatch = match.replace(/\*\*/g, '');
+        return (
+          <React.Fragment key={index}>
+            {part}
+            <Text style={styles.highlightedPlace}>{cleanMatch}</Text>
+          </React.Fragment>
+        );
+      }
+      return part;
+    });
+  };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Saved Experiences</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.headerContent}>
+          <Sparkles size={28} color={colors.dark.primary} />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>BORED AI</Text>
+            <Text style={styles.headerSubtitle}>Your antidote to boredom</Text>
+          </View>
+        </View>
       </View>
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.dark.primary} />
-          <Text style={styles.loadingText}>Loading saved experiences...</Text>
-        </View>
-      ) : savedExperienceDetails.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Bookmark size={64} color={colors.dark.textTertiary} />
-          <Text style={styles.emptyTitle}>No Saved Experiences</Text>
-          <Text style={styles.emptyText}>
-            Start exploring and save your favorite experiences to see them here!
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.introSection}>
+          <Text style={styles.introText}>
+            Don't know what to do? Tell our sassy AI how you're feeling, and get a non-boring recommendation instantly.
           </Text>
-          <Pressable
-            style={styles.exploreButton}
-            onPress={() => router.push('/(tabs)/explore' as any)}
-          >
-            <Text style={styles.exploreButtonText}>Explore Experiences</Text>
-          </Pressable>
         </View>
-      ) : (
-        <FlatList
-          data={savedExperienceDetails}
-          renderItem={renderExperience}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </View>
+
+        <View style={styles.inputSection}>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. I want to eat vegetarian but make it cool..."
+              placeholderTextColor={colors.dark.textTertiary}
+              value={userVibe}
+              onChangeText={setUserVibe}
+              multiline
+              maxLength={200}
+              editable={!isLoading}
+            />
+            <Pressable
+              style={[styles.sendButton, (!userVibe.trim() || isLoading) && styles.sendButtonDisabled]}
+              onPress={() => handleSubmit()}
+              disabled={!userVibe.trim() || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={colors.dark.background} />
+              ) : (
+                <Send size={20} color={colors.dark.background} />
+              )}
+            </Pressable>
+          </View>
+
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.moodsContainer}
+          >
+            {moods.map((mood) => (
+              <Pressable
+                key={mood.label}
+                style={styles.moodChip}
+                onPress={() => handleMoodPress(mood.vibe)}
+                disabled={isLoading}
+              >
+                <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+                <Text style={styles.moodLabel}>{mood.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        {currentResponse && (
+          <View style={styles.responsesSection}>
+            <View style={styles.responseCard}>
+              <View style={styles.responseHeader}>
+                <Text style={styles.responseVibe}>"{currentResponse.vibe}"</Text>
+                <View style={styles.aiChoiceBadge}>
+                  <Text style={styles.aiChoiceText}>AI CHOICE</Text>
+                </View>
+              </View>
+              {fontsLoaded ? (
+                <Text style={[styles.responseText, { fontFamily: 'PermanentMarker_400Regular' }]}>
+                  {renderTextWithHighlight(currentResponse.recommendation.text, currentResponse.recommendation.placeName)}
+                </Text>
+              ) : (
+                <Text style={styles.responseText}>
+                  {renderTextWithHighlight(currentResponse.recommendation.text, currentResponse.recommendation.placeName)}
+                </Text>
+              )}
+              {currentResponse.recommendation.mapsUrl && (
+                <Pressable 
+                  style={styles.mapsButton}
+                  onPress={() => handleOpenMaps(currentResponse.recommendation.mapsUrl!)}
+                >
+                  <MapPin size={18} color={colors.dark.background} />
+                  <Text style={styles.mapsButtonText}>View on Maps</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+
+        {!currentResponse && !isLoading && (
+          <View style={styles.emptyState} />
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -149,149 +225,183 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.dark.border,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '900' as const,
     color: colors.dark.text,
+    letterSpacing: 0.5,
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  loadingText: {
+  headerSubtitle: {
     fontSize: 14,
     color: colors.dark.textSecondary,
+    marginTop: 2,
   },
-  emptyContainer: {
+  content: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
+  },
+  contentContainer: {
+    paddingBottom: 100,
+  },
+  introSection: {
+    padding: 20,
+    backgroundColor: '#2a2a2a',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.dark.primary,
+  },
+  introText: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+    lineHeight: 20,
+    textAlign: 'center' as const,
+  },
+  inputSection: {
+    padding: 16,
     gap: 16,
   },
-  emptyTitle: {
-    fontSize: 20,
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    padding: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.dark.text,
+    minHeight: 44,
+    maxHeight: 120,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.dark.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.dark.textTertiary,
+    opacity: 0.5,
+  },
+  moodsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingRight: 16,
+  },
+  moodChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  moodEmoji: {
+    fontSize: 18,
+  },
+  moodLabel: {
+    fontSize: 13,
     fontWeight: '900' as const,
     color: colors.dark.text,
-    marginTop: 16,
   },
-  emptyText: {
+  responsesSection: {
+    padding: 16,
+    gap: 16,
+  },
+  responseCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  responseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  responseVibe: {
+    flex: 1,
     fontSize: 14,
     color: colors.dark.textSecondary,
-    textAlign: 'center' as const,
-    lineHeight: 20,
+    fontStyle: 'italic' as const,
   },
-  exploreButton: {
+  aiChoiceBadge: {
     backgroundColor: colors.dark.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    transform: [{ rotate: '-2deg' }],
+  },
+  aiChoiceText: {
+    fontSize: 10,
+    fontWeight: '900' as const,
+    color: colors.dark.background,
+    letterSpacing: 0.5,
+  },
+  responseText: {
+    fontSize: 16,
+    color: colors.dark.text,
+    lineHeight: 24,
+    fontWeight: '500' as const,
+  },
+  highlightedPlace: {
+    color: colors.dark.primary, // Lime green color
+    fontWeight: '900' as const,
+  },
+  mapsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.dark.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderRadius: 12,
     marginTop: 8,
   },
-  exploreButtonText: {
-    fontSize: 16,
+  mapsButtonText: {
+    fontSize: 15,
     fontWeight: '900' as const,
     color: colors.dark.background,
+    letterSpacing: 0.3,
   },
-  listContent: {
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 16,
-    paddingBottom: 100,
+    minHeight: 400,
   },
-  card: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  cardImage: {
+  emptyStateImage: {
     width: '100%',
-    height: 200,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  providerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  providerLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  providerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.dark.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  providerInitial: {
-    fontSize: 14,
-    fontWeight: '900' as const,
-    color: colors.dark.background,
-  },
-  providerName: {
-    fontSize: 14,
-    fontWeight: '900' as const,
-    color: colors.dark.textSecondary,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
-    marginBottom: 12,
-    lineHeight: 24,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 12,
-    color: colors.dark.textSecondary,
-  },
-  metaDivider: {
-    fontSize: 12,
-    color: colors.dark.textTertiary,
-    marginHorizontal: 8,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  price: {
-    fontSize: 20,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
-  },
-  priceUnit: {
-    fontSize: 14,
-    fontWeight: '400' as const,
-    color: colors.dark.textSecondary,
-  },
-  bookmarkBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 255, 140, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    height: 400,
+    maxWidth: 600,
   },
 });

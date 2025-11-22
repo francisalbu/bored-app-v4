@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   trendingCard: {
     width: 280,
-    backgroundColor: colors.dark.card,
+    backgroundColor: '#2a2a2a',
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: CARD_WIDTH,
-    backgroundColor: colors.dark.card,
+    backgroundColor: '#2a2a2a',
     borderRadius: 12,
     overflow: 'hidden',
   },

@@ -260,6 +260,10 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
 
   return (
     <Pressable style={styles.card}>
+      {/* Ticket notches */}
+      <View style={styles.ticketNotchLeft} />
+      <View style={styles.ticketNotchRight} />
+      
       <Image
         source={experience?.images?.[0] || { uri: booking.experience_image }}
         style={styles.cardImage}
@@ -420,14 +424,37 @@ const styles = StyleSheet.create({
     maxWidth: 250,
   },
   card: {
-    backgroundColor: colors.dark.card,
+    backgroundColor: '#2a2a2a',
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: 'visible',
     marginBottom: 16,
+    position: 'relative',
+  },
+  ticketNotchLeft: {
+    position: 'absolute',
+    left: -8,
+    top: '45%',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.dark.background,
+    zIndex: 10,
+  },
+  ticketNotchRight: {
+    position: 'absolute',
+    right: -8,
+    top: '45%',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.dark.background,
+    zIndex: 10,
   },
   cardImage: {
     width: '100%',
     height: 180,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   providerLogoContainer: {
     position: 'absolute',
