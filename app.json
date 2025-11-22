@@ -4,7 +4,7 @@
     "slug": "bored-tourist",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "https://storage.googleapis.com/bored_tourist_media/images/Icons/appstore.png",
     "scheme": "boredtourist",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
