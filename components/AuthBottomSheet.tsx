@@ -20,6 +20,7 @@ import colors from '@/constants/colors';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 
 // Complete the auth session when returning to app
@@ -39,17 +40,23 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
   // Listen for OAuth callback deep links
   useEffect(() => {
+    console.log('🎯 Deep link listener initialized');
+    
     // Handler for deep link events
     const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 Deep link received:', event.url);
+      console.log('🔍 Checking for OAuth callback...');
       
       // Check if this is an OAuth callback
-      if (event.url.includes('?code=') || event.url.includes('#access_token=')) {
-        console.log('✅ OAuth callback detected');
+      if (event.url.includes('?code=') || event.url.includes('#access_token=') || event.url.includes('auth/callback')) {
+        console.log('✅ OAuth callback detected!');
         
         try {
           const url = new URL(event.url);
+          console.log('📋 URL params:', Array.from(url.searchParams.entries()));
+          
           const code = url.searchParams.get('code');
+          console.log('🔑 Authorization code:', code ? 'FOUND' : 'NOT FOUND');
           
           if (code) {
             console.log('🔄 Exchanging authorization code for session...');
@@ -64,7 +71,7 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
             }
             
             if (data?.session) {
-              console.log('✅ Session established successfully!');
+              console.log('✅✅✅ Session established successfully!');
               console.log('📧 User:', data.session.user.email);
               
               // Close the auth modal
@@ -74,12 +81,18 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
               if (onSuccess) {
                 onSuccess();
               }
+            } else {
+              console.log('⚠️ No session in response');
             }
+          } else {
+            console.log('⚠️ No code found in URL params');
           }
         } catch (error) {
           console.error('❌ Error processing callback:', error);
           Alert.alert('Authentication Error', 'Failed to complete sign in.');
         }
+      } else {
+        console.log('ℹ️ Not an OAuth callback, ignoring');
       }
     };
 
@@ -106,12 +119,20 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
       console.log('🔐 Starting Google Sign-In with Supabase...');
       
-      // Use Supabase OAuth with manual redirect handling (Expo pattern)
-      // This is the recommended approach for Expo React Native apps
+      // Create proper redirect URL using AuthSession
+      // This automatically uses the correct scheme for production/development
+      const redirectUrl = AuthSession.makeRedirectUri({
+        scheme: 'app.rork.bored-explorer',
+        path: 'auth/callback',
+      });
+      
+      console.log('🔗 Redirect URL:', redirectUrl);
+      
+      // Use Supabase OAuth with the correct redirect URL
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'app.rork.bored-explorer://auth/callback',
+          redirectTo: redirectUrl,
           skipBrowserRedirect: true, // We handle the redirect manually via deep link
         },
       });
@@ -135,7 +156,7 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       // The deep link listener will handle the callback
       const result = await WebBrowser.openAuthSessionAsync(
         data.url,
-        'app.rork.bored-explorer://auth/callback'
+        redirectUrl
       );
 
       console.log('🔙 Browser result:', result.type);
