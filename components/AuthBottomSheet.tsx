@@ -106,9 +106,15 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
       console.log('🔐 Starting Google Sign-In...');
       
-      // Use the custom URL scheme directly (não usar Linking.createURL que gera exp://)
-      const redirectUrl = 'boredtourist://auth/callback';
+      // Get the correct redirect URL based on environment
+      // For TestFlight/Production builds, use the bundle identifier scheme
+      // For Expo Go, use the exp:// scheme
+      const redirectUrl = __DEV__ 
+        ? 'boredtourist://auth/callback'
+        : 'app.rork.bored-explorer://auth/callback';
+      
       console.log('🔗 Redirect URL:', redirectUrl);
+      console.log('🏗️ Environment:', __DEV__ ? 'Development' : 'Production');
       
       // Initiate OAuth flow
       const { data, error } = await supabase.auth.signInWithOAuth({

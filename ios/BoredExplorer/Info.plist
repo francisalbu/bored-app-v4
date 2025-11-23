@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Bored Explorer</string>
+    <string>Bored Tourist</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -27,8 +27,9 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>boredtravel</string>
+          <string>boredtourist</string>
           <string>app.rork.bored-explorer</string>
+          <string>boredtravel</string>
         </array>
       </dict>
     </array>
