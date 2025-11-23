@@ -45,54 +45,53 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
     // Handler for deep link events
     const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 Deep link received:', event.url);
-      console.log('🔍 Checking for OAuth callback...');
       
-      // Check if this is an OAuth callback
-      if (event.url.includes('?code=') || event.url.includes('#access_token=') || event.url.includes('auth/callback')) {
-        console.log('✅ OAuth callback detected!');
+      // Show alert for debugging
+      Alert.alert('Deep Link Received', event.url);
+      
+      // Check if this is an OAuth callback - be very permissive
+      if (event.url && (event.url.includes('auth') || event.url.includes('code=') || event.url.includes('access_token'))) {
+        console.log('✅ Potential OAuth callback detected!');
         
         try {
-          const url = new URL(event.url);
-          console.log('📋 URL params:', Array.from(url.searchParams.entries()));
+          // Try to parse as URL
+          const url = new URL(event.url.replace('://', '://dummy'));
           
-          const code = url.searchParams.get('code');
-          console.log('🔑 Authorization code:', code ? 'FOUND' : 'NOT FOUND');
+          // Try to get code from query params
+          let code = url.searchParams.get('code');
+          
+          // If no code in search params, try hash
+          if (!code && url.hash) {
+            const hashParams = new URLSearchParams(url.hash.substring(1));
+            code = hashParams.get('code');
+          }
+          
+          console.log('🔑 Code found:', code ? 'YES' : 'NO');
           
           if (code) {
-            console.log('🔄 Exchanging authorization code for session...');
+            console.log('🔄 Exchanging code for session...');
             
-            // Exchange the code for a session
             const { data, error } = await supabase.auth.exchangeCodeForSession(code);
             
             if (error) {
-              console.error('❌ Error exchanging code:', error);
-              Alert.alert('Authentication Error', error.message);
+              console.error('❌ Error:', error);
+              Alert.alert('Error', error.message);
               return;
             }
             
             if (data?.session) {
-              console.log('✅✅✅ Session established successfully!');
-              console.log('📧 User:', data.session.user.email);
-              
-              // Close the auth modal
+              console.log('✅ Session created!');
+              Alert.alert('Success!', 'Logged in as: ' + data.session.user.email);
               onClose();
-              
-              // Call success callback if provided
-              if (onSuccess) {
-                onSuccess();
-              }
-            } else {
-              console.log('⚠️ No session in response');
+              if (onSuccess) onSuccess();
             }
           } else {
-            console.log('⚠️ No code found in URL params');
+            Alert.alert('Debug', 'No code found in URL');
           }
-        } catch (error) {
-          console.error('❌ Error processing callback:', error);
-          Alert.alert('Authentication Error', 'Failed to complete sign in.');
+        } catch (error: any) {
+          console.error('❌ Error:', error);
+          Alert.alert('Error parsing URL', error.message);
         }
-      } else {
-        console.log('ℹ️ Not an OAuth callback, ignoring');
       }
     };
 
@@ -119,21 +118,17 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
       console.log('🔐 Starting Google Sign-In with Supabase...');
       
-      // Create proper redirect URL using AuthSession
-      // This automatically uses the correct scheme for production/development
-      const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: 'app.rork.bored-explorer',
-        path: 'auth/callback',
-      });
+      // Use the simplest scheme for maximum reliability
+      const redirectUrl = 'boredtourist://';
       
       console.log('🔗 Redirect URL:', redirectUrl);
       
-      // Use Supabase OAuth with the correct redirect URL
+      // Use Supabase OAuth with automatic redirect handling
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: true, // We handle the redirect manually via deep link
+          // Let Supabase SDK handle the browser redirect automatically
         },
       });
 
@@ -149,26 +144,25 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
         return;
       }
 
-      console.log('🌐 Opening OAuth URL...');
+      console.log('🌐 Opening OAuth URL with Supabase automatic handling...');
       console.log('📍 OAuth URL:', data.url);
       
-      // Open the OAuth URL in an in-app browser
-      // The deep link listener will handle the callback
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        redirectUrl
-      );
-
-      console.log('🔙 Browser result:', result.type);
-
-      if (result.type === 'cancel') {
-        console.log('ℹ️ User cancelled OAuth');
-        Alert.alert('Cancelled', 'You cancelled the authentication');
-      } else if (result.type === 'dismiss') {
-        console.log('ℹ️ Browser dismissed');
-      }
+      // Let Supabase SDK open the browser automatically
+      // It will handle the callback and session creation
+      await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
       
-      // Success case is handled by the deep link listener above
+      // The session will be automatically set by Supabase SDK
+      // Check if we have a session now
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (sessionData?.session) {
+        console.log('✅ Login successful!');
+        Alert.alert('Success', 'Logged in successfully!');
+        onClose();
+        if (onSuccess) onSuccess();
+      } else {
+        console.log('ℹ️ No session found - user may have cancelled');
+      }
 
     } catch (error: any) {
       console.error('❌ Google sign in error:', error);
