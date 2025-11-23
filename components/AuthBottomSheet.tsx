@@ -104,21 +104,15 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       setLoadingProvider('google');
       setIsLoading(true);
 
-      console.log('🔐 Starting Google Sign-In...');
+      console.log('🔐 Starting Google Sign-In with Supabase...');
       
-      // Get the correct redirect URL based on environment
-      // Always use the bundle identifier scheme for production builds
-      // This works for both TestFlight and App Store
-      const redirectUrl = 'app.rork.bored-explorer://auth/callback';
-      
-      console.log('🔗 Redirect URL:', redirectUrl);
-      
-      // Initiate OAuth flow
+      // Use Supabase OAuth with manual redirect handling (Expo pattern)
+      // This is the recommended approach for Expo React Native apps
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true, // We'll handle the redirect manually
+          redirectTo: 'app.rork.bored-explorer://auth/callback',
+          skipBrowserRedirect: true, // We handle the redirect manually via deep link
         },
       });
 
@@ -135,62 +129,25 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       }
 
       console.log('🌐 Opening OAuth URL...');
+      console.log('📍 OAuth URL:', data.url);
       
       // Open the OAuth URL in an in-app browser
+      // The deep link listener will handle the callback
       const result = await WebBrowser.openAuthSessionAsync(
         data.url,
-        redirectUrl
+        'app.rork.bored-explorer://auth/callback'
       );
 
       console.log('🔙 Browser result:', result.type);
-      console.log('🔙 Browser result data:', JSON.stringify(result));
 
-      if (result.type === 'success' && result.url) {
-        console.log('✅ OAuth completed, processing callback URL:', result.url);
-        
-        // Extract the authorization code from the URL
-        try {
-          const url = new URL(result.url);
-          console.log('🔍 Parsing URL params...');
-          console.log('🔍 Full URL:', result.url);
-          const code = url.searchParams.get('code');
-          console.log('🔍 Code found:', code ? 'YES' : 'NO');
-          
-          if (code) {
-            console.log('🔄 Exchanging authorization code for session...');
-            
-            // Exchange the code for a session
-            const { data: sessionData, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
-            
-            if (sessionError) {
-              console.error('❌ Error exchanging code:', sessionError);
-              Alert.alert('Authentication Error', sessionError.message);
-              return;
-            }
-            
-            if (sessionData?.session) {
-              console.log('✅✅✅ SESSION ESTABLISHED!');
-              console.log('📧 User:', sessionData.session.user.email);
-              
-              // Close the auth modal
-              onClose();
-              
-              // Call success callback if provided
-              if (onSuccess) {
-                onSuccess();
-              }
-            }
-          } else {
-            console.error('❌ No authorization code found in URL');
-            Alert.alert('Authentication Error', 'No authorization code received.');
-          }
-        } catch (urlError) {
-          console.error('❌ Error parsing callback URL:', urlError);
-          Alert.alert('Authentication Error', 'Failed to process callback.');
-        }
-      } else if (result.type === 'cancel') {
+      if (result.type === 'cancel') {
         console.log('ℹ️ User cancelled OAuth');
+        Alert.alert('Cancelled', 'You cancelled the authentication');
+      } else if (result.type === 'dismiss') {
+        console.log('ℹ️ Browser dismissed');
       }
+      
+      // Success case is handled by the deep link listener above
 
     } catch (error: any) {
       console.error('❌ Google sign in error:', error);
