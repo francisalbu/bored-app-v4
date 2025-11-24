@@ -25,7 +25,8 @@ export default function AuthCallbackScreen() {
       console.log('🔄 Auth Callback - Processing OAuth redirect...');
       console.log('📍 URL params:', JSON.stringify(params, null, 2));
       
-      // Extract tokens from URL params if they exist
+      // Extract code or tokens from URL params
+      const code = params.code as string;
       const accessToken = params.access_token as string;
       const refreshToken = params.refresh_token as string;
       const errorParam = params.error as string;
@@ -39,6 +40,39 @@ export default function AuthCallbackScreen() {
         return;
       }
       
+      // Handle PKCE flow (code exchange)
+      if (code) {
+        console.log('🔑 Authorization code found! Exchanging for session...');
+        
+        const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        
+        if (exchangeError) {
+          console.error('❌ Error exchanging code:', exchangeError);
+          router.replace('/(tabs)/profile');
+          return;
+        }
+        
+        if (sessionData?.session) {
+          console.log('✅ Session established via code exchange!');
+          console.log('📧 Email:', sessionData.session.user.email);
+          console.log('👤 User ID:', sessionData.session.user.id);
+          
+          // Sync with backend
+          try {
+            await refreshUser();
+            console.log('✅ User synced with backend!');
+          } catch (syncError) {
+            console.log('⚠️ Backend sync failed (continuing):', syncError);
+          }
+          
+          // Redirect to home
+          console.log('🏠 Redirecting to home...');
+          router.replace('/(tabs)');
+          return;
+        }
+      }
+      
+      // Handle Implicit flow (direct tokens)
       if (accessToken && refreshToken) {
         console.log('🔑 Tokens found in URL params!');
         console.log('🔄 Setting session...');
