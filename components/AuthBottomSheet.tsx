@@ -118,8 +118,8 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
       console.log('🔐 Starting Google Sign-In with Supabase...');
       
-      // Use the simplest scheme for maximum reliability
-      const redirectUrl = 'boredtourist://';
+      // Use scheme with explicit path - Supabase needs this!
+      const redirectUrl = 'boredtourist://auth/callback';
       
       console.log('🔗 Redirect URL:', redirectUrl);
       
@@ -128,7 +128,9 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          // Let Supabase SDK handle the browser redirect automatically
+          queryParams: {
+            prompt: 'select_account', // Always show account selection
+          },
         },
       });
 
@@ -144,24 +146,52 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
         return;
       }
 
-      console.log('🌐 Opening OAuth URL with Supabase automatic handling...');
+      console.log('🌐 Opening OAuth URL...');
       console.log('📍 OAuth URL:', data.url);
       
-      // Let Supabase SDK open the browser automatically
-      // It will handle the callback and session creation
-      await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      // Open the browser and wait for result
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
       
-      // The session will be automatically set by Supabase SDK
-      // Check if we have a session now
-      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('🔙 Browser closed, result type:', result.type);
       
-      if (sessionData?.session) {
-        console.log('✅ Login successful!');
-        Alert.alert('Success', 'Logged in successfully!');
-        onClose();
-        if (onSuccess) onSuccess();
+      if (result.type === 'success' && result.url) {
+        console.log('✅ OAuth completed successfully!');
+        console.log('📦 Result URL:', result.url);
+        
+        // Extract the code from the URL
+        try {
+          const url = new URL(result.url);
+          const code = url.searchParams.get('code');
+          
+          if (code) {
+            console.log('🔑 Authorization code found! Exchanging for session...');
+            
+            const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            
+            if (exchangeError) {
+              console.error('❌ Error exchanging code:', exchangeError);
+              Alert.alert('Error', 'Failed to complete authentication: ' + exchangeError.message);
+              return;
+            }
+            
+            if (sessionData?.session) {
+              console.log('✅✅✅ SESSION ESTABLISHED! ✅✅✅');
+              console.log('📧 User:', sessionData.session.user.email);
+              Alert.alert('Success!', 'Logged in as: ' + sessionData.session.user.email);
+              onClose();
+              if (onSuccess) onSuccess();
+              return;
+            }
+          } else {
+            console.log('⚠️ No code found in URL');
+          }
+        } catch (urlError) {
+          console.error('❌ Error parsing URL:', urlError);
+        }
+      } else if (result.type === 'cancel') {
+        console.log('ℹ️ User cancelled OAuth');
       } else {
-        console.log('ℹ️ No session found - user may have cancelled');
+        console.log('⚠️ OAuth did not complete, type:', result.type);
       }
 
     } catch (error: any) {

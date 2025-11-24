@@ -9,6 +9,7 @@ import { useFonts, Inter_300Light, Inter_400Regular, Inter_600SemiBold, Inter_80
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { BookingsProvider } from '@/contexts/BookingsContext';
+import * as Linking from 'expo-linking';
 
 // Stripe publishable key - TEST MODE 🧪
 // ⚠️ IMPORTANT: This is a TEST key - no real money will be charged!
@@ -53,6 +54,27 @@ export default function RootLayout() {
   useEffect(() => {
     console.log('[Bored App] App is starting...');
     
+    // Listen for deep links (OAuth callbacks)
+    const handleDeepLink = (event: { url: string }) => {
+      console.log('🔗 [ROOT] Deep link received:', event.url);
+      
+      // Check if it's an OAuth callback
+      if (event.url.includes('code=') || event.url.includes('access_token')) {
+        console.log('✅ [ROOT] OAuth callback detected!');
+      }
+    };
+    
+    // Subscribe to deep link events
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    
+    // Check if app was opened with a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('🔗 [ROOT] Initial URL:', url);
+        handleDeepLink({ url });
+      }
+    });
+    
     // Wake up the backend server (Render free tier sleeps after 15min)
     const wakeUpServer = async () => {
       try {
@@ -69,6 +91,11 @@ export default function RootLayout() {
     };
     
     wakeUpServer();
+    
+    // Cleanup
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   useEffect(() => {
