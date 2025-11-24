@@ -136,6 +136,11 @@ export default function ProfileScreen() {
         <AuthBottomSheet
           visible={showAuthSheet}
           onClose={() => setShowAuthSheet(false)}
+          onSuccess={() => {
+            console.log('🎉 Auth success - refreshing profile');
+            setShowAuthSheet(false);
+            // The auth context will auto-update and trigger a re-render
+          }}
         />
       </View>
     );

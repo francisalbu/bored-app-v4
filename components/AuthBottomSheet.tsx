@@ -19,9 +19,8 @@ import { X } from 'lucide-react-native';
 import colors from '@/constants/colors';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 // Complete the auth session when returning to app
 WebBrowser.maybeCompleteAuthSession();
@@ -38,78 +37,31 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
-  // Listen for OAuth callback deep links
+  // Listen for OAuth callback deep links - SIMPLIFIED
+  // Let Supabase handle the code exchange automatically!
   useEffect(() => {
-    console.log('🎯 Deep link listener initialized');
-    
-    // Handler for deep link events
     const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 Deep link received:', event.url);
       
-      // Show alert for debugging
-      Alert.alert('Deep Link Received', event.url);
-      
-      // Check if this is an OAuth callback - be very permissive
-      if (event.url && (event.url.includes('auth') || event.url.includes('code=') || event.url.includes('access_token'))) {
-        console.log('✅ Potential OAuth callback detected!');
+      // Just detect if this looks like an OAuth success callback
+      // Don't try to manually exchange the code - Supabase will do it!
+      if (event.url && (event.url.includes('access_token') || event.url.includes('code='))) {
+        console.log('✅ OAuth callback detected! Supabase will handle the token exchange.');
+        console.log('⏳ Closing modal and waiting for onAuthStateChange...');
         
-        try {
-          // Try to parse as URL
-          const url = new URL(event.url.replace('://', '://dummy'));
-          
-          // Try to get code from query params
-          let code = url.searchParams.get('code');
-          
-          // If no code in search params, try hash
-          if (!code && url.hash) {
-            const hashParams = new URLSearchParams(url.hash.substring(1));
-            code = hashParams.get('code');
-          }
-          
-          console.log('🔑 Code found:', code ? 'YES' : 'NO');
-          
-          if (code) {
-            console.log('🔄 Exchanging code for session...');
-            
-            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-            
-            if (error) {
-              console.error('❌ Error:', error);
-              Alert.alert('Error', error.message);
-              return;
-            }
-            
-            if (data?.session) {
-              console.log('✅ Session created!');
-              Alert.alert('Success!', 'Logged in as: ' + data.session.user.email);
-              onClose();
-              if (onSuccess) onSuccess();
-            }
-          } else {
-            Alert.alert('Debug', 'No code found in URL');
-          }
-        } catch (error: any) {
-          console.error('❌ Error:', error);
-          Alert.alert('Error parsing URL', error.message);
-        }
+        // Close the modal - the auth context listener will handle the rest
+        onClose();
       }
     };
 
     // Subscribe to URL events
     const subscription = Linking.addEventListener('url', handleDeepLink);
 
-    // Check if app was opened with a URL (cold start)
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
     // Cleanup subscription
     return () => {
       subscription.remove();
     };
-  }, [onClose, onSuccess]);
+  }, [onClose]);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -118,8 +70,8 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
       console.log('🔐 Starting Google Sign-In with Supabase...');
       
-      // Use scheme with explicit path - Supabase needs this!
-      const redirectUrl = 'boredtourist://auth/callback';
+      // Use base scheme only - let Supabase handle the callback automatically
+      const redirectUrl = Linking.createURL('/');
       
       console.log('🔗 Redirect URL:', redirectUrl);
       
@@ -149,45 +101,19 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       console.log('🌐 Opening OAuth URL...');
       console.log('📍 OAuth URL:', data.url);
       
-      // Open the browser and wait for result
+      // Open the browser - Let Supabase handle the code exchange automatically!
+      // The onAuthStateChange listener will catch when the session is ready
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
       
       console.log('🔙 Browser closed, result type:', result.type);
       
-      if (result.type === 'success' && result.url) {
-        console.log('✅ OAuth completed successfully!');
-        console.log('📦 Result URL:', result.url);
+      if (result.type === 'success') {
+        console.log('✅ OAuth flow completed! Supabase will handle the rest.');
+        console.log('⏳ Waiting for onAuthStateChange to fire...');
         
-        // Extract the code from the URL
-        try {
-          const url = new URL(result.url);
-          const code = url.searchParams.get('code');
-          
-          if (code) {
-            console.log('🔑 Authorization code found! Exchanging for session...');
-            
-            const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-            
-            if (exchangeError) {
-              console.error('❌ Error exchanging code:', exchangeError);
-              Alert.alert('Error', 'Failed to complete authentication: ' + exchangeError.message);
-              return;
-            }
-            
-            if (sessionData?.session) {
-              console.log('✅✅✅ SESSION ESTABLISHED! ✅✅✅');
-              console.log('📧 User:', sessionData.session.user.email);
-              Alert.alert('Success!', 'Logged in as: ' + sessionData.session.user.email);
-              onClose();
-              if (onSuccess) onSuccess();
-              return;
-            }
-          } else {
-            console.log('⚠️ No code found in URL');
-          }
-        } catch (urlError) {
-          console.error('❌ Error parsing URL:', urlError);
-        }
+        // Close the modal - the auth context will update automatically
+        onClose();
+        
       } else if (result.type === 'cancel') {
         console.log('ℹ️ User cancelled OAuth');
       } else {
