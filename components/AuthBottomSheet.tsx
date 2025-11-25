@@ -25,8 +25,9 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+// import * as AuthSession from 'expo-auth-session'; // Não é necessário para este fluxo
 
-// Complete the auth session when returning to app
+// Permite ao WebBrowser completar a sessão quando o app reabre
 WebBrowser.maybeCompleteAuthSession();
 
 interface AuthBottomSheetProps {
@@ -41,36 +42,31 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
-  // Listen for OAuth callback deep links - SIMPLIFIED
-  // Let Supabase handle the code exchange automatically!
+  // 🛑 ERRO CORRIGIDO AQUI: Removemos TODA a lógica manual de troca de código/token.
+  // Agora, o useEffect apenas fecha o modal após o redirecionamento.
   useEffect(() => {
     const handleDeepLink = async (event: { url: string }) => {
-      console.log('🔗 Deep link received:', event.url);
+      console.log('=== DEEP LINK RECEIVED (CLEANED) ===');
+      console.log('Full URL:', event.url);
       
-      // Parse the URL to check for OAuth parameters
-      const url = event.url;
+      const urlStr = event.url;
       
-      // Check if this is an OAuth callback (will have either access_token or code)
-      if (url && (url.includes('access_token') || url.includes('code='))) {
-        console.log('✅ OAuth callback detected! Supabase will handle the session.');
+      // Se a URL contém tokens ou código, significa que o login foi bem-sucedido no browser.
+      if (urlStr.includes('#access_token=') || urlStr.includes('?code=') || urlStr.includes('&code=')) {
+        console.log('✅ OAuth callback detected! Closing modal and waiting for AuthContext...');
         
-        // Give Supabase a moment to process the session
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Close the modal - the auth context listener will handle the rest
+        // O Supabase SDK irá detetar este evento e tratar da troca de código PKCE internamente.
+        // Se a troca for bem-sucedida, o AuthContext irá detetar o evento SIGNED_IN.
         onClose();
         
-        console.log('⏳ Waiting for onAuthStateChange to fire...');
+      } else {
+        console.log('URL does not contain auth tokens or code (Not a success)');
       }
     };
 
-    // Subscribe to URL events
+    // Assina o listener de URL
     const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Cleanup subscription
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, [onClose]);
 
   const handleGoogleSignIn = async () => {
@@ -78,62 +74,60 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       setLoadingProvider('google');
       setIsLoading(true);
 
-      console.log('🔐 Starting Google Sign-In with Supabase...');
+      console.log('=== STARTING GOOGLE SIGN-IN ===');
       
-      // Use the EXACT redirect URL configured in Supabase
-      // For TestFlight/production, use the custom scheme
-      const redirectUrl = 'app.rork.bored-explorer://';
+      // ⚠️ MELHOR PRÁTICA: Gerar a URL de redirecionamento base
+      // Isso usa o esquema definido no seu app.json (ex: boredtourist://)
+      const redirectURL_BASE = Linking.createURL('/'); 
+
+      // 🛑 CORREÇÃO DE CONSISTÊNCIA: Use a URL base gerada para todas as chamadas!
       
-      console.log('🔗 Redirect URL:', redirectUrl);
-      
-      // Use Supabase OAuth with automatic redirect handling
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
+          // Use a URL base (ex: boredtourist://)
+          redirectTo: redirectURL_BASE,
+          skipBrowserRedirect: false,
           queryParams: {
-            prompt: 'select_account', // Always show account selection
+            access_type: 'offline',
+            prompt: 'select_account', // Force account selection
           },
         },
       });
 
       if (error) {
-        console.error('❌ OAuth error:', error);
-        Alert.alert('Error', 'Failed to start Google sign in: ' + error.message);
-        return;
+        console.error('OAuth error:', error);
+        throw error;
       }
 
       if (!data?.url) {
-        console.error('❌ No OAuth URL returned');
-        Alert.alert('Error', 'Unable to start authentication.');
-        return;
+        throw new Error('No OAuth URL returned');
       }
 
-      console.log('🌐 Opening OAuth URL...');
-      console.log('📍 OAuth URL:', data.url);
-      
-      // Open the browser - Let Supabase handle the code exchange automatically!
-      // The onAuthStateChange listener will catch when the session is ready
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-      
-      console.log('🔙 Browser closed, result type:', result.type);
-      
+      console.log('OAuth URL received:', data.url.substring(0, 100) + '...');
+      console.log('Opening browser...');
+
+      // Abre o browser - O segundo parâmetro DEVE ser a URL de redirecionamento esperada
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectURL_BASE 
+      );
+
+      console.log('=== BROWSER CLOSED ===');
+      console.log('Result type:', result.type);
+
       if (result.type === 'success') {
-        console.log('✅ OAuth flow completed! Supabase will handle the rest.');
-        console.log('⏳ Waiting for onAuthStateChange to fire...');
-        
-        // Close the modal - the auth context will update automatically
+        console.log('✅ OAuth flow completed! Waiting for AuthContext to detect SIGNED_IN...');
+        // O AuthContext (onAuthStateChange) é quem vai detetar a sessão e navegar.
         onClose();
-        
       } else if (result.type === 'cancel') {
-        console.log('ℹ️ User cancelled OAuth');
-      } else {
-        console.log('⚠️ OAuth did not complete, type:', result.type);
+        console.log('User cancelled');
+        Alert.alert('Cancelado', 'Login foi cancelado');
       }
-
     } catch (error: any) {
-      console.error('❌ Google sign in error:', error);
-      Alert.alert('Error', error.message || 'Failed to sign in with Google.');
+      console.error('=== GOOGLE SIGN-IN ERROR ===');
+      console.error(error);
+      Alert.alert('Erro', error.message || 'Falha ao entrar com Google');
     } finally {
       setIsLoading(false);
       setLoadingProvider(null);
@@ -155,12 +149,11 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
     }
 
     onClose();
-    // Route to login page (not signup) - users with existing accounts want to sign in
     router.push({
       pathname: '/auth/login',
       params: { 
         email,
-        returnTo: onSuccess ? 'payment' : 'home' // Tell login where to go after success
+        returnTo: onSuccess ? 'payment' : 'home'
       },
     });
   };
@@ -201,80 +194,81 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-            <Text style={styles.subtitle}>
-              Access your tickets easily from any device with your Bored Tourist account.
-            </Text>
-
-            {/* Social Sign In Buttons */}
-            <View style={styles.socialButtons}>
-              {/* Apple Sign In - TEMPORARILY DISABLED */}
-              <Pressable
-                style={[styles.socialButton, styles.appleButton, { opacity: 0.5 }]}
-                disabled={true}
-              >
-                <Text style={styles.appleIcon}></Text>
-                <Text style={styles.socialButtonText}>Continue with Apple (coming soon)</Text>
-              </Pressable>
-
-              {/* Google Sign In */}
-              <Pressable
-                style={[styles.socialButton, styles.googleButton]}
-                onPress={handleGoogleSignIn}
-                disabled={isLoading}
-              >
-                {loadingProvider === 'google' ? (
-                  <ActivityIndicator color={colors.dark.text} />
-                ) : (
-                  <>
-                    <Text style={styles.googleIcon}>G</Text>
-                    <Text style={[styles.socialButtonText, styles.googleButtonText]}>
-                      Continue with Google
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-
-              {/* Facebook Sign In - TEMPORARILY DISABLED */}
-              <Pressable
-                style={[styles.socialButton, styles.facebookButton, { opacity: 0.5 }]}
-                disabled={true}
-              >
-                <Text style={styles.facebookIcon}>f</Text>
-                <Text style={[styles.socialButtonText, styles.facebookButtonText]}>
-                  Continue with Facebook (coming soon)
+                <Text style={styles.subtitle}>
+                  Access your tickets easily from any device with your Bored Tourist account.
                 </Text>
-              </Pressable>
-            </View>
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
+                {/* Social Sign In Buttons */}
+                <View style={styles.socialButtons}>
+                  {/* Apple Sign In - TEMPORARILY DISABLED */}
+                  <Pressable
+                    style={[styles.socialButton, styles.appleButton, { opacity: 0.5 }]}
+                    disabled={true}
+                  >
+                    <Text style={styles.appleIcon}></Text>
+                    <Text style={styles.socialButtonText}>Continue with Apple (coming soon)</Text>
+                  </Pressable>
 
-            {/* Email Input */}
-            <View style={styles.emailSection}>
-              <TextInput
-                style={styles.input}
-                placeholder="Email address"
-                placeholderTextColor={colors.dark.textTertiary}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isLoading}
-              />
+                  {/* Google Sign In */}
+                  <Pressable
+                    style={[styles.socialButton, styles.googleButton]}
+                    onPress={handleGoogleSignIn}
+                    disabled={isLoading}
+                  >
+                    {loadingProvider === 'google' ? (
+                      <ActivityIndicator color={colors.dark.text} />
+                    ) : (
+                      <>
+                        <Text style={styles.googleIcon}>G</Text>
+                        <Text style={[styles.socialButtonText, styles.googleButtonText]}>
+                          Continue with Google
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
 
-              <Pressable
-                style={[styles.continueButton, (!email || isLoading) && styles.continueButtonDisabled]}
-                onPress={handleEmailContinue}
-                disabled={!email || isLoading}
-              >
-                <Text style={styles.continueButtonText}>Continue with email</Text>
-              </Pressable>
-            </View>
+                  {/* Facebook Sign In - TEMPORARILY DISABLED */}
+                  <Pressable
+                    style={[styles.socialButton, styles.facebookButton, { opacity: 0.5 }]}
+                    disabled={true}
+                  >
+                    <Text style={styles.facebookIcon}>f</Text>
+                    <Text style={[styles.socialButtonText, styles.facebookButtonText]}>
+                      Continue with Facebook (coming soon)
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Divider */}
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                {/* Email Input */}
+                <View style={styles.emailSection}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email address"
+                    placeholderTextColor={colors.dark.textTertiary}
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!isLoading}
+                  />
+
+                  {/* Continue Button */}
+                  <Pressable
+                    style={[styles.continueButton, (!email || isLoading) && styles.continueButtonDisabled]}
+                    onPress={handleEmailContinue}
+                    disabled={!email || isLoading}
+                  >
+                    <Text style={styles.continueButtonText}>Continue with email</Text>
+                  </Pressable>
+                </View>
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
@@ -283,6 +277,8 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
     </Modal>
   );
 }
+
+// ... (Restante dos styles omitidos)
 
 const styles = StyleSheet.create({
   overlay: {

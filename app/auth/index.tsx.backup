@@ -39,7 +39,7 @@ export default function AuthIndexScreen() {
       setLoadingProvider('google');
       setIsLoading(true);
 
-      console.log('Starting Google Sign-In...');
+      console.log('🔐 Starting Google Sign-In...');
 
       // Request OAuth URL from Supabase
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -53,7 +53,7 @@ export default function AuthIndexScreen() {
         throw error || new Error('No OAuth URL returned');
       }
 
-      console.log('Opening browser with AuthSession...');
+      console.log('🌐 Opening browser with AuthSession...');
 
       // Open browser using AuthSession (better than WebBrowser for OAuth)
       const result = await AuthSession.openAuthSessionAsync(
@@ -61,10 +61,10 @@ export default function AuthIndexScreen() {
         'app.rork.bored-explorer://'
       );
 
-      console.log('Browser result:', result.type);
+      console.log('🔙 Browser result:', result.type);
 
       if (result.type === 'success' && result.url) {
-        console.log('Got redirect URL with tokens!');
+        console.log('✅ Got redirect URL with tokens!');
         
         // Parse the URL to extract tokens
         const url = new URL(result.url);
@@ -74,7 +74,7 @@ export default function AuthIndexScreen() {
         const access_token = params.get('access_token');
         const refresh_token = params.get('refresh_token');
 
-        console.log('Tokens found:', {
+        console.log('🔑 Tokens found:', {
           hasAccessToken: !!access_token,
           hasRefreshToken: !!refresh_token,
         });
@@ -90,8 +90,8 @@ export default function AuthIndexScreen() {
             throw sessionError;
           }
 
-          console.log('Session set! User:', sessionData.session?.user.email);
-          console.log('Redirecting to home...');
+          console.log('✅ Session set! User:', sessionData.session?.user.email);
+          console.log('🏠 Redirecting to home...');
 
           // Navigate to home
           router.replace('/(tabs)');
@@ -99,13 +99,60 @@ export default function AuthIndexScreen() {
           throw new Error('No tokens in redirect URL');
         }
       } else if (result.type === 'cancel') {
-        console.log('User cancelled');
+        console.log('❌ User cancelled');
         Alert.alert('Cancelado', 'Login com Google foi cancelado');
       } else {
         throw new Error(`Unexpected result type: ${result.type}`);
       }
     } catch (error: any) {
-      console.error('Google Sign-In error:', error);
+      console.error('❌ Google Sign-In error:', error);
+      Alert.alert('Erro', error.message || 'Falha ao entrar com Google');
+    } finally {
+      setIsLoading(false);
+      setLoadingProvider(null);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    Alert.alert('Coming Soon', 'Apple sign in will be available soon!');
+  };
+
+  const handleFacebookSignIn = async () => {
+    Alert.alert('Coming Soon', 'Facebook sign in will be available soon!');
+
+        console.log('� Browser closed, result type:', result.type);
+
+        if (result.type === 'success') {
+          console.log('✅ OAuth flow completed! Supabase will handle the rest.');
+          console.log('⏳ Waiting for onAuthStateChange to fire...');
+          
+          // Wait for Supabase to process the callback
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Check if we have a session now
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('❌ Error getting session:', sessionError);
+            Alert.alert('Erro', 'Falha ao obter sessão. Tente novamente.');
+            return;
+          }
+          
+          if (sessionData?.session) {
+            console.log('✅ Session found! User:', sessionData.session.user.email);
+            console.log('✅ Auth state will update automatically via onAuthStateChange');
+            router.replace('/(tabs)');
+          } else {
+            console.warn('⚠️ No session found after OAuth. This might mean the redirect was not processed.');
+            Alert.alert('Atenção', 'Login aparentemente concluído, mas sessão não foi criada. Tente novamente.');
+          }
+        } else if (result.type === 'cancel') {
+          console.log('❌ User cancelled OAuth');
+          Alert.alert('Cancelado', 'Login com Google cancelado');
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Google sign in error:', error);
       Alert.alert('Erro', error.message || 'Falha ao entrar com Google');
     } finally {
       setIsLoading(false);

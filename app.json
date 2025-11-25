@@ -5,7 +5,7 @@
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": ["boredtourist", "app.rork.bored-explorer"],
+    "scheme": "boredtourist",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -19,7 +19,20 @@
       "config": {
         "googleMapsApiKey": "YOUR_IOS_API_KEY"
       },
-      "runtimeVersion": "1.0.0"
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "com.rork.boredtourist.oauth",
+            "CFBundleURLSchemes": [
+              "boredtourist",
+              "app.rork.bored-explorer"
+            ]
+          }
+        ]
+      },
+      "associatedDomains": [
+        "applinks:hnivuisqktlrusyqywaz.supabase.co"
+      ]
     },
     "android": {
       "adaptiveIcon": {

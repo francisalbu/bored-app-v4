@@ -39,68 +39,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (event === 'SIGNED_IN' && session) {
         console.log('✅ User signed in (OAuth or email):', session.user.email);
-        console.log('🔄 Syncing with backend to get full user data...');
+        console.log('🎯 Trigger will handle sync to public.users automatically');
         
-        // CRITICAL: Sync with backend to get the correct user.id (BIGINT) from public.users
-        try {
-          const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
-            ? 'http://192.168.1.136:3000/api' 
-            : 'https://bored-tourist-api.onrender.com/api';
-
-          const response = await fetch(`${backendURL}/auth/supabase/me`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            signal: AbortSignal.timeout(10000), // 10 second timeout
-          });
-
-          const backendData = await response.json();
-          console.log('📦 Backend sync response:', backendData);
+        // Wait a moment for trigger to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Query public.users to get the full user data (with the auto-increment ID)
+        const { data: publicUser, error: queryError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('supabase_uid', session.user.id)
+          .single();
+        
+        if (queryError || !publicUser) {
+          console.error('❌ Failed to get user from public.users:', queryError);
+          console.log('⚠️ Using Supabase auth data as fallback');
           
-          if (backendData.success && backendData.data.user) {
-            // Use the backend user data which has the correct BIGINT id
-            const userData = {
-              id: backendData.data.user.id.toString(),
-              email: backendData.data.user.email,
-              name: backendData.data.user.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-              phone: backendData.data.user.phone || undefined,
-            };
-
-            await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-            await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
-
-            api.setAuthToken(session.access_token);
-            setUser(userData);
-
-            console.log('✅ User signed in and synced with backend successfully!');
-          } else {
-            console.error('❌ Backend did not return user data:', backendData);
-            
-            // Fallback: use Supabase data but warn
-            console.warn('⚠️ Using Supabase data as fallback (may cause issues)');
-            const userData = {
-              id: session.user.id,
-              email: session.user.email || '',
-              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-              phone: session.user.phone || undefined,
-            };
-
-            await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-            await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
-
-            api.setAuthToken(session.access_token);
-            setUser(userData);
-          }
-        } catch (error) {
-          console.error('❌ Error syncing with backend:', error);
-          
-          // Fallback: use Supabase data but warn
-          console.warn('⚠️ Using Supabase data as fallback (may cause issues)');
+          // Fallback to auth data
           const userData = {
             id: session.user.id,
             email: session.user.email || '',
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
             phone: session.user.phone || undefined,
           };
 
@@ -109,7 +68,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           api.setAuthToken(session.access_token);
           setUser(userData);
+          return;
         }
+        
+        console.log('✅ Got user from public.users:', publicUser.email);
+        
+        // Use data from public.users (has the numeric ID)
+        const userData = {
+          id: publicUser.id.toString(),
+          email: publicUser.email,
+          name: publicUser.name,
+          phone: publicUser.phone || undefined,
+        };
+
+        await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
+        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+
+        api.setAuthToken(session.access_token);
+        setUser(userData);
+
+        console.log('✅ User signed in successfully with ID:', userData.id);
       } else if (event === 'TOKEN_REFRESHED' && session) {
         console.log('✅ Token refreshed automatically');
         const newToken = session.access_token;
@@ -141,46 +119,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (session && !sessionError) {
         console.log('✅ Found active Supabase session:', session.user.email);
-        console.log('🔄 Syncing with backend...');
         
-        // Sync with backend immediately
-        try {
-          const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
-            ? 'http://192.168.1.136:3000/api' 
-            : 'https://bored-tourist-api.onrender.com/api';
-
-          const response = await fetch(`${backendURL}/auth/supabase/me`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-          });
-
-          const backendData = await response.json();
-          console.log('📦 Backend response:', backendData);
+        // Get user from public.users table
+        const { data: publicUser, error: queryError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('supabase_uid', session.user.id)
+          .single();
+        
+        if (publicUser && !queryError) {
+          console.log('✅ Found user in public.users:', publicUser.email);
           
-          if (backendData.success && backendData.data.user) {
-            const userData = {
-              id: backendData.data.user.id.toString(),
-              email: backendData.data.user.email,
-              name: backendData.data.user.name || session.user.email?.split('@')[0] || 'User',
-              phone: backendData.data.user.phone,
-            };
+          const userData = {
+            id: publicUser.id.toString(),
+            email: publicUser.email,
+            name: publicUser.name,
+            phone: publicUser.phone || undefined,
+          };
 
-            await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-            await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+          await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
+          await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
 
-            api.setAuthToken(session.access_token);
-            setUser(userData);
+          api.setAuthToken(session.access_token);
+          setUser(userData);
 
-            console.log('✅ User synced on app start!');
-            setIsLoading(false);
-            return;
-          } else {
-            console.log('⚠️ Backend did not return user data');
-          }
-        } catch (syncError) {
-          console.error('❌ Error syncing with backend on start:', syncError);
+          console.log('✅ User loaded from public.users on app start!');
+          setIsLoading(false);
+          return;
+        } else {
+          console.error('❌ User not in public.users yet:', queryError);
         }
       }
       
