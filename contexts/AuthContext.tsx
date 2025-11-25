@@ -39,24 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (event === 'SIGNED_IN' && session) {
         console.log('✅ User signed in (OAuth or email):', session.user.email);
+        console.log('🔄 Syncing with backend to get full user data...');
         
-        // Create user data from Supabase session
-        const userData = {
-          id: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-          phone: session.user.phone || undefined,
-        };
-
-        await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
-
-        api.setAuthToken(session.access_token);
-        setUser(userData);
-
-        console.log('✅ User signed in successfully');
-
-        // Try to sync with backend (optional, non-blocking)
+        // CRITICAL: Sync with backend to get the correct user.id (BIGINT) from public.users
         try {
           const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
             ? 'http://192.168.1.136:3000/api' 
@@ -67,16 +52,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
             },
-            signal: AbortSignal.timeout(5000), // 5 second timeout
+            signal: AbortSignal.timeout(10000), // 10 second timeout
           });
 
           const backendData = await response.json();
+          console.log('📦 Backend sync response:', backendData);
           
           if (backendData.success && backendData.data.user) {
-            console.log('✅ User synced with backend');
+            // Use the backend user data which has the correct BIGINT id
+            const userData = {
+              id: backendData.data.user.id.toString(),
+              email: backendData.data.user.email,
+              name: backendData.data.user.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+              phone: backendData.data.user.phone || undefined,
+            };
+
+            await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
+            await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+
+            api.setAuthToken(session.access_token);
+            setUser(userData);
+
+            console.log('✅ User signed in and synced with backend successfully!');
+          } else {
+            console.error('❌ Backend did not return user data:', backendData);
+            
+            // Fallback: use Supabase data but warn
+            console.warn('⚠️ Using Supabase data as fallback (may cause issues)');
+            const userData = {
+              id: session.user.id,
+              email: session.user.email || '',
+              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+              phone: session.user.phone || undefined,
+            };
+
+            await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
+            await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+
+            api.setAuthToken(session.access_token);
+            setUser(userData);
           }
         } catch (error) {
-          console.warn('⚠️ Could not sync with backend (optional):', error);
+          console.error('❌ Error syncing with backend:', error);
+          
+          // Fallback: use Supabase data but warn
+          console.warn('⚠️ Using Supabase data as fallback (may cause issues)');
+          const userData = {
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            phone: session.user.phone || undefined,
+          };
+
+          await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
+          await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+
+          api.setAuthToken(session.access_token);
+          setUser(userData);
         }
       } else if (event === 'TOKEN_REFRESHED' && session) {
         console.log('✅ Token refreshed automatically');

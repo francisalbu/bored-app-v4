@@ -43,14 +43,20 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
     const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 Deep link received:', event.url);
       
-      // Just detect if this looks like an OAuth success callback
-      // Don't try to manually exchange the code - Supabase will do it!
-      if (event.url && (event.url.includes('access_token') || event.url.includes('code='))) {
-        console.log('✅ OAuth callback detected! Supabase will handle the token exchange.');
-        console.log('⏳ Closing modal and waiting for onAuthStateChange...');
+      // Parse the URL to check for OAuth parameters
+      const url = event.url;
+      
+      // Check if this is an OAuth callback (will have either access_token or code)
+      if (url && (url.includes('access_token') || url.includes('code='))) {
+        console.log('✅ OAuth callback detected! Supabase will handle the session.');
+        
+        // Give Supabase a moment to process the session
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Close the modal - the auth context listener will handle the rest
         onClose();
+        
+        console.log('⏳ Waiting for onAuthStateChange to fire...');
       }
     };
 
@@ -70,8 +76,9 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
       console.log('🔐 Starting Google Sign-In with Supabase...');
       
-      // Use base scheme only - let Supabase handle the callback automatically
-      const redirectUrl = Linking.createURL('/');
+      // Use the EXACT redirect URL configured in Supabase
+      // For TestFlight/production, use the custom scheme
+      const redirectUrl = 'app.rork.bored-explorer://';
       
       console.log('🔗 Redirect URL:', redirectUrl);
       
