@@ -10,6 +10,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { BookingsProvider } from '@/contexts/BookingsContext';
 import * as Linking from 'expo-linking';
+import { supabase } from '@/lib/supabase';
 
 // Stripe publishable key - TEST MODE 🧪
 // ⚠️ IMPORTANT: This is a TEST key - no real money will be charged!
@@ -55,12 +56,45 @@ export default function RootLayout() {
     console.log('[Bored App] App is starting...');
     
     // Listen for deep links (OAuth callbacks)
-    const handleDeepLink = (event: { url: string }) => {
+    const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 [ROOT] Deep link received:', event.url);
       
       // Check if it's an OAuth callback
       if (event.url.includes('code=') || event.url.includes('access_token')) {
-        console.log('✅ [ROOT] OAuth callback detected!');
+        console.log('✅ [ROOT] OAuth callback detected! Processing...');
+        
+        try {
+          // Fix malformed URL: app.rork.bored-explorer:?code=... → app.rork.bored-explorer://?code=...
+          let fixedUrl = event.url;
+          if (fixedUrl.includes('app.rork.bored-explorer:?')) {
+            fixedUrl = fixedUrl.replace('app.rork.bored-explorer:?', 'app.rork.bored-explorer://?');
+            console.log('🔧 [ROOT] Fixed malformed URL');
+          }
+          
+          // Extract code from URL for PKCE flow
+          const url = new URL(fixedUrl);
+          const code = url.searchParams.get('code');
+          
+          if (code) {
+            // Remove the trailing # if present
+            const cleanCode = code.replace(/%23$/, '').replace(/#$/, '');
+            console.log('🔑 [ROOT] Found auth code, exchanging for session...');
+            
+            const { data, error } = await supabase.auth.exchangeCodeForSession(cleanCode);
+            
+            if (error) {
+              console.error('❌ [ROOT] Error exchanging code:', error);
+              console.error('Error details:', JSON.stringify(error, null, 2));
+            } else if (data.session) {
+              console.log('✅ [ROOT] Session created successfully!');
+              console.log('User:', data.session.user.email);
+            }
+          } else {
+            console.log('ℹ️ [ROOT] No code in URL, might be implicit flow');
+          }
+        } catch (err) {
+          console.error('❌ [ROOT] Exception processing deep link:', err);
+        }
       }
     };
     

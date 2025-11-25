@@ -38,47 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔄 [AUTH STATE CHANGE]:', event);
       
       if (event === 'SIGNED_IN' && session) {
-        console.log('✅ User signed in (OAuth or email):', session.user.email);
-        console.log('🎯 Trigger will handle sync to public.users automatically');
+        console.log('✅ User signed in:', session.user.email);
         
-        // Wait a moment for trigger to complete
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Query public.users to get the full user data (with the auto-increment ID)
-        const { data: publicUser, error: queryError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('supabase_uid', session.user.id)
-          .single();
-        
-        if (queryError || !publicUser) {
-          console.error('❌ Failed to get user from public.users:', queryError);
-          console.log('⚠️ Using Supabase auth data as fallback');
-          
-          // Fallback to auth data
-          const userData = {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-            phone: session.user.phone || undefined,
-          };
-
-          await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-          await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
-
-          api.setAuthToken(session.access_token);
-          setUser(userData);
-          return;
-        }
-        
-        console.log('✅ Got user from public.users:', publicUser.email);
-        
-        // Use data from public.users (has the numeric ID)
+        // Use Supabase auth data directly (faster and more reliable)
         const userData = {
-          id: publicUser.id.toString(),
-          email: publicUser.email,
-          name: publicUser.name,
-          phone: publicUser.phone || undefined,
+          id: session.user.id,
+          email: session.user.email || '',
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+          phone: session.user.phone || undefined,
         };
 
         await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
@@ -86,8 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         api.setAuthToken(session.access_token);
         setUser(userData);
-
-        console.log('✅ User signed in successfully with ID:', userData.id);
+        
+        console.log('✅ Login complete!');
       } else if (event === 'TOKEN_REFRESHED' && session) {
         console.log('✅ Token refreshed automatically');
         const newToken = session.access_token;

@@ -41,30 +41,26 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
+  const [showSigningIn, setShowSigningIn] = useState(false);
 
-  // 🛑 ERRO CORRIGIDO AQUI: Removemos TODA a lógica manual de troca de código/token.
-  // Agora, o useEffect apenas fecha o modal após o redirecionamento.
+  // Deep link listener to show loading and close modal when OAuth completes
   useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      console.log('=== DEEP LINK RECEIVED (CLEANED) ===');
-      console.log('Full URL:', event.url);
+    const handleDeepLink = (event: { url: string }) => {
+      console.log('📱 [AuthBottomSheet] Deep link received:', event.url);
       
-      const urlStr = event.url;
-      
-      // Se a URL contém tokens ou código, significa que o login foi bem-sucedido no browser.
-      if (urlStr.includes('#access_token=') || urlStr.includes('?code=') || urlStr.includes('&code=')) {
-        console.log('✅ OAuth callback detected! Closing modal and waiting for AuthContext...');
+      // If it's an OAuth callback, show loading overlay
+      if (event.url.includes('code=') || event.url.includes('access_token=')) {
+        console.log('✅ [AuthBottomSheet] OAuth callback detected, showing loading...');
+        setShowSigningIn(true);
         
-        // O Supabase SDK irá detetar este evento e tratar da troca de código PKCE internamente.
-        // Se a troca for bem-sucedida, o AuthContext irá detetar o evento SIGNED_IN.
-        onClose();
-        
-      } else {
-        console.log('URL does not contain auth tokens or code (Not a success)');
+        // Hide loading and close modal after AuthContext processes the session
+        setTimeout(() => {
+          setShowSigningIn(false);
+          onClose();
+        }, 1000); // Quick transition
       }
     };
 
-    // Assina o listener de URL
     const subscription = Linking.addEventListener('url', handleDeepLink);
     return () => subscription.remove();
   }, [onClose]);
@@ -76,18 +72,16 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
       console.log('=== STARTING GOOGLE SIGN-IN ===');
       
-      // ⚠️ MELHOR PRÁTICA: Gerar a URL de redirecionamento base
-      // Isso usa o esquema definido no seu app.json (ex: boredtourist://)
-      const redirectURL_BASE = Linking.createURL('/'); 
-
-      // 🛑 CORREÇÃO DE CONSISTÊNCIA: Use a URL base gerada para todas as chamadas!
+      // Use the fixed redirect URL configured in Supabase
+      const redirectURL = 'app.rork.bored-explorer://';
+      
+      console.log('Redirect URL:', redirectURL);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Use a URL base (ex: boredtourist://)
-          redirectTo: redirectURL_BASE,
-          skipBrowserRedirect: false,
+          redirectTo: redirectURL,
+          skipBrowserRedirect: false, // Let WebBrowser capture the redirect
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account', // Force account selection
@@ -107,22 +101,72 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       console.log('OAuth URL received:', data.url.substring(0, 100) + '...');
       console.log('Opening browser...');
 
-      // Abre o browser - O segundo parâmetro DEVE ser a URL de redirecionamento esperada
+      // Open browser with the fixed redirect URL
       const result = await WebBrowser.openAuthSessionAsync(
         data.url,
-        redirectURL_BASE 
+        redirectURL
       );
 
       console.log('=== BROWSER CLOSED ===');
       console.log('Result type:', result.type);
-
-      if (result.type === 'success') {
-        console.log('✅ OAuth flow completed! Waiting for AuthContext to detect SIGNED_IN...');
-        // O AuthContext (onAuthStateChange) é quem vai detetar a sessão e navegar.
-        onClose();
-      } else if (result.type === 'cancel') {
+      console.log('Full result:', JSON.stringify(result));
+      
+      if (result.type === 'cancel') {
         console.log('User cancelled');
         Alert.alert('Cancelado', 'Login foi cancelado');
+      } else if (result.type === 'success' && 'url' in result) {
+        console.log('✅ Got callback URL:', result.url);
+        
+        // Show signing in overlay
+        setShowSigningIn(true);
+        
+        // Process the URL - Supabase SDK should detect it via detectSessionInUrl
+        // But we'll also manually trigger the session creation
+        try {
+          // Fix malformed URL
+          let fixedUrl = result.url;
+          if (fixedUrl.includes('app.rork.bored-explorer:?')) {
+            fixedUrl = fixedUrl.replace('app.rork.bored-explorer:?', 'app.rork.bored-explorer://?');
+          }
+          
+          const url = new URL(fixedUrl);
+          const code = url.searchParams.get('code')?.replace(/%23$/, '').replace(/#$/, '');
+          
+          if (code) {
+            console.log('🔑 Exchanging code for session...');
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            
+            if (exchangeError) {
+              console.error('❌ Exchange error:', exchangeError);
+              // Try to get the session anyway - might already be created
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                console.log('✅ Session found after exchange error!');
+                // Wait a bit for AuthContext to process
+                await new Promise(resolve => setTimeout(resolve, 500));
+                setShowSigningIn(false);
+                onClose();
+                return;
+              }
+              throw exchangeError;
+            }
+            
+            console.log('✅ Session created!');
+            // Wait for AuthContext to process the session (500ms is enough)
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (err) {
+          console.error('❌ Error processing callback:', err);
+          setShowSigningIn(false);
+          Alert.alert('Erro', 'Falha ao fazer login. Tente novamente.');
+          return;
+        }
+        
+        setShowSigningIn(false);
+        onClose();
+      } else {
+        console.log('✅ OAuth completed');
+        onClose();
       }
     } catch (error: any) {
       console.error('=== GOOGLE SIGN-IN ERROR ===');
@@ -159,13 +203,32 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView
+    <>
+      {/* Signing In Overlay */}
+      {showSigningIn && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+        >
+          <View style={styles.signingInOverlay}>
+            <View style={styles.signingInCard}>
+              <ActivityIndicator size="large" color="#4285F4" />
+              <Text style={styles.signingInText}>Signing you in...</Text>
+              <Text style={styles.signingInSubtext}>Please wait</Text>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Main Auth Modal */}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
@@ -275,6 +338,7 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
         </Pressable>
       </KeyboardAvoidingView>
     </Modal>
+    </>
   );
 }
 
@@ -423,5 +487,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.dark.background,
+  },
+  signingInOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signingInCard: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    gap: 16,
+    minWidth: 280,
+  },
+  signingInText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.dark.text,
+    marginTop: 8,
+  },
+  signingInSubtext: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
   },
 });
