@@ -55,25 +55,26 @@ export default function ProfileScreen() {
   // Show login prompt when not authenticated
   if (!isAuthenticated) {
     return (
-      <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-          <Text style={styles.headerTitle}>Profile</Text>
-        </View>
-        
-        <ScrollView 
-          style={styles.guestScrollView}
-          contentContainerStyle={styles.guestContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.guestContent}>
-            <Text style={styles.guestTitle}>Access your bookings from anywhere</Text>
-            <Text style={styles.guestDescription}>
-              Sign up to sync your bookings, add activities to your favorites list, and make payments faster with saved data.
-            </Text>
-            <Pressable style={styles.guestButton} onPress={handleLogin}>
-              <Text style={styles.guestButtonText}>Sign in or create account</Text>
-            </Pressable>
+      <>
+        <View style={styles.container}>
+          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+            <Text style={styles.headerTitle}>Profile</Text>
           </View>
+          
+          <ScrollView 
+            style={styles.guestScrollView}
+            contentContainerStyle={styles.guestContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.guestContent}>
+              <Text style={styles.guestTitle}>Access your bookings from anywhere</Text>
+              <Text style={styles.guestDescription}>
+                Sign up to sync your bookings, add activities to your favorites list, and make payments faster with saved data.
+              </Text>
+              <Pressable style={styles.guestButton} onPress={handleLogin}>
+                <Text style={styles.guestButtonText}>Sign in or create account</Text>
+              </Pressable>
+            </View>
 
           <View style={styles.guestSettingsSection}>
             <Text style={styles.guestSectionTitle}>General</Text>
@@ -131,7 +132,8 @@ export default function ProfileScreen() {
               <Text style={styles.guestSettingLabel}>Cancellation & Refund Policy</Text>
             </Pressable>
           </View>
-        </ScrollView>
+          </ScrollView>
+        </View>
 
         <AuthBottomSheet
           visible={showAuthSheet}
@@ -142,7 +144,7 @@ export default function ProfileScreen() {
             // The auth context will auto-update and trigger a re-render
           }}
         />
-      </View>
+      </>
     );
   }
 
@@ -690,7 +692,7 @@ const styles = StyleSheet.create({
   },
   guestContainer: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   guestContent: {
     backgroundColor: colors.dark.card,

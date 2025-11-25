@@ -294,7 +294,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
+    maxHeight: '85%',
+    minHeight: '50%',
   },
   header: {
     flexDirection: 'row',
@@ -319,12 +320,11 @@ const styles = StyleSheet.create({
     color: colors.dark.text,
   },
   scrollContent: {
-    flex: 1,
+    maxHeight: '100%',
   },
   content: {
     padding: 24,
     paddingBottom: 40,
-    flexGrow: 1,
   },
   subtitle: {
     fontSize: 14,
