@@ -5,6 +5,7 @@ import { Video, ResizeMode } from 'expo-av';
 import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
+import * as Location from 'expo-location';
 import {
   Dimensions,
   FlatList,
@@ -33,6 +34,23 @@ import apiService from '@/services/api';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Lisbon center coordinates (default fallback)
+const LISBON_CENTER = { latitude: 38.7223, longitude: -9.1393 };
+const MAX_DISTANCE_KM = 100;
+
+// Calculate distance between two coordinates using Haversine formula
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -40,25 +58,81 @@ export default function FeedScreen() {
   const [showReviews, setShowReviews] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [selectedFilter, setSelectedFilter] = useState<'nearMe' | 'availableToday'>('nearMe');
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationPermission, setLocationPermission] = useState<boolean>(false);
+  const [showNoActivitiesMessage, setShowNoActivitiesMessage] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading: loadingExperiences, error: experiencesError } = useExperiences();
 
+  // Request location permission and get user location
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          setLocationPermission(true);
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          setUserLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          console.log('📍 User location:', location.coords);
+        } else {
+          console.log('❌ Location permission denied, using Lisbon as default');
+          setUserLocation(LISBON_CENTER);
+        }
+      } catch (error) {
+        console.error('❌ Error getting location:', error);
+        setUserLocation(LISBON_CENTER);
+      }
+    })();
+  }, []);
+
   // Filter experiences based on selected filter
   const filteredExperiences = React.useMemo(() => {
-    if (selectedFilter === 'nearMe') {
-      // Sort by distance (closest first) - using distance string parsing
-      return [...EXPERIENCES].sort((a, b) => {
-        const distA = parseInt(a.distance.replace(/[^\d]/g, '')) || 999;
-        const distB = parseInt(b.distance.replace(/[^\d]/g, '')) || 999;
-        return distA - distB;
+    if (selectedFilter === 'nearMe' && userLocation) {
+      // Calculate real distances from user location
+      const experiencesWithDistance = EXPERIENCES.map(exp => {
+        // Parse coordinates from experience (assuming they have lat/lng)
+        // For now, we'll use Lisbon coordinates as default for all experiences
+        // TODO: Add actual coordinates to experiences in the database
+        const expLat = exp.latitude || LISBON_CENTER.latitude;
+        const expLng = exp.longitude || LISBON_CENTER.longitude;
+        
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          expLat,
+          expLng
+        );
+        
+        return { ...exp, calculatedDistance: distance };
       });
+
+      // Sort by distance (closest first)
+      const sorted = experiencesWithDistance.sort((a, b) => a.calculatedDistance - b.calculatedDistance);
+
+      // Check if closest experience is more than 100km away
+      const hasNearbyActivities = sorted.length > 0 && sorted[0].calculatedDistance <= MAX_DISTANCE_KM;
+      setShowNoActivitiesMessage(!hasNearbyActivities);
+
+      // If no activities nearby and user is not in Lisbon area, return all Lisbon activities
+      if (!hasNearbyActivities) {
+        console.log('📍 No activities within 100km, showing all Lisbon experiences');
+        return sorted; // Still show Lisbon activities
+      }
+
+      // Filter only activities within 100km
+      return sorted.filter(exp => exp.calculatedDistance <= MAX_DISTANCE_KM);
     } else {
       // Filter only experiences available today
       return EXPERIENCES.filter(exp => exp.availableToday);
     }
-  }, [selectedFilter, EXPERIENCES]);
+  }, [selectedFilter, EXPERIENCES, userLocation]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -197,6 +271,29 @@ export default function FeedScreen() {
           </Pressable>
         </BlurView>
       </View>
+
+      {/* No Activities Nearby Message */}
+      {showNoActivitiesMessage && selectedFilter === 'nearMe' && (
+        <View style={styles.noActivitiesOverlay}>
+          <View style={styles.noActivitiesCard}>
+            <View style={styles.noActivitiesContent}>
+              <Text style={styles.noActivitiesEmoji}>🗺️</Text>
+              <Text style={styles.noActivitiesTitle}>
+                Sorry, no cool activities in your area yet
+              </Text>
+              <Text style={styles.noActivitiesSubtitle}>
+                We'll be there soon! In the meantime, check our experiences in Lisbon.
+              </Text>
+              <Pressable 
+                style={styles.exploreLisbonButton}
+                onPress={() => setShowNoActivitiesMessage(false)}
+              >
+                <Text style={styles.exploreLisbonButtonText}>Explore Lisbon</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
 
       <AIChatModal
         visible={showAIChat}
@@ -1124,6 +1221,63 @@ const styles = StyleSheet.create({
     color: colors.dark.text,
     fontSize: 16,
     fontFamily: typography.fonts.semibold,
+  },
+  noActivitiesOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.dark.background, // Solid black background
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    zIndex: 100,
+  },
+  noActivitiesCard: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: colors.dark.card,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  noActivitiesContent: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  noActivitiesEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  noActivitiesTitle: {
+    fontSize: 22,
+    fontFamily: typography.fonts.extrabold,
+    color: colors.dark.text,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  noActivitiesSubtitle: {
+    fontSize: 16,
+    fontFamily: typography.fonts.regular,
+    color: colors.dark.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  exploreLisbonButton: {
+    backgroundColor: colors.dark.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    width: '100%',
+  },
+  exploreLisbonButtonText: {
+    color: colors.dark.background,
+    fontSize: 16,
+    fontFamily: typography.fonts.extrabold,
+    textAlign: 'center',
   },
 });
 

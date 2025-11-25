@@ -31,12 +31,52 @@ export default function ExploreScreen() {
   const filteredExperiences = EXPERIENCES.filter((exp) => {
     const matchesSearch = exp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       exp.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || 
-      exp.category.toLowerCase().includes(selectedCategory.toLowerCase());
-    return matchesSearch && matchesCategory;
+    
+    if (selectedCategory === 'all') {
+      return matchesSearch;
+    }
+    
+    // Normalize both category strings for comparison
+    const expCategory = exp.category.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+    const selectedCat = selectedCategory.toLowerCase();
+    
+    // Check if experience category matches
+    const matchesCategory = expCategory === selectedCat || 
+                           expCategory.includes(selectedCat) ||
+                           exp.category.toLowerCase().includes(selectedCategory.toLowerCase());
+    
+    // Also check if any tag matches
+    const matchesTag = exp.tags.some(tag => {
+      const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+      return normalizedTag === selectedCat || tag.toLowerCase().includes(selectedCategory.toLowerCase());
+    });
+    
+    return matchesSearch && (matchesCategory || matchesTag);
   });
 
   const trendingExperiences = EXPERIENCES.filter(exp => exp.rating >= 4.8);
+
+  // Filter categories to only show those with at least 1 experience
+  const categoriesWithExperiences = CATEGORIES.filter(category => {
+    if (category.id === 'all') return true; // Always show "All"
+    
+    // Normalize category name for matching (e.g., "Mind & Body" -> "mind-body")
+    const normalizedCategoryName = category.name.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+    
+    return EXPERIENCES.some(exp => {
+      // Check if experience category matches
+      const expCategory = exp.category.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+      if (expCategory === normalizedCategoryName || expCategory.includes(category.id)) {
+        return true;
+      }
+      
+      // Check if any tag matches the category name
+      return exp.tags.some(tag => {
+        const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+        return normalizedTag === normalizedCategoryName || tag.toLowerCase().includes(category.name.toLowerCase());
+      });
+    });
+  });
 
   return (
     <View style={styles.container}>
@@ -73,7 +113,7 @@ export default function ExploreScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesContainer}
           >
-            {CATEGORIES.map((category) => (
+            {categoriesWithExperiences.map((category) => (
               <Pressable
                 key={category.id}
                 style={[
