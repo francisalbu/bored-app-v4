@@ -14,6 +14,10 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import colors from '@/constants/colors';
@@ -168,25 +172,35 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       transparent={true}
       onRequestClose={onClose}
     >
-      <Pressable 
-        style={styles.overlay} 
-        onPress={onClose}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
         <Pressable 
-          style={styles.container}
-          onPress={(e) => e.stopPropagation()}
+          style={styles.overlay} 
+          onPress={() => {
+            Keyboard.dismiss();
+            onClose();
+          }}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={colors.dark.text} />
-            </Pressable>
-            <Text style={styles.headerTitle}>Sign in or sign up</Text>
-            <View style={{ width: 40 }} />
-          </View>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <View style={styles.container}>
+              {/* Header */}
+              <View style={styles.header}>
+                <Pressable onPress={onClose} style={styles.closeButton}>
+                  <X size={24} color={colors.dark.text} />
+                </Pressable>
+                <Text style={styles.headerTitle}>Sign in or sign up</Text>
+                <View style={{ width: 40 }} />
+              </View>
 
-          {/* Content */}
-          <View style={styles.content}>
+              {/* Content - Scrollable */}
+              <ScrollView
+                style={styles.scrollContent}
+                contentContainerStyle={styles.content}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
             <Text style={styles.subtitle}>
               Access your tickets easily from any device with your Bored Tourist account.
             </Text>
@@ -261,9 +275,11 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
                 <Text style={styles.continueButtonText}>Continue with email</Text>
               </Pressable>
             </View>
-          </View>
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -302,9 +318,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.dark.text,
   },
+  scrollContent: {
+    flex: 1,
+  },
   content: {
     padding: 24,
     paddingBottom: 40,
+    flexGrow: 1,
   },
   subtitle: {
     fontSize: 14,
