@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import Constants from 'expo-constants';
 
 export interface VibeCheckResponse {
   text: string;
@@ -8,13 +9,17 @@ export interface VibeCheckResponse {
 
 export const getVibeCheckRecommendation = async (userVibe: string): Promise<VibeCheckResponse> => {
   try {
-    // Initialize the client only when needed (Lazy Initialization)
-    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_AI_KEY;
+    // Try environment variable first, fallback to app.json extra config
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_AI_KEY || Constants.expoConfig?.extra?.googleAiKey;
     
     if (!apiKey) {
-      console.error("API Key is missing from environment variables.");
+      console.error("❌ Google AI API Key is missing!");
+      console.error("Check: process.env.EXPO_PUBLIC_GOOGLE_AI_KEY =", process.env.EXPO_PUBLIC_GOOGLE_AI_KEY);
+      console.error("Check: Constants.expoConfig?.extra?.googleAiKey =", Constants.expoConfig?.extra?.googleAiKey);
       return { text: "System offline. The developer forgot the API key. Oops." };
     }
+    
+    console.log('✅ Google AI API Key found:', apiKey.substring(0, 10) + '...');
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
