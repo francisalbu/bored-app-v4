@@ -12,6 +12,8 @@ import {
   View,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -365,15 +367,8 @@ export default function PaymentScreen() {
               { 
                 text: 'Create Account', 
                 onPress: () => {
-                  // Pre-fill registration with guest data
-                  router.push({
-                    pathname: '/auth/signup' as any,
-                    params: {
-                      email: customerEmail,
-                      name: customerName,
-                      phone: customerPhone,
-                    }
-                  });
+                  // Open auth sheet with Google OAuth option
+                  setShowAuthSheet(true);
                 }
               }
             ]
@@ -396,7 +391,11 @@ export default function PaymentScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView 
+      style={[styles.container, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
       <Stack.Screen options={{ headerShown: false }} />
       
       {/* Header */}
@@ -408,7 +407,11 @@ export default function PaymentScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Experience Card */}
         <View style={styles.card}>
           <View style={styles.experienceHeader}>
@@ -650,7 +653,7 @@ export default function PaymentScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

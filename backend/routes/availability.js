@@ -79,22 +79,22 @@ router.get('/:experienceId',
         console.log('📋 First slot:', slotsWithSpots[0]);
       }
       
-      // Filter out slots that are less than 3 hours from now
-      // Example: Activity at 10:00, current time 07:01 → blocked (2h59min < 3h)
-      //          Activity at 10:00, current time 06:59 → available (3h01min > 3h)
+      // Filter out slots that are less than 90 minutes from now
+      // Example: Activity at 10:00, current time 08:31 → blocked (1h29min < 1h30min)
+      //          Activity at 10:00, current time 08:29 → available (1h31min > 1h30min)
       const now = new Date();
-      const THREE_HOURS_IN_MS = 3 * 60 * 60 * 1000;
+      const NINETY_MINUTES_IN_MS = 90 * 60 * 1000;
       
       const availableSlots = slotsWithSpots.filter(slot => {
         // Combine date and start_time to get the full datetime
         const slotDateTime = new Date(`${slot.date}T${slot.start_time}`);
         const timeUntilSlot = slotDateTime - now;
         
-        // Only show slots that are more than 3 hours away
-        const isBookable = timeUntilSlot > THREE_HOURS_IN_MS;
+        // Only show slots that are more than 90 minutes away
+        const isBookable = timeUntilSlot > NINETY_MINUTES_IN_MS;
         
         if (!isBookable) {
-          console.log(`⏰ Slot ${slot.id} blocked: ${slot.date} ${slot.start_time} (${Math.round(timeUntilSlot / 1000 / 60)} minutes away, need >180 minutes)`);
+          console.log(`⏰ Slot ${slot.id} blocked: ${slot.date} ${slot.start_time} (${Math.round(timeUntilSlot / 1000 / 60)} minutes away, need >90 minutes)`);
         }
         
         return isBookable;

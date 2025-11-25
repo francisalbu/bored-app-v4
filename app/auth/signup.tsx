@@ -16,6 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { User, Mail, Lock, ArrowLeft } from 'lucide-react-native';
 import colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
+import * as WebBrowser from 'expo-web-browser';
+import { supabase } from '@/lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -26,6 +30,9 @@ export default function SignupScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [showSigningIn, setShowSigningIn] = useState(false);
   
   // Pre-fill email if passed as parameter
   useEffect(() => {
@@ -33,7 +40,6 @@ export default function SignupScreen() {
       setEmail(params.email);
     }
   }, [params.email]);
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async () => {
     if (!name || !email || !password) {
@@ -64,6 +70,69 @@ export default function SignupScreen() {
       }
     } else {
       Alert.alert('Signup Failed', result.error || 'Failed to create account');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsGoogleLoading(true);
+
+      const redirectURL = 'app.rork.bored-explorer://';
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectURL,
+          skipBrowserRedirect: false,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.url) throw new Error('No OAuth URL returned');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectURL);
+      
+      if (result.type === 'cancel') {
+        Alert.alert('Cancelled', 'Login was cancelled');
+      } else if (result.type === 'success' && 'url' in result) {
+        setShowSigningIn(true);
+        
+        try {
+          let fixedUrl = result.url;
+          if (fixedUrl.includes('app.rork.bored-explorer:?')) {
+            fixedUrl = fixedUrl.replace('app.rork.bored-explorer:?', 'app.rork.bored-explorer://?');
+          }
+          
+          const url = new URL(fixedUrl);
+          const code = url.searchParams.get('code')?.replace(/%23$/, '').replace(/#$/, '');
+          
+          if (code) {
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            
+            if (exchangeError) {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) throw exchangeError;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (err) {
+          setShowSigningIn(false);
+          Alert.alert('Error', 'Failed to sign in. Please try again.');
+          return;
+        }
+        
+        setShowSigningIn(false);
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to sign in with Google');
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -157,12 +226,38 @@ export default function SignupScreen() {
             <View style={styles.dividerLine} />
           </View>
 
+          <Pressable
+            style={[styles.googleButton, isGoogleLoading && styles.googleButtonDisabled]}
+            onPress={handleGoogleSignIn}
+            disabled={isGoogleLoading}
+          >
+            {isGoogleLoading ? (
+              <ActivityIndicator color={colors.dark.text} />
+            ) : (
+              <>
+                <View style={styles.googleIcon}>
+                  <Text style={styles.googleIconText}>G</Text>
+                </View>
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </>
+            )}
+          </Pressable>
+
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>Already have an account? </Text>
             <Pressable onPress={() => router.back()}>
               <Text style={styles.loginLink}>Sign In</Text>
             </Pressable>
           </View>
+
+          {showSigningIn && (
+            <View style={styles.signingInOverlay}>
+              <View style={styles.signingInBox}>
+                <ActivityIndicator size="large" color={colors.dark.primary} />
+                <Text style={styles.signingInText}>Signing you in...</Text>
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -282,5 +377,60 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.dark.primary,
     fontWeight: '700' as const,
+  },
+  googleButton: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#4285F4',
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
+  },
+  signingInOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  signingInBox: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    gap: 16,
+  },
+  signingInText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
   },
 });

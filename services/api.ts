@@ -1,8 +1,10 @@
 // API Configuration
 // Use your computer's IP address for iOS Simulator to connect to local backend
-const API_BASE_URL = process.env.NODE_ENV === 'development' || __DEV__
-  ? 'http://192.168.1.145:3000/api' 
-  : 'https://bored-tourist-api.onrender.com/api';
+// Temporarily using production API for testing
+const API_BASE_URL = 'https://bored-tourist-api.onrender.com/api';
+// const API_BASE_URL = process.env.NODE_ENV === 'development' || __DEV__
+//   ? 'http://192.168.1.131:3000/api' 
+//   : 'https://bored-tourist-api.onrender.com/api';
 
 interface ApiResponse<T> {
   success: boolean;
