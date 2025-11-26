@@ -32,6 +32,7 @@ const favoritesRoutes = require('./routes/favorites');
 const availabilityRoutes = require('./routes/availability');
 const paymentsRoutes = require('./routes/payments');
 const reviewsRoutes = require('./routes/reviews');
+const usersRoutes = require('./routes/users');
 
 // Initialize Express app
 const app = express();
@@ -86,6 +87,7 @@ app.use('/api/favorites', favoritesRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/reviews', reviewsRoutes);
+app.use('/api/users', usersRoutes);
 
 // 404 handler
 app.use((req, res) => {

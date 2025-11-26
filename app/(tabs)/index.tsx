@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
 import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 import {
@@ -54,6 +54,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [showAIChat, setShowAIChat] = useState<boolean>(false);
   const [showReviews, setShowReviews] = useState<boolean>(false);
@@ -63,6 +64,9 @@ export default function FeedScreen() {
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [showNoActivitiesMessage, setShowNoActivitiesMessage] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
+  
+  // Check if we're on the home tab (feed screen is active)
+  const isTabFocused = pathname === '/' || pathname === '/index';
 
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading: loadingExperiences, error: experiencesError } = useExperiences();
@@ -172,6 +176,7 @@ export default function FeedScreen() {
           experience={item}
           isActive={index === currentIndex}
           isSaved={isSaved(item.id)}
+          isTabFocused={isTabFocused}
           onAIChatPress={() => setShowAIChat(true)}
           onReviewsPress={() => setShowReviews(true)}
           onSavePress={() => handleSave(item.id)}
@@ -320,12 +325,13 @@ interface ExperienceCardProps {
   experience: Experience;
   isActive: boolean;
   isSaved: boolean;
+  isTabFocused: boolean;
   onAIChatPress: () => void;
   onReviewsPress: () => void;
   onSavePress: () => void;
 }
 
-function ExperienceCard({ experience, isActive, isSaved, onAIChatPress, onReviewsPress, onSavePress }: ExperienceCardProps) {
+function ExperienceCard({ experience, isActive, isSaved, isTabFocused, onAIChatPress, onReviewsPress, onSavePress }: ExperienceCardProps) {
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
   const [videoReady, setVideoReady] = useState<boolean>(false);
@@ -378,9 +384,9 @@ Book this amazing experience on BoredTourist!`;
             source={typeof experience.video === 'string' ? { uri: experience.video } : experience.video}
             style={[styles.cardImage, !videoReady && { opacity: 0 }]}
             resizeMode={ResizeMode.COVER}
-            shouldPlay={isActive && videoReady}
+            shouldPlay={isActive && videoReady && isTabFocused}
             isLooping
-            isMuted={true}
+            isMuted={!isTabFocused || !isActive}
             useNativeControls={false}
             onError={(error) => console.log('❌ Video Error:', error)}
             onLoad={() => {

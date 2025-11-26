@@ -10,6 +10,7 @@ import {
   View,
   FlatList,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -148,7 +149,15 @@ export default function BookingsScreen() {
         </View>
       ) : filteredBookings.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📅</Text>
+          <View style={styles.calendarContainer}>
+            <View style={styles.calendarHeader}>
+              <Text style={styles.calendarMonth}>JUL</Text>
+              <Text style={styles.calendarYear}>2024</Text>
+            </View>
+            <View style={styles.calendarBody}>
+              <Text style={styles.calendarDay}>17</Text>
+            </View>
+          </View>
           <Text style={styles.emptyTitle}>No {filter} bookings</Text>
           <Text style={styles.emptyText}>
             {filter === 'upcoming'
@@ -156,10 +165,10 @@ export default function BookingsScreen() {
               : 'Your past experiences will appear here'}
           </Text>
           <Pressable 
-            style={styles.actionButton}
-            onPress={() => router.push('/(tabs)/explore')}
+            style={styles.exploreButton}
+            onPress={() => router.push('/(tabs)/' as any)}
           >
-            <Text style={styles.actionButtonText}>Explore Experiences</Text>
+            <Text style={styles.exploreButtonText}>Explore Experiences</Text>
           </Pressable>
         </View>
       ) : filter === 'upcoming' ? (
@@ -318,6 +327,53 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
           </View>
         </View>
 
+        {/* Help & Contact Section */}
+        {isUpcoming && !isCancelled && (
+          <View style={styles.helpSection}>
+            <Text style={styles.helpTitle}>Need Help?</Text>
+            
+            <Pressable 
+              style={styles.helpItem}
+              onPress={() => {
+                Linking.openURL('https://wa.me/351912345678');
+              }}
+            >
+              <Text style={styles.helpIcon}>📱</Text>
+              <View style={styles.helpTextContainer}>
+                <Text style={styles.helpLabel}>Contact Us (WhatsApp)</Text>
+                <Text style={styles.helpValue}>+351 912 345 678</Text>
+              </View>
+            </Pressable>
+
+            <Pressable 
+              style={styles.helpItem}
+              onPress={() => {
+                const address = encodeURIComponent(booking.experience_location || 'Lisbon, Portugal');
+                Linking.openURL(`https://maps.google.com/?q=${address}`);
+              }}
+            >
+              <Text style={styles.helpIcon}>📍</Text>
+              <View style={styles.helpTextContainer}>
+                <Text style={styles.helpLabel}>Meeting Point</Text>
+                <Text style={styles.helpValue}>{booking.experience_location}</Text>
+              </View>
+            </Pressable>
+
+            <Pressable 
+              style={styles.helpItem}
+              onPress={() => {
+                Linking.openURL('mailto:support@boredtourist.com');
+              }}
+            >
+              <Text style={styles.helpIcon}>✉️</Text>
+              <View style={styles.helpTextContainer}>
+                <Text style={styles.helpLabel}>Email Support</Text>
+                <Text style={styles.helpValue}>support@boredtourist.com</Text>
+              </View>
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.cardFooter}>
           <View>
             <Text style={styles.referenceLabel}>Booking Reference</Text>
@@ -403,25 +459,85 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   emptyState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 100,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+  calendarContainer: {
+    width: 140,
+    height: 140,
+    backgroundColor: colors.dark.backgroundTertiary,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  calendarHeader: {
+    backgroundColor: '#8B0000',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  calendarMonth: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  calendarYear: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    opacity: 0.8,
+  },
+  calendarBody: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calendarDay: {
+    fontSize: 56,
+    fontWeight: '700' as const,
+    color: '#1a1a1a',
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '900' as const,
     color: colors.dark.text,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.dark.textSecondary,
     textAlign: 'center' as const,
-    maxWidth: 250,
+    lineHeight: 24,
+    marginBottom: 32,
+    maxWidth: 280,
+  },
+  exploreButton: {
+    backgroundColor: colors.dark.primary,
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 16,
+    shadowColor: colors.dark.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    width: '100%',
+    maxWidth: 320,
+  },
+  exploreButtonText: {
+    fontSize: 17,
+    fontWeight: '900' as const,
+    color: colors.dark.background,
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   card: {
     backgroundColor: '#2a2a2a',
@@ -699,5 +815,43 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600' as const,
     color: colors.dark.text,
+  },
+  helpSection: {
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: colors.dark.backgroundTertiary,
+    borderRadius: 12,
+    gap: 12,
+  },
+  helpTitle: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 4,
+  },
+  helpItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  helpIcon: {
+    fontSize: 24,
+    width: 32,
+    textAlign: 'center',
+  },
+  helpTextContainer: {
+    flex: 1,
+  },
+  helpLabel: {
+    fontSize: 12,
+    color: colors.dark.textTertiary,
+    marginBottom: 2,
+  },
+  helpValue: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: colors.dark.primary,
   },
 });

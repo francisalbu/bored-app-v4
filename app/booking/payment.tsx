@@ -20,6 +20,7 @@ import { Image } from 'expo-image';
 import { useStripe } from '@stripe/stripe-react-native';
 
 import colors from '@/constants/colors';
+import { supabase } from '@/lib/supabase';
 import { EXPERIENCES } from '@/constants/experiences';
 import { useBookings } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -90,6 +91,9 @@ export default function PaymentScreen() {
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]); // Portugal por defeito
   const [showCountryModal, setShowCountryModal] = useState(false);
   
+  // Save contact info for future bookings (only for authenticated users)
+  const [saveContactInfo, setSaveContactInfo] = useState(false);
+  
   // Auth bottom sheet
   const [showAuthSheet, setShowAuthSheet] = useState(false);
   
@@ -107,6 +111,9 @@ export default function PaymentScreen() {
           setSelectedCountry(matchedCountry);
         }
       }
+      
+      // Auto-check "save contact info" for authenticated users (opt-out instead of opt-in)
+      setSaveContactInfo(true);
     }
   }, [user]);
   
@@ -181,12 +188,11 @@ export default function PaymentScreen() {
   const pricePerGuest = parseFloat(price || '0');
   const totalPrice = pricePerGuest * adultsCount;
   
-  // Check if form is valid (for guest checkout)
-  const isFormValid = user || (
+  // Check if form is valid - ALWAYS validate all fields (even for authenticated users)
+  const isFormValid = 
     guestName.trim().length > 0 &&
     validateEmail(guestEmail) &&
-    validatePhone(guestPhone)
-  );
+    validatePhone(guestPhone);
 
   if (!experience) {
     return (
@@ -220,6 +226,43 @@ export default function PaymentScreen() {
       return false;
     }
     return true;
+  };
+
+  // Update user phone in database if saveContactInfo is enabled
+  const updateUserPhoneInDatabase = async (phone: string) => {
+    try {
+      console.log('📞 Updating user phone in database:', phone);
+      
+      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
+        ? 'http://192.168.1.145:3000/api' 
+        : 'https://bored-tourist-api.onrender.com/api';
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ No active session');
+        return;
+      }
+
+      const response = await fetch(`${backendURL}/users/update-phone`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ phone }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        console.log('✅ Phone updated successfully');
+        // Refresh user data in context
+        await refreshUser();
+      } else {
+        console.error('❌ Failed to update phone:', data.error);
+      }
+    } catch (error) {
+      console.error('❌ Error updating phone:', error);
+    }
   };
 
   const handlePayment = async () => {
@@ -374,6 +417,12 @@ export default function PaymentScreen() {
       const newBookingId = bookingResult.data.id;
       console.log('✅ [PAYMENT] Booking created:', newBookingId);
       setBookingId(newBookingId);
+
+      // If user is authenticated and wants to save contact info, update phone in database
+      if (!isGuest && saveContactInfo && guestPhone) {
+        const fullPhone = `${selectedCountry.dialCode}${guestPhone}`.replace(/\s/g, '');
+        await updateUserPhoneInDatabase(fullPhone);
+      }
 
         // Show success message with account creation prompt for guests
         if (isGuest) {
@@ -581,6 +630,23 @@ export default function PaymentScreen() {
                 <Text style={styles.validationError}>{phoneError}</Text>
               )}
             </View>
+
+            {/* Save contact info checkbox (only for authenticated users) */}
+            {user && (
+              <Pressable 
+                style={styles.checkboxContainer}
+                onPress={() => setSaveContactInfo(!saveContactInfo)}
+              >
+                <View style={[styles.checkbox, saveContactInfo && styles.checkboxChecked]}>
+                  {saveContactInfo && (
+                    <Text style={styles.checkboxIcon}>✓</Text>
+                  )}
+                </View>
+                <Text style={styles.checkboxLabel}>
+                  Save this phone number for faster future checkouts
+                </Text>
+              </Pressable>
+            )}
         </View>
 
         {/* Info */}
@@ -1029,5 +1095,39 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.dark.textSecondary,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.dark.border,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.dark.border,
+    backgroundColor: colors.dark.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.dark.primary,
+    borderColor: colors.dark.primary,
+  },
+  checkboxIcon: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.dark.background,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.dark.text,
+    lineHeight: 20,
   },
 });
