@@ -29,8 +29,15 @@ export default function ExploreScreen() {
   const { experiences: EXPERIENCES, loading, error } = useExperiences();
 
   const filteredExperiences = EXPERIENCES.filter((exp) => {
-    const matchesSearch = exp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      exp.location.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Enhanced search: title, location, category, tags, description
+    const matchesSearch = query === '' || 
+      exp.title.toLowerCase().includes(query) ||
+      exp.location.toLowerCase().includes(query) ||
+      exp.category.toLowerCase().includes(query) ||
+      exp.tags.some(tag => tag.toLowerCase().includes(query)) ||
+      (exp.description && exp.description.toLowerCase().includes(query));
     
     if (selectedCategory === 'all') {
       return matchesSearch;
@@ -85,7 +92,7 @@ export default function ExploreScreen() {
           <Search size={20} color={colors.dark.textTertiary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search experiences, places..."
+            placeholder="Search amazing experiences"
             placeholderTextColor={colors.dark.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -134,18 +141,21 @@ export default function ExploreScreen() {
           </ScrollView>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔥 Trending Now</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.trendingContainer}
-          >
-            {trendingExperiences.map((experience) => (
-              <TrendingCard key={experience.id} experience={experience} />
-            ))}
-          </ScrollView>
-        </View>
+        {/* Trending section only shows when "All" category is selected */}
+        {selectedCategory === 'all' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🔥 Trending Now</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.trendingContainer}
+            >
+              {trendingExperiences.map((experience) => (
+                <TrendingCard key={experience.id} experience={experience} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>

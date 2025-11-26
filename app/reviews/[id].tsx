@@ -1,7 +1,7 @@
 import { Video, ResizeMode } from 'expo-av';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Heart, MessageCircle, Share2, Bookmark, MoreVertical } from 'lucide-react-native';
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -10,12 +10,14 @@ import {
   Dimensions,
   FlatList,
   ViewToken,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
 import colors from '@/constants/colors';
 import { EXPERIENCES } from '@/constants/experiences';
+import apiService from '@/services/api';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -37,86 +39,65 @@ interface Review {
   isBookmarked: boolean;
 }
 
-// Mock reviews data (mix of videos and photos)
-const getReviews = (experienceId: string): Review[] => {
-  return [
-    {
-      id: 'review-1',
-      type: 'video',
-      video: require('@/assets/videos/escala25.mp4'),
-      user: {
-        name: 'Maria Silva',
-        username: '@mariasilva',
-      },
-      rating: 5,
-      caption: 'Experiência incrível! Super recomendo para quem quer sentir adrenalina 🔥 #Lisboa #Adventure',
-      likes: 1247,
-      comments: 89,
-      isLiked: false,
-      isBookmarked: false,
+// Transform API review to app Review format
+const transformApiReview = (apiReview: any): Review => {
+  return {
+    id: apiReview.id.toString(),
+    type: 'photo', // For now, all reviews are photos
+    photos: [], // No photos from API yet
+    user: {
+      name: apiReview.author?.name || 'Anonymous',
+      username: `@${apiReview.author?.name?.toLowerCase().replace(/\s+/g, '')}` || '@user',
     },
-    {
-      id: 'review-2',
-      type: 'photo',
-      photos: [
-        require('@/assets/images/review1.avif'),
-        require('@/assets/images/review2.avif'),
-        require('@/assets/images/review3.avif'),
-      ],
-      user: {
-        name: 'Karla',
-        username: '@karlaexplorer',
-      },
-      rating: 5,
-      caption: '⭐️⭐️⭐️⭐️⭐️ Our tour with LX4 Tours was an unforgettable experience! From start to finish, the day was filled with fun, excitement, and adventure. Manu, Diogo, and Carlotta were absolutely wonderful—professional, personable, and so passionate about what they do. They made us feel comfortable and kept the energy high throughout the entire journey. The route was beautifully planned, and the views were simply breathtaking—truly "wow" moments around every corner. If you\'re looking for a thrilling and scenic way to explore Portugal, LX4 Tours is the perfect choice. Highly recommended!',
-      likes: 2341,
-      comments: 156,
-      isLiked: false,
-      isBookmarked: false,
-    },
-    {
-      id: 'review-3',
-      type: 'video',
-      video: require('@/assets/videos/puppybond_1.mp4'),
-      user: {
-        name: 'João Pedro',
-        username: '@joaopedro',
-      },
-      rating: 5,
-      caption: 'Melhor atividade que fiz em Lisboa! Os guias são top e a vista é espetacular 🌅',
-      likes: 892,
-      comments: 54,
-      isLiked: false,
-      isBookmarked: false,
-    },
-    {
-      id: 'review-4',
-      type: 'video',
-      video: require('@/assets/videos/puppybond_1.mp4'),
-      user: {
-        name: 'Ana Costa',
-        username: '@anacosta',
-      },
-      rating: 4,
-      caption: 'Vale muito a pena! Experiência única 🙌 Já quero voltar',
-      likes: 654,
-      comments: 32,
-      isLiked: false,
-      isBookmarked: false,
-    },
-  ];
+    rating: apiReview.rating || 5,
+    caption: apiReview.comment || '',
+    likes: 0, // Not available from API
+    comments: 0, // Not available from API
+    isLiked: false,
+    isBookmarked: false,
+  };
 };
 
 export default function VideoReviewsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [reviews, setReviews] = useState<Review[]>(getReviews(id || '0'));
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState<{ [key: string]: number }>({});
   const [expandedCaptions, setExpandedCaptions] = useState<{ [key: string]: boolean }>({});
   const videoRefs = useRef<{ [key: string]: Video | null }>({});
 
   const experience = EXPERIENCES.find((exp) => exp.id === id);
+
+  // Fetch reviews from API
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        console.log('📦 Fetching reviews for experience:', id);
+        const response: any = await apiService.getExperienceReviews(id);
+        
+        if (response.success && Array.isArray(response.data)) {
+          console.log('✅ Reviews loaded:', response.data.length);
+          const transformedReviews = response.data.map(transformApiReview);
+          setReviews(transformedReviews);
+        } else {
+          console.log('⚠️ No reviews found');
+          setReviews([]);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching reviews:', error);
+        setReviews([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [id]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0) {
@@ -345,10 +326,37 @@ export default function VideoReviewsScreen() {
     );
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ActivityIndicator size="large" color={colors.dark.primary} />
+        <Text style={styles.loadingText}>Loading reviews...</Text>
+      </View>
+    );
+  }
+
   if (!experience) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, styles.centerContent]}>
+        <Stack.Screen options={{ headerShown: false }} />
         <Text style={styles.errorText}>Experience not found</Text>
+      </View>
+    );
+  }
+
+  if (reviews.length === 0) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color="white" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Reviews</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <Text style={styles.noReviewsText}>No reviews yet for this experience</Text>
       </View>
     );
   }
@@ -379,6 +387,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark.background,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    color: colors.dark.text,
+    fontSize: 16,
+    marginTop: 16,
+  },
+  noReviewsText: {
+    color: colors.dark.textSecondary,
+    fontSize: 16,
+    textAlign: 'center' as const,
   },
   videoContainer: {
     width: SCREEN_WIDTH,

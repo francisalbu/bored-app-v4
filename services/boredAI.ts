@@ -7,19 +7,41 @@ export interface VibeCheckResponse {
   mapsUrl?: string;
 }
 
+// Retry logic helper
+const retryWithBackoff = async <T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      const delay = initialDelay * Math.pow(2, i);
+      console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Max retries reached');
+};
+
 export const getVibeCheckRecommendation = async (userVibe: string): Promise<VibeCheckResponse> => {
   try {
     // Try environment variable first, fallback to app.json extra config
     const apiKey = process.env.EXPO_PUBLIC_GOOGLE_AI_KEY || Constants.expoConfig?.extra?.googleAiKey;
     
+    console.log('🔍 DEBUG: Checking API Key...');
+    console.log('- process.env.EXPO_PUBLIC_GOOGLE_AI_KEY:', process.env.EXPO_PUBLIC_GOOGLE_AI_KEY ? '✅ Found' : '❌ Missing');
+    console.log('- Constants.expoConfig?.extra?.googleAiKey:', Constants.expoConfig?.extra?.googleAiKey ? '✅ Found' : '❌ Missing');
+    console.log('- Final API Key:', apiKey ? `✅ ${apiKey.substring(0, 10)}...` : '❌ Missing');
+    
     if (!apiKey) {
       console.error("❌ Google AI API Key is missing!");
-      console.error("Check: process.env.EXPO_PUBLIC_GOOGLE_AI_KEY =", process.env.EXPO_PUBLIC_GOOGLE_AI_KEY);
-      console.error("Check: Constants.expoConfig?.extra?.googleAiKey =", Constants.expoConfig?.extra?.googleAiKey);
-      return { text: "System offline. The developer forgot the API key. Oops." };
+      return { text: "Yo, the AI needs its coffee (aka API key) before it can help. Hit up the dev." };
     }
     
-    console.log('✅ Google AI API Key found:', apiKey.substring(0, 10) + '...');
+    console.log('🤖 Bored AI: Generating recommendation with user vibe:', userVibe);
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -37,21 +59,30 @@ export const getVibeCheckRecommendation = async (userVibe: string): Promise<Vibe
       7. IMPORTANT: Always include the exact place name in your response for places like restaurants, bars, parks, museums, etc.
     `;
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: systemInstruction,
-      generationConfig: {
-        temperature: 1.2, // High temperature for more creativity/sass
-      }
-    });
+    // Try with retry logic  
+    const generateWithRetry = async () => {
+      // Use gemini-2.5-flash (same as website - works reliably)
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        systemInstruction: systemInstruction,
+        generationConfig: {
+          temperature: 1.2, // High temperature for more creativity/sass
+          maxOutputTokens: 100, // Keep responses short
+        }
+      });
 
-    const result = await model.generateContent(`My vibe right now is: ${userVibe}`);
-    const response = result.response;
-    const text = response.text();
+      const result = await model.generateContent(`My vibe right now is: ${userVibe}`);
+      const response = result.response;
+      return response.text();
+    };
+
+    const text = await retryWithBackoff(generateWithRetry, 3, 1000);
 
     if (!text) {
-      return { text: "My brain is buffering. Try again, tourist." };
+      return { text: "My brain is buffering harder than a Netflix show on slow wifi. Try again?" };
     }
+
+    console.log('✅ Bored AI: Recommendation generated successfully');
 
     // Extract place name from bold markdown (**Place Name**)
     const placeMatch = text.match(/\*\*([^*]+)\*\*/);
@@ -70,8 +101,18 @@ export const getVibeCheckRecommendation = async (userVibe: string): Promise<Vibe
       placeName,
       mapsUrl
     };
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return { text: "The AI is on a coffee break. Try again later." };
+  } catch (error: any) {
+    console.error("❌ Bored AI Error:", error);
+    
+    // Provide more helpful error messages based on error type
+    if (error?.message?.includes('API key')) {
+      return { text: "Bruh, the API key is acting sus. Tell the dev to check it." };
+    } else if (error?.message?.includes('quota') || error?.message?.includes('limit')) {
+      return { text: "The AI hit its daily limit. Blame Google, not me. Try tomorrow." };
+    } else if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+      return { text: "Network's being weird. Check your wifi and try again." };
+    } else {
+      return { text: "Something broke. The AI is debugging itself. Give it a sec and retry." };
+    }
   }
 };

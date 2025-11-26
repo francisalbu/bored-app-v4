@@ -30,7 +30,8 @@ class ApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryCount = 0
   ): Promise<ApiResponse<T>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -41,11 +42,14 @@ class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    const maxRetries = 2;
+    const timeoutMs = 90000; // 90 seconds for Render cold starts
+
     try {
-      console.log('API Request:', `${this.baseURL}${endpoint}`, options.method || 'GET');
+      console.log(`API Request (attempt ${retryCount + 1}/${maxRetries + 1}):`, `${this.baseURL}${endpoint}`, options.method || 'GET');
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout for cold starts
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         ...options,
@@ -71,12 +75,28 @@ class ApiService {
       return data;
     } catch (error) {
       console.error('API Error:', error);
+      
+      // Retry logic for timeouts (Render cold start)
+      if (error instanceof Error && error.name === 'AbortError' && retryCount < maxRetries) {
+        console.log(`⏳ Request timed out, retrying (${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        return this.request<T>(endpoint, options, retryCount + 1);
+      }
+      
       if (error instanceof Error && error.name === 'AbortError') {
         return {
           success: false,
-          error: 'Request timeout - server is not responding',
+          error: 'Server is taking too long to respond. The server might be starting up (cold start). Please try again in a minute.',
         };
       }
+      
+      // Retry for network errors
+      if (error instanceof Error && error.message.includes('Network request failed') && retryCount < maxRetries) {
+        console.log(`🔄 Network error, retrying (${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return this.request<T>(endpoint, options, retryCount + 1);
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Network error',

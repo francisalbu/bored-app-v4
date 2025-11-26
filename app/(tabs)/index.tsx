@@ -2,7 +2,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle } from 'lucide-react-native';
+import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare } from 'lucide-react-native';
 import { router } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
@@ -31,6 +31,7 @@ import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExperiences } from '@/hooks/useExperiences';
 import apiService from '@/services/api';
+import AuthBottomSheet from '@/components/AuthBottomSheet';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -307,7 +308,7 @@ export default function FeedScreen() {
         onClose={() => setShowReviews(false)}
       />
 
-      <AuthModal
+      <AuthBottomSheet
         visible={showAuthModal}
         onClose={() => setShowAuthModal(false)}
       />
@@ -462,7 +463,9 @@ Book this amazing experience on BoredTourist!`;
               <Text style={styles.sideActionLabel}>AI</Text>
             </Pressable>
             <Pressable style={styles.sideActionButton} onPress={onReviewsPress}>
-              <Star size={28} color={colors.dark.text} />
+              <View style={styles.reviewIconContainer}>
+                <Star size={16} color={colors.dark.text} fill={colors.dark.text} />
+              </View>
               <Text style={styles.sideActionLabel}>{experience.rating}</Text>
             </Pressable>
             <Pressable style={styles.sideActionButton} onPress={handleShare}>
@@ -614,6 +617,15 @@ const styles = StyleSheet.create({
   sideActionButton: {
     alignItems: 'center',
     gap: 4,
+  },
+  reviewIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.dark.text,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sideActionLabel: {
     color: colors.dark.text,
@@ -1082,146 +1094,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700' as const,
   },
-  // Auth Modal Styles
-  authModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  authModalBackdrop: {
-    flex: 1,
-  },
-  authModalContent: {
-    backgroundColor: colors.dark.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 40,
-  },
-  authModalHeader: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    position: 'relative' as const,
-  },
-  authCloseButton: {
-    position: 'absolute' as const,
-    left: 20,
-    top: 20,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  authCloseButtonText: {
-    fontSize: 24,
-    color: colors.dark.textSecondary,
-    fontWeight: '400' as const,
-  },
-  authModalTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-  },
-  authDescription: {
-    fontSize: 15,
-    color: colors.dark.textSecondary,
-    lineHeight: 22,
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    textAlign: 'center' as const,
-  },
-  authButtonsContainer: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  authButtonApple: {
-    backgroundColor: colors.dark.text,
-    paddingVertical: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  authAppleIcon: {
-    fontSize: 20,
-  },
-  authButtonAppleText: {
-    color: colors.dark.background,
-    fontSize: 16,
-    fontFamily: typography.fonts.semibold,
-  },
-  authButtonSocial: {
-    backgroundColor: colors.dark.backgroundSecondary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-  },
-  authSocialIcon: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-  },
-  authFacebookIcon: {
-    fontSize: 22,
-    fontWeight: '700' as const,
-    color: '#1877F2',
-  },
-  authButtonSocialText: {
-    color: colors.dark.text,
-    fontSize: 16,
-    fontFamily: typography.fonts.semibold,
-  },
-  authDividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  authDividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.dark.border,
-  },
-  authDividerText: {
-    color: colors.dark.textSecondary,
-    fontSize: 14,
-    paddingHorizontal: 12,
-    fontFamily: typography.fonts.regular,
-  },
-  authEmailInput: {
-    backgroundColor: colors.dark.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: colors.dark.text,
-  },
-  authButtonEmail: {
-    backgroundColor: colors.dark.backgroundSecondary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-  },
-  authButtonEmailDisabled: {
-    opacity: 0.5,
-  },
-  authButtonEmailText: {
-    color: colors.dark.text,
-    fontSize: 16,
-    fontFamily: typography.fonts.semibold,
-  },
   noActivitiesOverlay: {
     position: 'absolute',
     top: 0,
@@ -1337,12 +1209,13 @@ function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
     >
-      <View style={styles.aiModalOverlay}>
+      <KeyboardAvoidingView 
+        style={styles.aiModalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
         <Pressable style={styles.aiModalBackdrop} onPress={onClose} />
-        <KeyboardAvoidingView
-          style={styles.aiModalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <View style={styles.aiModalContainer}>
           <View style={styles.aiModalContent}>
             {/* Header */}
             <View style={styles.aiModalHeader}>
@@ -1360,8 +1233,9 @@ function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
             {/* Chat Messages */}
             <ScrollView 
               style={{ flex: 1 }}
-              contentContainerStyle={styles.aiChatContainer} 
+              contentContainerStyle={[styles.aiChatContainer, { paddingBottom: 20 }]} 
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               {messages.length === 0 && (
                 <View style={styles.aiWelcomeContainer}>
@@ -1405,7 +1279,7 @@ function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
             </ScrollView>
 
             {/* Input */}
-            <View style={[styles.aiInputContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={[styles.aiInputContainer, { paddingBottom: Math.max(insets.bottom + 8, 24) }]}>
               <View style={styles.aiInputWrapper}>
                 <TextInput
                   style={styles.aiInput}
@@ -1427,115 +1301,8 @@ function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
               </View>
             </View>
           </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
-  );
-}
-
-interface AuthModalProps {
-  visible: boolean;
-  onClose: () => void;
-}
-
-function AuthModal({ visible, onClose }: AuthModalProps) {
-  const [email, setEmail] = useState<string>('');
-
-  const handleAppleSignIn = () => {
-    console.log('Sign in with Apple');
-    // TODO: Implement Apple Sign In
-    onClose();
-  };
-
-  const handleGoogleSignIn = () => {
-    console.log('Sign in with Google');
-    // TODO: Implement Google Sign In
-    onClose();
-  };
-
-  const handleFacebookSignIn = () => {
-    console.log('Sign in with Facebook');
-    // TODO: Implement Facebook Sign In
-    onClose();
-  };
-
-  const handleEmailSignIn = () => {
-    console.log('Sign in with email:', email);
-    // TODO: Implement Email Sign In
-    onClose();
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-    >
-      <View style={styles.authModalOverlay}>
-        <Pressable style={styles.authModalBackdrop} onPress={onClose} />
-        <View style={styles.authModalContent}>
-          {/* Header */}
-          <View style={styles.authModalHeader}>
-            <Pressable style={styles.authCloseButton} onPress={onClose}>
-              <Text style={styles.authCloseButtonText}>✕</Text>
-            </Pressable>
-            <Text style={styles.authModalTitle}>Entrar ou cadastrar-se</Text>
-          </View>
-
-          {/* Description */}
-          <Text style={styles.authDescription}>
-            Confira ou acesse seus ingressos com mais facilidade de qualquer dispositivo com sua conta BoredTourist.
-          </Text>
-
-          {/* Social Login Buttons */}
-          <View style={styles.authButtonsContainer}>
-            <Pressable style={styles.authButtonApple} onPress={handleAppleSignIn}>
-              <Text style={styles.authAppleIcon}>🍎</Text>
-              <Text style={styles.authButtonAppleText}>Continuar com a Apple</Text>
-            </Pressable>
-
-            <Pressable style={styles.authButtonSocial} onPress={handleGoogleSignIn}>
-              <Text style={styles.authSocialIcon}>G</Text>
-              <Text style={styles.authButtonSocialText}>Continuar com o Google</Text>
-            </Pressable>
-
-            <Pressable style={styles.authButtonSocial} onPress={handleFacebookSignIn}>
-              <Text style={styles.authFacebookIcon}>f</Text>
-              <Text style={styles.authButtonSocialText}>Continuar com o Facebook</Text>
-            </Pressable>
-
-            {/* Divider */}
-            <View style={styles.authDividerContainer}>
-              <View style={styles.authDividerLine} />
-              <Text style={styles.authDividerText}>ou</Text>
-              <View style={styles.authDividerLine} />
-            </View>
-
-            {/* Email Input */}
-            <TextInput
-              style={styles.authEmailInput}
-              placeholder="Endereço de e-mail"
-              placeholderTextColor={colors.dark.textTertiary}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-            />
-
-            {/* Email Continue Button */}
-            <Pressable 
-              style={[styles.authButtonEmail, !email.trim() && styles.authButtonEmailDisabled]} 
-              onPress={handleEmailSignIn}
-              disabled={!email.trim()}
-            >
-              <Text style={styles.authButtonEmailText}>Continuar com e-mail</Text>
-            </Pressable>
-          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

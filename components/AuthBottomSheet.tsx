@@ -186,20 +186,83 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
     Alert.alert('Coming Soon', 'Facebook sign in will be available soon!');
   };
 
-  const handleEmailContinue = () => {
+  const handleEmailContinue = async () => {
     if (!email) {
       Alert.alert('Error', 'Please enter your email');
       return;
     }
 
-    onClose();
-    router.push({
-      pathname: '/auth/login',
-      params: { 
-        email,
-        returnTo: onSuccess ? 'payment' : 'home'
-      },
-    });
+    setIsLoading(true);
+
+    try {
+      // Check if email exists in Supabase auth.users
+      const { data, error } = await supabase.rpc('check_email_exists', { 
+        email_to_check: email.toLowerCase().trim() 
+      });
+
+      if (error) {
+        console.error('Error checking email:', error);
+        // If RPC fails, try alternative method: attempt sign in to check if user exists
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.toLowerCase().trim(),
+          password: 'dummy-password-to-check-existence', // This will fail but tell us if user exists
+        });
+
+        // Check error message to determine if user exists
+        const userExists = signInError?.message?.includes('Invalid login credentials') || 
+                          signInError?.message?.includes('Email not confirmed');
+
+        onClose();
+        if (userExists) {
+          // User exists, go to login
+          router.push({
+            pathname: '/auth/login',
+            params: { 
+              email,
+              returnTo: onSuccess ? 'payment' : 'home'
+            },
+          });
+        } else {
+          // User doesn't exist, go to signup
+          router.push({
+            pathname: '/auth/signup',
+            params: { 
+              email,
+              returnTo: onSuccess ? 'payment' : 'home'
+            },
+          });
+        }
+        return;
+      }
+
+      onClose();
+
+      // If we have the RPC function, use its result
+      if (data === true) {
+        // Email exists, redirect to login
+        router.push({
+          pathname: '/auth/login',
+          params: { 
+            email,
+            returnTo: onSuccess ? 'payment' : 'home'
+          },
+        });
+      } else {
+        // Email doesn't exist, redirect to signup
+        router.push({
+          pathname: '/auth/signup',
+          params: { 
+            email,
+            returnTo: onSuccess ? 'payment' : 'home'
+          },
+        });
+      }
+    } catch (error: any) {
+      console.error('Error in handleEmailContinue:', error);
+      Alert.alert('Error', 'Failed to verify email. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -228,10 +291,6 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
         transparent={true}
         onRequestClose={onClose}
       >
-        <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
         <Pressable 
           style={styles.overlay} 
           onPress={() => {
@@ -239,24 +298,30 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
             onClose();
           }}
         >
-          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-            <View style={styles.container}>
-              {/* Header */}
-              <View style={styles.header}>
-                <Pressable onPress={onClose} style={styles.closeButton}>
-                  <X size={24} color={colors.dark.text} />
-                </Pressable>
-                <Text style={styles.headerTitle}>Sign in or sign up</Text>
-                <View style={{ width: 40 }} />
-              </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={0}
+          >
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={styles.container}>
+                {/* Header */}
+                <View style={styles.header}>
+                  <Pressable onPress={onClose} style={styles.closeButton}>
+                    <X size={24} color={colors.dark.text} />
+                  </Pressable>
+                  <Text style={styles.headerTitle}>Sign in or sign up</Text>
+                  <View style={{ width: 40 }} />
+                </View>
 
-              {/* Content - Scrollable */}
-              <ScrollView
-                style={styles.scrollContent}
-                contentContainerStyle={styles.content}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
+                {/* Content - Scrollable */}
+                <ScrollView
+                  style={styles.scrollContent}
+                  contentContainerStyle={styles.content}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                >
                 <Text style={styles.subtitle}>
                   Access your tickets easily from any device with your Bored Tourist account.
                 </Text>
@@ -329,14 +394,18 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
                     onPress={handleEmailContinue}
                     disabled={!email || isLoading}
                   >
-                    <Text style={styles.continueButtonText}>Continue with email</Text>
+                    {isLoading && loadingProvider === null ? (
+                      <ActivityIndicator color={colors.dark.background} />
+                    ) : (
+                      <Text style={styles.continueButtonText}>Continue with email</Text>
+                    )}
                   </Pressable>
                 </View>
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </Pressable>
-      </KeyboardAvoidingView>
     </Modal>
     </>
   );
@@ -350,12 +419,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoidingView: {
+    width: '100%',
+    maxHeight: '85%',
+  },
   container: {
     backgroundColor: colors.dark.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
-    minHeight: '50%',
+    height: '100%',
   },
   header: {
     flexDirection: 'row',

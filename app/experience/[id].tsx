@@ -22,6 +22,7 @@ import { type Experience } from '@/constants/experiences';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import apiService from '@/services/api';
+import AuthBottomSheet from '@/components/AuthBottomSheet';
 
 export default function ExperienceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +33,8 @@ export default function ExperienceDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
   const { toggleSave, isSaved } = useFavorites();
   const { isAuthenticated } = useAuth();
@@ -50,13 +53,15 @@ export default function ExperienceDetailScreen() {
           console.log('📦 Raw experience data:', exp);
           console.log('📦 Images field:', exp.images);
           console.log('📦 Images type:', typeof exp.images);
+          console.log('📦 Provider logo field:', exp.provider_logo);
+          console.log('📦 Operator logo field:', exp.operator_logo);
           
           // Transform API data to match frontend Experience type
           const transformedExperience: Experience = {
             id: exp.id.toString(),
             title: exp.title,
             provider: exp.operator_name || 'Local Provider',
-            providerLogo: exp.operator_logo || exp.provider_logo,
+            providerLogo: exp.provider_logo || exp.operator_logo,
             rating: exp.rating || 0,
             reviewCount: exp.review_count || 0,
             location: exp.location,
@@ -109,7 +114,11 @@ export default function ExperienceDetailScreen() {
       try {
         const response: any = await apiService.getExperienceReviews(experience.id);
         if (response.success) {
-          setReviews(Array.isArray(response.data) ? response.data.slice(0, 3) : []);
+          // Filter only text reviews (no video reviews)
+          const textReviews = Array.isArray(response.data) 
+            ? response.data.filter((review: any) => review.comment && review.comment.trim() !== '')
+            : [];
+          setReviews(textReviews);
         }
       } catch (error) {
         console.error('Error fetching reviews:', error);
@@ -134,14 +143,7 @@ export default function ExperienceDetailScreen() {
   const handleSave = async () => {
     if (!experience) return;
     if (!isAuthenticated) {
-      Alert.alert(
-        'Sign In Required',
-        'Please sign in to save experiences',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/auth/login' as any) }
-        ]
-      );
+      setShowAuthModal(true);
       return;
     }
     await toggleSave(experience.id);
@@ -178,13 +180,10 @@ Book this amazing experience on BoredTourist!`;
 
   const handleOpenMap = async () => {
     if (!experience) return;
-    const googleMapsUrl = experience.id === '0' 
-      ? 'https://maps.app.goo.gl/zKktCEzgxqerFxKT6'
-      : `https://www.google.com/maps/search/?api=1&query=${experience.latitude},${experience.longitude}`;
     
-    const appleMapsUrl = experience.id === '0'
-      ? `https://maps.apple.com/?address=Costa+da+Caparica,Portugal`
-      : `https://maps.apple.com/?ll=${experience.latitude},${experience.longitude}`;
+    // Always use experience coordinates (no user location needed)
+    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${experience.latitude},${experience.longitude}`;
+    const appleMapsUrl = `https://maps.apple.com/?ll=${experience.latitude},${experience.longitude}&q=${encodeURIComponent(experience.title)}`;
 
     Alert.alert(
       'Open Location',
@@ -281,17 +280,27 @@ Book this amazing experience on BoredTourist!`;
             />
 
             {!loading && carouselImages.length > 1 && (
-              <View style={styles.imageIndicatorContainer}>
-                {carouselImages.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.imageIndicator,
-                      currentImageIndex === index && styles.imageIndicatorActive,
-                    ]}
-                  />
-                ))}
-              </View>
+              <>
+                {/* Page Dots */}
+                <View style={styles.imageIndicatorContainer}>
+                  {carouselImages.map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.imageIndicator,
+                        currentImageIndex === index && styles.imageIndicatorActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+                
+                {/* Image Counter */}
+                <View style={styles.imageCounterContainer}>
+                  <Text style={styles.imageCounterText}>
+                    {currentImageIndex + 1} / {carouselImages.length}
+                  </Text>
+                </View>
+              </>
             )}
 
             <View style={[styles.topActions, { paddingTop: insets.top + 16 }]}>
@@ -324,9 +333,25 @@ Book this amazing experience on BoredTourist!`;
 
             {experience && (
               <View style={styles.hostInfo}>
-                <View style={styles.hostAvatar}>
-                  <Text style={styles.hostInitial}>{experience.provider[0]}</Text>
-                </View>
+                {experience.providerLogo ? (
+                  <>
+                    <Image
+                      source={{ uri: experience.providerLogo }}
+                      style={styles.hostLogo}
+                      resizeMode="contain"
+                      onError={(e) => {
+                        console.log('❌ Logo failed to load:', experience.providerLogo, e);
+                      }}
+                      onLoad={() => {
+                        console.log('✅ Logo loaded successfully:', experience.providerLogo);
+                      }}
+                    />
+                  </>
+                ) : (
+                  <View style={styles.hostAvatar}>
+                    <Text style={styles.hostInitial}>{experience.provider[0]}</Text>
+                  </View>
+                )}
                 <Text style={styles.hostName}>Hosted by {experience.provider}</Text>
               </View>
             )}
@@ -417,7 +442,7 @@ Book this amazing experience on BoredTourist!`;
               ) : reviews.length === 0 ? (
                 <Text style={styles.noReviewsText}>No reviews yet</Text>
               ) : (
-                reviews.map((review) => (
+                (showAllReviews ? reviews : reviews.slice(0, 3)).map((review) => (
                   <View key={review.id} style={styles.reviewCard}>
                     <View style={styles.reviewContent}>
                       <View style={styles.reviewHeader}>
@@ -453,12 +478,21 @@ Book this amazing experience on BoredTourist!`;
                 ))
               )}
 
-              {reviews.length > 0 && experience && (
+              {reviews.length > 3 && !showAllReviews && (
                 <Pressable 
                   style={styles.viewAllReviews}
-                  onPress={() => router.push(`/reviews/${experience.id}`)}
+                  onPress={() => setShowAllReviews(true)}
                 >
-                  <Text style={styles.viewAllReviewsText}>View All Reviews</Text>
+                  <Text style={styles.viewAllReviewsText}>View All {reviews.length} Reviews</Text>
+                </Pressable>
+              )}
+
+              {showAllReviews && reviews.length > 3 && (
+                <Pressable 
+                  style={styles.viewAllReviews}
+                  onPress={() => setShowAllReviews(false)}
+                >
+                  <Text style={styles.viewAllReviewsText}>Show Less</Text>
                 </Pressable>
               )}
               </View>
@@ -486,6 +520,11 @@ Book this amazing experience on BoredTourist!`;
           </View>
         )}
       </View>
+
+      <AuthBottomSheet
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </>
   );
 }
@@ -505,22 +544,43 @@ const styles = StyleSheet.create({
   },
   imageIndicatorContainer: {
     position: 'absolute' as const,
-    bottom: 20,
+    bottom: 70,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
   },
   imageIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
   imageIndicatorActive: {
+    width: 32,
     backgroundColor: colors.dark.primary,
-    width: 24,
+    borderColor: colors.dark.primary,
+  },
+  imageCounterContainer: {
+    position: 'absolute' as const,
+    bottom: 24,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  imageCounterText: {
+    color: colors.dark.text,
+    fontSize: 14,
+    fontFamily: typography.fonts.extrabold,
+    letterSpacing: 0.5,
   },
   topActions: {
     position: 'absolute' as const,
@@ -567,6 +627,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  hostLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: colors.dark.border,
   },
   hostInitial: {
     color: colors.dark.background,

@@ -261,14 +261,36 @@ export default function PaymentScreen() {
       console.log('🔵 [PAYMENT] URL:', `${API_URL}/api/payments/create-intent`);
       console.log('🔵 [PAYMENT] Amount:', totalPrice);
       
-      const response = await fetch(`${API_URL}/api/payments/create-intent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: totalPrice,
-          currency: 'eur',
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+      
+      let response;
+      try {
+        response = await fetch(`${API_URL}/api/payments/create-intent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: totalPrice,
+            currency: 'eur',
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.log('❌ [PAYMENT] Request timed out');
+          Alert.alert(
+            'Connection Timeout',
+            'The server is taking too long to respond. This might be because the server is starting up (cold start). Please try again in a minute.',
+            [{ text: 'OK' }]
+          );
+          setIsProcessing(false);
+          return;
+        }
+        throw fetchError;
+      }
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
       console.log('🔵 [PAYMENT] Payment intent response:', data);
