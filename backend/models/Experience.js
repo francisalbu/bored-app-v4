@@ -242,11 +242,99 @@ async function incrementViews(id) {
   return;
 }
 
+/**
+ * Get reviews for an experience
+ * Returns mix of Google reviews + app reviews
+ */
+async function getExperienceReviews(experienceId) {
+  const { data: reviews, error } = await from('reviews')
+    .select(`
+      *,
+      users(email, created_at)
+    `)
+    .eq('experience_id', experienceId)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  
+  // Format reviews
+  return reviews.map(review => ({
+    id: review.id,
+    rating: review.rating,
+    comment: review.comment,
+    created_at: review.created_at,
+    source: review.source, // 'google' or 'app'
+    verified_purchase: review.verified_purchase,
+    author: {
+      name: review.author_name || review.users?.email?.split('@')[0] || 'Anonymous',
+      email: review.users?.email,
+      photo: review.author_photo
+    }
+  }));
+}
+
+/**
+ * Check if user has already reviewed a booking
+ */
+async function getUserReviewForBooking(experienceId, userId, bookingId) {
+  const { data, error } = await from('reviews')
+    .select('*')
+    .eq('experience_id', experienceId)
+    .eq('user_id', userId)
+    .eq('booking_id', bookingId)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
+  
+  return data;
+}
+
+/**
+ * Create a new review
+ */
+async function createReview({ experience_id, user_id, booking_id, rating, comment, source = 'app', verified_purchase = true }) {
+  const { data, error } = await from('reviews')
+    .insert({
+      experience_id,
+      user_id,
+      booking_id,
+      rating,
+      comment,
+      source,
+      verified_purchase,
+      created_at: new Date().toISOString()
+    })
+    .select(`
+      *,
+      users(email)
+    `)
+    .single();
+  
+  if (error) throw error;
+  
+  // Format review
+  return {
+    id: data.id,
+    rating: data.rating,
+    comment: data.comment,
+    created_at: data.created_at,
+    source: data.source,
+    verified_purchase: data.verified_purchase,
+    author: {
+      name: data.users?.email?.split('@')[0] || 'Anonymous',
+      email: data.users?.email
+    }
+  };
+}
+
 module.exports = {
   getAllExperiences,
   getExperienceById,
   searchExperiences,
   getExperiencesByCategory,
   getTrendingExperiences,
-  incrementViews
+  incrementViews,
+  getExperienceReviews,
+  getUserReviewForBooking,
+  createReview
 };

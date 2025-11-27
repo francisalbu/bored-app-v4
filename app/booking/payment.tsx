@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase';
 import { EXPERIENCES } from '@/constants/experiences';
 import { useBookings } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__
@@ -65,6 +66,7 @@ const COUNTRIES = [
 ];
 
 export default function PaymentScreen() {
+  const { t } = useLanguage();
   const { experienceId, slotId, date, time, adults, price } = useLocalSearchParams<{
     experienceId: string;
     slotId: string;

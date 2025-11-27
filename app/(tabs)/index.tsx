@@ -2,7 +2,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare } from 'lucide-react-native';
+import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Bot } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useExperiences } from '@/hooks/useExperiences';
 import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -53,6 +54,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 export default function FeedScreen() {
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -191,7 +193,7 @@ export default function FeedScreen() {
   if (loadingExperiences) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.loadingText}>Loading experiences...</Text>
+        <Text style={styles.loadingText}>{t('feed.loading')}</Text>
       </View>
     );
   }
@@ -200,8 +202,8 @@ export default function FeedScreen() {
   if (experiencesError) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>Error: {experiencesError}</Text>
-        <Text style={styles.errorSubtext}>Please check your connection and try again</Text>
+        <Text style={styles.errorText}>{t('feed.error')}: {experiencesError}</Text>
+        <Text style={styles.errorSubtext}>{t('feed.errorSubtext')}</Text>
       </View>
     );
   }
@@ -210,8 +212,8 @@ export default function FeedScreen() {
   if (filteredExperiences.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.emptyText}>No experiences found</Text>
-        <Text style={styles.emptySubtext}>Try adjusting your filters</Text>
+        <Text style={styles.emptyText}>{t('feed.emptyText')}</Text>
+        <Text style={styles.emptySubtext}>{t('feed.emptySubtext')}</Text>
       </View>
     );
   }
@@ -257,7 +259,7 @@ export default function FeedScreen() {
               styles.filterText,
               selectedFilter === 'nearMe' && styles.filterTextActive
             ]}>
-              Near Me
+              {t('feed.nearMe')}
             </Text>
           </Pressable>
           
@@ -272,7 +274,7 @@ export default function FeedScreen() {
               styles.filterText,
               selectedFilter === 'availableToday' && styles.filterTextActive
             ]}>
-              Available Today
+              {t('feed.availableToday')}
             </Text>
           </Pressable>
         </BlurView>
@@ -285,16 +287,16 @@ export default function FeedScreen() {
             <View style={styles.noActivitiesContent}>
               <Text style={styles.noActivitiesEmoji}>🗺️</Text>
               <Text style={styles.noActivitiesTitle}>
-                Sorry, no cool activities in your area yet
+                {t('feed.noActivitiesTitle')}
               </Text>
               <Text style={styles.noActivitiesSubtitle}>
-                We'll be there soon! In the meantime, check our experiences in Lisbon.
+                {t('feed.noActivitiesSubtitle')}
               </Text>
               <Pressable 
                 style={styles.exploreLisbonButton}
                 onPress={() => setShowNoActivitiesMessage(false)}
               >
-                <Text style={styles.exploreLisbonButtonText}>Explore Lisbon</Text>
+                <Text style={styles.exploreLisbonButtonText}>{t('feed.exploreLisbon')}</Text>
               </Pressable>
             </View>
           </View>
@@ -332,6 +334,7 @@ interface ExperienceCardProps {
 }
 
 function ExperienceCard({ experience, isActive, isSaved, isTabFocused, onAIChatPress, onReviewsPress, onSavePress }: ExperienceCardProps) {
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
   const [videoReady, setVideoReady] = useState<boolean>(false);
@@ -451,7 +454,7 @@ Book this amazing experience on BoredTourist!`;
               <Text style={styles.metaDivider}>•</Text>
               <Text style={styles.price}>
                 {experience.currency}{experience.price}
-                <Text style={styles.priceUnit}>/person</Text>
+                <Text style={styles.priceUnit}>/{t('feed.person')}</Text>
               </Text>
             </View>
             
@@ -459,24 +462,22 @@ Book this amazing experience on BoredTourist!`;
               style={styles.bookButton}
               onPress={() => router.push(`/booking/${experience.id}`)}
             >
-              <Text style={styles.bookButtonText}>BOOK NOW</Text>
+              <Text style={styles.bookButtonText}>{t('feed.bookNow').toUpperCase()}</Text>
             </Pressable>
           </Pressable>
 
           <View style={styles.sideActions}>
             <Pressable style={styles.sideActionButton} onPress={onAIChatPress}>
-              <MessageCircle size={28} color={colors.dark.text} />
+              <Bot size={28} color={colors.dark.text} />
               <Text style={styles.sideActionLabel}>AI</Text>
             </Pressable>
             <Pressable style={styles.sideActionButton} onPress={onReviewsPress}>
-              <View style={styles.reviewIconContainer}>
-                <Star size={16} color={colors.dark.text} fill={colors.dark.text} />
-              </View>
+              <MessageCircle size={28} color={colors.dark.text} />
               <Text style={styles.sideActionLabel}>{experience.rating}</Text>
             </Pressable>
             <Pressable style={styles.sideActionButton} onPress={handleShare}>
               <Share2 size={28} color={colors.dark.text} />
-              <Text style={styles.sideActionLabel}>Share</Text>
+              <Text style={styles.sideActionLabel}>{t('feed.share')}</Text>
             </Pressable>
             <Pressable
               style={styles.sideActionButton}
@@ -489,7 +490,7 @@ Book this amazing experience on BoredTourist!`;
                 color={isSaved ? colors.dark.accent : colors.dark.text}
                 fill={isSaved ? colors.dark.accent : 'transparent'}
               />
-              <Text style={styles.sideActionLabel}>{isSaved ? 'Saved' : 'Save'}</Text>
+              <Text style={styles.sideActionLabel}>{isSaved ? t('feed.saved') : t('feed.save')}</Text>
             </Pressable>
           </View>
         </View>
@@ -1166,16 +1167,17 @@ interface AIChatModalProps {
 }
 
 function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
+  const { t } = useLanguage();
   const [message, setMessage] = useState<string>('');
   const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([]);
   const insets = useSafeAreaInsets();
 
   // Pre-fabricated questions based on experience type
   const quickQuestions = [
-    "What's included in the price?",
-    "What should I bring?",
-    "Is this suitable for children?",
-    "Can I cancel or reschedule?",
+    t('feed.aiQuestion1'),
+    t('feed.aiQuestion2'),
+    t('feed.aiQuestion3'),
+    t('feed.aiQuestion4'),
   ];
 
   const handleQuickQuestion = (question: string) => {
@@ -1229,7 +1231,7 @@ function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
                 <View style={styles.aiIcon}>
                   <MessageCircle size={20} color={colors.dark.background} />
                 </View>
-                <Text style={styles.aiModalTitle}>Ask about this experience</Text>
+                <Text style={styles.aiModalTitle}>{t('feed.aiModalTitle')}</Text>
               </View>
               <Pressable style={styles.aiCloseButton} onPress={onClose}>
                 <Text style={styles.aiCloseButtonText}>✕</Text>
@@ -1246,12 +1248,12 @@ function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
               {messages.length === 0 && (
                 <View style={styles.aiWelcomeContainer}>
                   <Text style={styles.aiWelcomeText}>
-                    Hi! 👋 I'm your AI assistant. Ask me anything about{' '}
+                    {t('feed.aiWelcome')}{' '}
                     <Text style={styles.aiWelcomeTextBold}>"{experience.title}"</Text>
                   </Text>
                   
                   {/* Quick Questions */}
-                  <Text style={styles.quickQuestionsTitle}>Quick Questions:</Text>
+                  <Text style={styles.quickQuestionsTitle}>{t('feed.quickQuestions')}</Text>
                   <View style={styles.quickQuestionsContainer}>
                     {quickQuestions.map((question, idx) => (
                       <Pressable
@@ -1289,7 +1291,7 @@ function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
               <View style={styles.aiInputWrapper}>
                 <TextInput
                   style={styles.aiInput}
-                  placeholder="Type your question..."
+                  placeholder={t('feed.aiPlaceholder')}
                   placeholderTextColor={colors.dark.textTertiary}
                   value={message}
                   onChangeText={setMessage}
@@ -1320,6 +1322,7 @@ interface ReviewsModalProps {
 }
 
 function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
+  const { t } = useLanguage();
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>(null);
@@ -1371,7 +1374,7 @@ function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              Reviews ({stats?.total_reviews || experience.reviewCount || 0})
+              {t('feed.reviews')} ({stats?.total_reviews || experience.reviewCount || 0})
             </Text>
             <Pressable style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>✕</Text>
@@ -1393,7 +1396,7 @@ function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
                   ))}
                 </View>
                 <Text style={styles.totalReviewsText}>
-                  {stats.total_reviews} review{stats.total_reviews !== 1 ? 's' : ''}
+                  {stats.total_reviews} {stats.total_reviews !== 1 ? t('feed.reviewsPlural') : t('feed.reviewSingular')}
                 </Text>
               </View>
             </View>
@@ -1402,11 +1405,11 @@ function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
           <ScrollView style={styles.reviewsContainer}>
             {loading ? (
               <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading reviews...</Text>
+                <Text style={styles.loadingText}>{t('feed.loadingReviews')}</Text>
               </View>
             ) : reviews.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyReviewsText}>No reviews yet</Text>
+                <Text style={styles.emptyReviewsText}>{t('feed.noReviews')}</Text>
               </View>
             ) : (
               reviews.map((review) => (
@@ -1436,7 +1439,7 @@ function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
                   <Text style={styles.reviewText}>{review.comment}</Text>
                   {review.verified_purchase && (
                     <View style={styles.verifiedBadge}>
-                      <Text style={styles.verifiedText}>✓ Verified Purchase</Text>
+                      <Text style={styles.verifiedText}>✓ {t('feed.verifiedPurchase')}</Text>
                     </View>
                   )}
                 </View>

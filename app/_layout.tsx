@@ -9,6 +9,7 @@ import { useFonts, Inter_300Light, Inter_400Regular, Inter_600SemiBold, Inter_80
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { BookingsProvider } from '@/contexts/BookingsContext';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 
@@ -145,21 +146,23 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StripeProvider
-        publishableKey={STRIPE_PUBLISHABLE_KEY}
-        urlScheme="boredtravel"
-        merchantIdentifier="merchant.app.rork.bored-explorer"
-      >
-        <AuthProvider>
-          <BookingsProvider>
-            <FavoritesProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <RootLayoutNav />
-              </GestureHandlerRootView>
-            </FavoritesProvider>
-          </BookingsProvider>
-        </AuthProvider>
-      </StripeProvider>
+      <LanguageProvider>
+        <StripeProvider
+          publishableKey={STRIPE_PUBLISHABLE_KEY}
+          urlScheme="boredtravel"
+          merchantIdentifier="merchant.app.rork.bored-explorer"
+        >
+          <AuthProvider>
+            <BookingsProvider>
+              <FavoritesProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <RootLayoutNav />
+                </GestureHandlerRootView>
+              </FavoritesProvider>
+            </BookingsProvider>
+          </AuthProvider>
+        </StripeProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }

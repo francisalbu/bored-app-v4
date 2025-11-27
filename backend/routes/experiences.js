@@ -94,4 +94,104 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
   }
 });
 
+/**
+ * GET /api/experiences/:id/reviews
+ * Get reviews for a specific experience
+ * Returns mix of Google reviews + app reviews
+ */
+router.get('/:id/reviews', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Get reviews from database (both Google and app reviews)
+    const reviews = await Experience.getExperienceReviews(id);
+    
+    // Calculate stats
+    const stats = {
+      total_reviews: reviews.length,
+      average_rating: reviews.length > 0
+        ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+        : 0,
+      rating_distribution: {
+        5: reviews.filter(r => r.rating === 5).length,
+        4: reviews.filter(r => r.rating === 4).length,
+        3: reviews.filter(r => r.rating === 3).length,
+        2: reviews.filter(r => r.rating === 2).length,
+        1: reviews.filter(r => r.rating === 1).length,
+      }
+    };
+    
+    res.json({
+      success: true,
+      data: reviews,
+      stats
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/experiences/:id/reviews
+ * Create a new review for an experience (authenticated users only)
+ * Body: { rating, comment, booking_id }
+ */
+const { authenticateSupabase } = require('../middleware/auth');
+const { body, validationResult } = require('express-validator');
+
+router.post('/:id/reviews', 
+  authenticateSupabase,
+  [
+    param('id').isInt().withMessage('Experience ID must be a valid integer'),
+    body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+    body('comment').isString().trim().isLength({ min: 10, max: 1000 }).withMessage('Comment must be between 10 and 1000 characters'),
+    body('booking_id').isInt().withMessage('Booking ID must be a valid integer'),
+  ],
+  async (req, res, next) => {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array()
+        });
+      }
+
+      const { id } = req.params;
+      const { rating, comment, booking_id } = req.body;
+      const userId = req.user.id; // From authenticateSupabase middleware
+
+      // Check if user has already reviewed this experience for this booking
+      const existingReview = await Experience.getUserReviewForBooking(id, userId, booking_id);
+      
+      if (existingReview) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have already reviewed this booking'
+        });
+      }
+
+      // Create review
+      const review = await Experience.createReview({
+        experience_id: id,
+        user_id: userId,
+        booking_id,
+        rating,
+        comment,
+        source: 'app', // Mark as app review (not Google)
+        verified_purchase: true // Always verified since it's from a real booking
+      });
+
+      res.status(201).json({
+        success: true,
+        data: review,
+        message: 'Review submitted successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 module.exports = router;

@@ -18,6 +18,7 @@ import { useFonts, PermanentMarker_400Regular } from '@expo-google-fonts/permane
 
 import colors from '@/constants/colors';
 import { getVibeCheckRecommendation, type VibeCheckResponse } from '@/services/boredAI';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface VibeResponse {
   id: string;
@@ -27,6 +28,7 @@ interface VibeResponse {
 }
 
 export default function BoredAITab() {
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const [userVibe, setUserVibe] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,12 +39,12 @@ export default function BoredAITab() {
   });
 
   const moods = [
-    { emoji: '🎉', label: 'Chaos', vibe: 'chaotic energy, need something wild' },
-    { emoji: '😌', label: 'Chill', vibe: 'relaxed vibes, nothing too crazy' },
-    { emoji: '🤘', label: 'Rave', vibe: 'party mode, show me the nightlife' },
-    { emoji: '🏛️', label: 'History', vibe: 'history nerd mode, make it fun though' },
-    { emoji: '🍕', label: 'Food', vibe: 'foodie vibes, best eats in town' },
-    { emoji: '🏄', label: 'Surf', vibe: 'beach and surf culture' },
+    { emoji: '🎉', label: t('boredAI.moods.chaos'), vibe: t('boredAI.vibes.chaos') },
+    { emoji: '😌', label: t('boredAI.moods.chill'), vibe: t('boredAI.vibes.chill') },
+    { emoji: '🤘', label: t('boredAI.moods.rave'), vibe: t('boredAI.vibes.rave') },
+    { emoji: '🏛️', label: t('boredAI.moods.history'), vibe: t('boredAI.vibes.history') },
+    { emoji: '🍕', label: t('boredAI.moods.food'), vibe: t('boredAI.vibes.food') },
+    { emoji: '🏄', label: t('boredAI.moods.surf'), vibe: t('boredAI.vibes.surf') },
   ];
 
   const handleMoodPress = async (vibe: string) => {
@@ -117,8 +119,8 @@ export default function BoredAITab() {
         <View style={styles.headerContent}>
           <Sparkles size={28} color={colors.dark.primary} />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>BORED AI</Text>
-            <Text style={styles.headerSubtitle}>Your antidote to boredom</Text>
+            <Text style={styles.headerTitle}>{t('boredAI.title')}</Text>
+            <Text style={styles.headerSubtitle}>{t('boredAI.subtitle')}</Text>
           </View>
         </View>
       </View>
@@ -131,7 +133,7 @@ export default function BoredAITab() {
       >
         <View style={styles.introSection}>
           <Text style={styles.introText}>
-            Don't know what to do? Tell our sassy AI how you're feeling, and get a non-boring recommendation instantly.
+            {t('boredAI.intro')}
           </Text>
         </View>
 
@@ -139,7 +141,7 @@ export default function BoredAITab() {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="e.g. I want to eat vegetarian but make it cool..."
+              placeholder={t('boredAI.placeholder')}
               placeholderTextColor={colors.dark.textTertiary}
               value={userVibe}
               onChangeText={setUserVibe}
@@ -185,7 +187,7 @@ export default function BoredAITab() {
               <View style={styles.responseHeader}>
                 <Text style={styles.responseVibe}>"{currentResponse.vibe}"</Text>
                 <View style={styles.aiChoiceBadge}>
-                  <Text style={styles.aiChoiceText}>AI CHOICE</Text>
+                  <Text style={styles.aiChoiceText}>{t('boredAI.aiChoice')}</Text>
                 </View>
               </View>
               {fontsLoaded ? (
@@ -203,7 +205,7 @@ export default function BoredAITab() {
                   onPress={() => handleOpenMaps(currentResponse.recommendation.mapsUrl!)}
                 >
                   <MapPin size={18} color={colors.dark.background} />
-                  <Text style={styles.mapsButtonText}>View on Maps</Text>
+                  <Text style={styles.mapsButtonText}>{t('boredAI.viewOnMaps')}</Text>
                 </Pressable>
               )}
             </View>

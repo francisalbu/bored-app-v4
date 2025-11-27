@@ -199,17 +199,22 @@ class ApiService {
 
   // Review APIs
   async getExperienceReviews(experienceId: string) {
-    return this.request(`/reviews/${experienceId}`);
+    return this.request(`/experiences/${experienceId}/reviews`);
   }
 
   async createReview(reviewData: {
     experienceId: string;
+    bookingId: number;
     rating: number;
     comment: string;
   }) {
-    return this.request('/reviews', {
+    return this.request(`/experiences/${reviewData.experienceId}/reviews`, {
       method: 'POST',
-      body: JSON.stringify(reviewData),
+      body: JSON.stringify({
+        rating: reviewData.rating,
+        comment: reviewData.comment,
+        booking_id: reviewData.bookingId
+      }),
     });
   }
 

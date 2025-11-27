@@ -1,4 +1,4 @@
-import { Calendar, Clock, MapPin, RefreshCw, X } from 'lucide-react-native';
+import { Calendar, Clock, MapPin, RefreshCw, X, Star } from 'lucide-react-native';
 import React, { useState, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -11,9 +11,14 @@ import {
   FlatList,
   Dimensions,
   Linking,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import apiService from '@/services/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 32; // 16px margin on each side
@@ -22,10 +27,12 @@ import colors from '@/constants/colors';
 import { useBookings, type Booking } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type BookingFilter = 'upcoming' | 'past';
 
 export default function BookingsScreen() {
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -34,33 +41,35 @@ export default function BookingsScreen() {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [currentTicketIndex, setCurrentTicketIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<Booking | null>(null);
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-          <Text style={styles.headerTitle}>My Bookings</Text>
+          <Text style={styles.headerTitle}>{t('booking.myBookings')}</Text>
         </View>
         <View style={styles.loginEmptyState}>
           <View style={styles.loginIconContainer}>
             <Text style={styles.loginIcon}>🎟️</Text>
           </View>
-          <Text style={styles.loginTitle}>Your tickets await!</Text>
+          <Text style={styles.loginTitle}>{t('booking.yourTicketsAwait')}</Text>
           <Text style={styles.loginText}>
-            Sign in to access your bookings and start exploring amazing experiences
+            {t('booking.signInToAccess')}
           </Text>
           <Pressable 
             style={styles.loginButton}
             onPress={() => router.push('/auth/login')}
           >
-            <Text style={styles.loginButtonText}>Sign In</Text>
+            <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
           </Pressable>
           <Pressable 
             style={styles.signupButton}
             onPress={() => router.push('/auth/signup')}
           >
-            <Text style={styles.signupButtonText}>Create Account</Text>
+            <Text style={styles.signupButtonText}>{t('auth.createAccount')}</Text>
           </Pressable>
         </View>
       </View>
@@ -71,12 +80,12 @@ export default function BookingsScreen() {
 
   const handleCancelBooking = async (bookingId: number, bookingTitle: string) => {
     Alert.alert(
-      'Cancel Booking',
-      `Are you sure you want to cancel "${bookingTitle}"? This action cannot be undone.`,
+      t('booking.cancelBooking'),
+      t('booking.cancelConfirmation', { title: bookingTitle }),
       [
-        { text: 'No', style: 'cancel' },
+        { text: t('common.no'), style: 'cancel' },
         {
-          text: 'Yes, Cancel',
+          text: t('booking.yesCancel'),
           style: 'destructive',
           onPress: async () => {
             setCancellingId(bookingId);
@@ -84,9 +93,9 @@ export default function BookingsScreen() {
             setCancellingId(null);
             
             if (result.success) {
-              Alert.alert('Success', 'Booking cancelled successfully');
+              Alert.alert(t('common.success'), t('booking.cancelSuccess'));
             } else {
-              Alert.alert('Error', result.error || 'Failed to cancel booking');
+              Alert.alert(t('common.error'), result.error || t('booking.cancelError'));
             }
           },
         },
@@ -94,11 +103,21 @@ export default function BookingsScreen() {
     );
   };
 
+  const handleOpenReviewModal = (booking: Booking) => {
+    setSelectedBookingForReview(booking);
+    setReviewModalVisible(true);
+  };
+
+  const handleCloseReviewModal = () => {
+    setReviewModalVisible(false);
+    setSelectedBookingForReview(null);
+  };
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>My Bookings</Text>
+          <Text style={styles.headerTitle}>{t('booking.myBookings')}</Text>
           <Pressable onPress={refreshBookings} disabled={isLoading}>
             <RefreshCw 
               size={20} 
@@ -120,7 +139,7 @@ export default function BookingsScreen() {
                 filter === 'upcoming' && styles.filterTextActive,
               ]}
             >
-              Upcoming ({upcomingBookings.length})
+              {t('booking.upcoming')} ({upcomingBookings.length})
             </Text>
           </Pressable>
           <Pressable
@@ -136,7 +155,7 @@ export default function BookingsScreen() {
                 filter === 'past' && styles.filterTextActive,
               ]}
             >
-              Past ({pastBookings.length})
+              {t('booking.past')} ({pastBookings.length})
             </Text>
           </Pressable>
         </View>
@@ -145,7 +164,7 @@ export default function BookingsScreen() {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.dark.primary} />
-          <Text style={styles.loadingText}>Loading bookings...</Text>
+          <Text style={styles.loadingText}>{t('booking.loadingBookings')}</Text>
         </View>
       ) : filteredBookings.length === 0 ? (
         <View style={styles.emptyState}>
@@ -188,6 +207,7 @@ export default function BookingsScreen() {
                 booking={filteredBookings[0]}
                 onCancel={handleCancelBooking}
                 isCancelling={cancellingId === filteredBookings[0].id}
+                onWriteReview={handleOpenReviewModal}
               />
             </View>
           ) : (
@@ -211,6 +231,7 @@ export default function BookingsScreen() {
                     booking={item}
                     onCancel={handleCancelBooking}
                     isCancelling={cancellingId === item.id}
+                    onWriteReview={handleOpenReviewModal}
                   />
                 </View>
               )}
@@ -230,9 +251,23 @@ export default function BookingsScreen() {
               booking={booking}
               onCancel={handleCancelBooking}
               isCancelling={cancellingId === booking.id}
+              onWriteReview={handleOpenReviewModal}
             />
           ))}
         </ScrollView>
+      )}
+
+      {/* Review Modal */}
+      {selectedBookingForReview && (
+        <ReviewModal
+          visible={reviewModalVisible}
+          booking={selectedBookingForReview}
+          onClose={handleCloseReviewModal}
+          onSubmitSuccess={() => {
+            handleCloseReviewModal();
+            refreshBookings();
+          }}
+        />
       )}
     </View>
   );
@@ -242,9 +277,11 @@ interface BookingCardProps {
   booking: Booking;
   onCancel: (id: number, title: string) => void;
   isCancelling: boolean;
+  onWriteReview?: (booking: Booking) => void;
 }
 
-function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
+function BookingCard({ booking, onCancel, isCancelling, onWriteReview }: BookingCardProps) {
+  const { t } = useLanguage();
   const bookingDate = new Date(booking.slot_date || booking.booking_date);
   const formattedDate = bookingDate.toLocaleDateString('en-US', {
     month: 'short',
@@ -297,7 +334,7 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
             isCancelled && styles.statusBadgeCancelled
           ]}>
             <Text style={styles.statusText}>
-              {isCancelled ? '❌ Cancelled' : isUpcoming ? '⏱️ Upcoming' : 'Completed'}
+              {isCancelled ? `❌ ${t('booking.cancelled')}` : isUpcoming ? `⏱️ ${t('booking.upcoming')}` : t('booking.completed')}
             </Text>
           </View>
         </View>
@@ -322,7 +359,7 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailText}>
-              👥 {booking.participants} {booking.participants === 1 ? 'person' : 'people'}
+              👥 {booking.participants} {booking.participants === 1 ? t('booking.person') : t('booking.people')}
             </Text>
           </View>
         </View>
@@ -330,7 +367,7 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
         {/* Help & Contact Section */}
         {isUpcoming && !isCancelled && (
           <View style={styles.helpSection}>
-            <Text style={styles.helpTitle}>Need Help?</Text>
+            <Text style={styles.helpTitle}>{t('booking.needHelp')}</Text>
             
             <Pressable 
               style={styles.helpItem}
@@ -340,7 +377,7 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
             >
               <Text style={styles.helpIcon}>📱</Text>
               <View style={styles.helpTextContainer}>
-                <Text style={styles.helpLabel}>Contact Us (WhatsApp)</Text>
+                <Text style={styles.helpLabel}>{t('booking.contactWhatsApp')}</Text>
                 <Text style={styles.helpValue}>+351 912 345 678</Text>
               </View>
             </Pressable>
@@ -354,7 +391,7 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
             >
               <Text style={styles.helpIcon}>📍</Text>
               <View style={styles.helpTextContainer}>
-                <Text style={styles.helpLabel}>Meeting Point</Text>
+                <Text style={styles.helpLabel}>{t('booking.meetingPoint')}</Text>
                 <Text style={styles.helpValue}>{booking.experience_location}</Text>
               </View>
             </Pressable>
@@ -367,7 +404,7 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
             >
               <Text style={styles.helpIcon}>✉️</Text>
               <View style={styles.helpTextContainer}>
-                <Text style={styles.helpLabel}>Email Support</Text>
+                <Text style={styles.helpLabel}>{t('booking.emailSupport')}</Text>
                 <Text style={styles.helpValue}>support@boredtourist.com</Text>
               </View>
             </Pressable>
@@ -376,11 +413,11 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
 
         <View style={styles.cardFooter}>
           <View>
-            <Text style={styles.referenceLabel}>Booking Reference</Text>
+            <Text style={styles.referenceLabel}>{t('booking.bookingReference')}</Text>
             <Text style={styles.referenceText}>{booking.booking_reference}</Text>
           </View>
           <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>Total</Text>
+            <Text style={styles.priceLabel}>{t('booking.total')}</Text>
             <Text style={styles.price}>
               {booking.currency}{booking.total_amount}
             </Text>
@@ -396,18 +433,164 @@ function BookingCard({ booking, onCancel, isCancelling }: BookingCardProps) {
             {isCancelling ? (
               <ActivityIndicator size="small" color={colors.dark.textTertiary} />
             ) : (
-              <Text style={styles.cancelLinkText}>Cancel my booking</Text>
+              <Text style={styles.cancelLinkText}>{t('booking.cancelMyBooking')}</Text>
             )}
           </Pressable>
         )}
 
-        {!isUpcoming && !isCancelled && (
-          <Pressable style={styles.reviewButton}>
-            <Text style={styles.reviewButtonText}>Write a Review</Text>
+        {!isUpcoming && !isCancelled && onWriteReview && (
+          <Pressable style={styles.reviewButton} onPress={() => onWriteReview(booking)}>
+            <Text style={styles.reviewButtonText}>{t('booking.writeReview')}</Text>
           </Pressable>
         )}
       </View>
     </Pressable>
+  );
+}
+
+// Review Modal Component
+interface ReviewModalProps {
+  visible: boolean;
+  booking: Booking;
+  onClose: () => void;
+  onSubmitSuccess: () => void;
+}
+
+function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModalProps) {
+  const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (rating === 0) {
+      Alert.alert(t('common.error'), t('reviews.ratingRequired'));
+      return;
+    }
+
+    if (comment.trim().length < 10) {
+      Alert.alert(t('common.error'), t('reviews.commentTooShort'));
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await apiService.createReview({
+        experienceId: booking.experience_id.toString(),
+        bookingId: booking.id,
+        rating,
+        comment: comment.trim(),
+      });
+
+      if (response.success) {
+        Alert.alert(t('common.success'), t('reviews.thankYou'));
+        setRating(0);
+        setComment('');
+        onSubmitSuccess();
+      } else {
+        Alert.alert(t('common.error'), response.error || t('reviews.submitError'));
+      }
+    } catch (error: any) {
+      console.error('Error submitting review:', error);
+      Alert.alert(t('common.error'), error.message || t('reviews.submitError'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView 
+        style={styles.reviewModalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={styles.reviewModalBackdrop} onPress={onClose} />
+        <View style={[styles.reviewModalContent, { paddingBottom: Math.max(insets.bottom + 16, 32) }]}>
+          {/* Header */}
+          <View style={styles.reviewModalHeader}>
+            <Text style={styles.reviewModalTitle}>{t('reviews.writeReview')}</Text>
+            <Pressable onPress={onClose}>
+              <X size={24} color={colors.dark.textSecondary} />
+            </Pressable>
+          </View>
+
+          <ScrollView 
+            style={styles.reviewModalBody}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Experience Info */}
+            <View style={styles.reviewExperienceInfo}>
+              <Text style={styles.reviewExperienceTitle}>{booking.experience_title}</Text>
+              <Text style={styles.reviewExperienceDate}>
+                {new Date(booking.slot_date || booking.booking_date).toLocaleDateString()}
+              </Text>
+            </View>
+
+            {/* Rating Stars */}
+            <View style={styles.reviewRatingSection}>
+              <Text style={styles.reviewSectionLabel}>{t('reviews.yourRating')}</Text>
+              <View style={styles.reviewStars}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Pressable
+                    key={star}
+                    onPress={() => setRating(star)}
+                    style={styles.reviewStar}
+                  >
+                    <Star
+                      size={40}
+                      color={star <= rating ? '#FFB800' : colors.dark.textTertiary}
+                      fill={star <= rating ? '#FFB800' : 'transparent'}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Comment */}
+            <View style={styles.reviewCommentSection}>
+              <Text style={styles.reviewSectionLabel}>{t('reviews.yourReview')}</Text>
+              <TextInput
+                style={styles.reviewCommentInput}
+                placeholder={t('reviews.shareExperience')}
+                placeholderTextColor={colors.dark.textTertiary}
+                value={comment}
+                onChangeText={setComment}
+                multiline
+                numberOfLines={6}
+                maxLength={1000}
+                textAlignVertical="top"
+              />
+              <Text style={styles.reviewCharCount}>
+                {comment.length}/1000
+              </Text>
+            </View>
+
+            {/* Submit Button */}
+            <Pressable
+              style={[
+                styles.reviewSubmitButton,
+                (rating === 0 || comment.trim().length < 10 || isSubmitting) && styles.reviewSubmitButtonDisabled
+              ]}
+              onPress={handleSubmit}
+              disabled={rating === 0 || comment.trim().length < 10 || isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color={colors.dark.background} />
+              ) : (
+                <Text style={styles.reviewSubmitButtonText}>{t('reviews.submit')}</Text>
+              )}
+            </Pressable>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -853,5 +1036,104 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600' as const,
     color: colors.dark.primary,
+  },
+  // Review Modal Styles
+  reviewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'flex-end',
+  },
+  reviewModalBackdrop: {
+    flex: 1,
+  },
+  reviewModalContent: {
+    backgroundColor: colors.dark.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  reviewModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
+  },
+  reviewModalTitle: {
+    fontSize: 20,
+    fontWeight: '900' as const,
+    color: colors.dark.text,
+  },
+  reviewModalBody: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  reviewExperienceInfo: {
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
+  },
+  reviewExperienceTitle: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 4,
+  },
+  reviewExperienceDate: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+  },
+  reviewRatingSection: {
+    paddingVertical: 24,
+  },
+  reviewSectionLabel: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 16,
+  },
+  reviewStars: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  reviewStar: {
+    padding: 4,
+  },
+  reviewCommentSection: {
+    paddingBottom: 24,
+  },
+  reviewCommentInput: {
+    backgroundColor: colors.dark.backgroundSecondary,
+    borderRadius: 12,
+    padding: 16,
+    color: colors.dark.text,
+    fontSize: 15,
+    minHeight: 150,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  reviewCharCount: {
+    fontSize: 12,
+    color: colors.dark.textTertiary,
+    textAlign: 'right' as const,
+    marginTop: 8,
+  },
+  reviewSubmitButton: {
+    backgroundColor: colors.dark.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reviewSubmitButtonDisabled: {
+    opacity: 0.5,
+  },
+  reviewSubmitButtonText: {
+    color: colors.dark.background,
+    fontSize: 16,
+    fontWeight: '900' as const,
   },
 });

@@ -114,7 +114,7 @@ export function BookingsProvider({ children }: { children: React.ReactNode }) {
       console.log('🔄 Refreshing bookings for user:', user?.email);
       setIsLoading(true);
       setError(null);
-      const response = await api.get<Booking[]>('/bookings');
+      const response = await api.getMyBookings();
 
       console.log('📦 Bookings API Response:', {
         success: response.success,
