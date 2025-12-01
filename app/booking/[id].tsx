@@ -449,6 +449,11 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     borderBottomWidth: 1,
     borderBottomColor: colors.dark.border,
+    backgroundColor: colors.dark.backgroundTertiary,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    borderBottomWidth: 0,
   },
   sectionRow: {
     flexDirection: 'row',
@@ -528,14 +533,13 @@ const styles = StyleSheet.create({
   },
   weekDays: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     marginBottom: 12,
   },
   weekDay: {
     fontSize: 12,
     fontWeight: '600' as const,
     color: colors.dark.textSecondary,
-    width: (SCREEN_WIDTH - 96) / 7,
+    flex: 1,
     textAlign: 'center' as const,
   },
   daysGrid: {
@@ -543,8 +547,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   dayCell: {
-    width: (SCREEN_WIDTH - 96) / 7,
-    height: (SCREEN_WIDTH - 96) / 7,
+    width: '14.28%',
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
@@ -554,12 +558,12 @@ const styles = StyleSheet.create({
   },
   dayCellSelected: {
     backgroundColor: colors.dark.primary,
-    borderRadius: ((SCREEN_WIDTH - 96) / 7) / 2,
+    borderRadius: 100,
   },
   dayCellToday: {
     borderWidth: 1,
     borderColor: colors.dark.primary,
-    borderRadius: ((SCREEN_WIDTH - 96) / 7) / 2,
+    borderRadius: 100,
   },
   dayCellPast: {
     opacity: 0.3,

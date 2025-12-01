@@ -23,4 +23,4 @@ services:
         generateValue: true  # Render gera automaticamente
       - key: CORS_ORIGIN
         value: "*"  # Ou específico: "exp://your-app"
-    healthCheckPath: /api/experiences
+    healthCheckPath: /health

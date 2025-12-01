@@ -210,19 +210,18 @@ router.get('/:id',
  */
 router.put('/:id',
   authenticateSupabase,
-  [
-  ],
   async (req, res, next) => {
     try {
-      if (!errors.isEmpty()) {
+      const { id } = req.params;
+      
+      // Manual validation
+      if (!id || isNaN(parseInt(id)) || parseInt(id) < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
-          errors: errors.array()
+          message: 'Invalid booking ID'
         });
       }
       
-      const { id } = req.params;
       const updates = {
         customer_name: req.body.customer_name,
         customer_email: req.body.customer_email,
@@ -261,19 +260,18 @@ router.put('/:id',
  */
 router.put('/:id/cancel',
   authenticateSupabase,
-  [
-  ],
   async (req, res, next) => {
     try {
-      if (!errors.isEmpty()) {
+      const { id } = req.params;
+      
+      // Manual validation
+      if (!id || isNaN(parseInt(id)) || parseInt(id) < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid booking ID',
-          errors: errors.array()
+          message: 'Invalid booking ID'
         });
       }
       
-      const { id } = req.params;
       const booking = await Booking.cancelBooking(id, req.user.id);
       
       res.json({
@@ -307,19 +305,18 @@ router.put('/:id/cancel',
  */
 router.delete('/:id',
   authenticateSupabase,
-  [
-  ],
   async (req, res, next) => {
     try {
-      if (!errors.isEmpty()) {
+      const { id } = req.params;
+      
+      // Manual validation
+      if (!id || isNaN(parseInt(id)) || parseInt(id) < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid booking ID',
-          errors: errors.array()
+          message: 'Invalid booking ID'
         });
       }
       
-      const { id } = req.params;
       const result = await Booking.deleteBooking(id, req.user.id);
       
       res.json({

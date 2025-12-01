@@ -725,7 +725,7 @@ export default function PaymentScreen() {
                 <Text style={styles.bulletNumber}>1.</Text> Your payment secures your spot now.
               </Text>
               <Text style={styles.earlyAccessBullet}>
-                <Text style={styles.bulletNumber}>2.</Text> Official confirmation from the partner will arrive within <Text style={styles.boldText}>24 hours (business days).</Text>
+                <Text style={styles.bulletNumber}>2.</Text> Official confirmation from the partner will arrive within <Text style={styles.boldText}>24 hours.</Text>
               </Text>
               <Text style={styles.earlyAccessBullet}>
                 <Text style={styles.bulletNumber}>3.</Text> <Text style={styles.boldText}>Full Refund Guarantee:</Text> If we can't secure your spot (due to capacity), you get <Text style={styles.boldText}>100% of your money back</Text> within 24 hours of notification.
@@ -1207,17 +1207,19 @@ const styles = StyleSheet.create({
   // Early Access Modal Styles
   earlyAccessOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   earlyAccessModal: {
-    backgroundColor: colors.dark.card,
+    backgroundColor: '#2a2a2a',
     borderRadius: 20,
     padding: 24,
     width: '100%',
     maxWidth: 400,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
   },
   earlyAccessTitle: {
     fontSize: 22,
