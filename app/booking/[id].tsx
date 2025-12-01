@@ -88,7 +88,7 @@ export default function BookingScreen() {
         
         try {
           const response = await api.get<any>(
-            `/availability/${experience.id}?date=${dateStr}`
+            `/availability/${parseInt(experience.id)}?date=${dateStr}`
           );
           
           console.log('📅 Availability for', dateStr, ':', response);

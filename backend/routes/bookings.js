@@ -11,7 +11,6 @@
 
 const express = require('express');
 const router = express.Router();
-const { body, param, validationResult } = require('express-validator');
 const Booking = require('../models/Booking');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 

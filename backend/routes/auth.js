@@ -6,7 +6,6 @@
 
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
 const passport = require('../config/passport');
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
@@ -16,27 +15,33 @@ const { authenticate } = require('../middleware/auth');
  * POST /api/auth/register
  * Register a new user with email and password
  */
-router.post('/register',
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 6 }),
-    body('name').trim().notEmpty()
-  ],
-  async (req, res, next) => {
-    try {
-      // Validate input
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-      
-      const { email, password, name } = req.body;
-      
-      // Create user
+router.post('/register', async (req, res, next) => {
+  try {
+    const { email, password, name } = req.body;
+    
+    // Manual validation
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid email is required'
+      });
+    }
+    
+    if (!password || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters'
+      });
+    }
+    
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required'
+      });
+    }
+    
+    // Create user
       const user = await User.createUser(email, password, name);
       
       // Generate JWT token
@@ -70,24 +75,24 @@ router.post('/register',
  * POST /api/auth/login
  * Login with email and password
  */
-router.post('/login',
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty()
-  ],
-  async (req, res, next) => {
-    try {
-      // Validate input
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-      
-      const { email, password } = req.body;
+router.post('/login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Manual validation
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid email is required'
+      });
+    }
+    
+    if (!password || password.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required'
+      });
+    }
       
       // Verify credentials
       const user = await User.verifyPassword(email, password);

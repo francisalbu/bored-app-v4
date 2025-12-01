@@ -459,10 +459,21 @@ Book this amazing experience on BoredTourist!`;
             </View>
             
             <Pressable
-              style={styles.bookButton}
-              onPress={() => router.push(`/booking/${experience.id}`)}
+              style={[
+                styles.bookButton,
+                (experience.id === '12' || experience.id === '19') && styles.interestButton
+              ]}
+              onPress={() => {
+                if (experience.id === '12' || experience.id === '19') {
+                  router.push(`/experience/interest/${experience.id}`);
+                } else {
+                  router.push(`/booking/${experience.id}`);
+                }
+              }}
             >
-              <Text style={styles.bookButtonText}>{t('feed.bookNow').toUpperCase()}</Text>
+              <Text style={styles.bookButtonText}>
+                {(experience.id === '12' || experience.id === '19') ? "I'M INTERESTED!" : t('feed.bookNow').toUpperCase()}
+              </Text>
             </Pressable>
           </Pressable>
 
@@ -687,6 +698,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginBottom: 10,
+    flexWrap: 'nowrap',
   },
   metaItem: {
     flexDirection: 'row',
@@ -704,11 +716,12 @@ const styles = StyleSheet.create({
   },
   price: {
     color: colors.dark.primary,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900' as const,
+    flexShrink: 0,
   },
   priceUnit: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.dark.primary,
     fontWeight: '700' as const,
   },
@@ -717,6 +730,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 25,
     alignItems: 'center',
+  },
+  interestButton: {
+    backgroundColor: '#8B5CF6',
   },
   bookButtonText: {
     color: colors.dark.background,

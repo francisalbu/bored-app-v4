@@ -91,6 +91,7 @@ export default function ExperienceDetailScreen() {
           };
           
           console.log('✅ Experience loaded:', transformedExperience.title);
+          console.log('✅ Experience ID after transform:', transformedExperience.id, 'Type:', typeof transformedExperience.id);
           setExperience(transformedExperience);
         }
       } catch (error) {
@@ -502,6 +503,11 @@ Book this amazing experience on BoredTourist!`;
           </View>
         </ScrollView>
 
+        {experience && (() => {
+          console.log('🎨 RENDERING BUTTON - ID:', experience.id, 'Type:', typeof experience.id);
+          console.log('🎨 Should be INTERESTED?', experience.id === '12' || experience.id === '19');
+          return null;
+        })()}
         {experience && (
           <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.priceSection}>
@@ -512,10 +518,27 @@ Book this amazing experience on BoredTourist!`;
               <Text style={styles.priceLabel}>per person</Text>
             </View>
             <Pressable 
-              style={styles.bookButton}
-              onPress={() => router.push(`/booking/${experience.id}`)}
+              style={[
+                styles.bookButton,
+                (experience.id === '12' || experience.id === '19') && styles.interestButton
+              ]}
+              onPress={() => {
+                console.log('🔍 Experience ID:', experience.id, 'Type:', typeof experience.id);
+                console.log('🔍 Is ID 12?', experience.id === '12');
+                console.log('🔍 Is ID 19?', experience.id === '19');
+                
+                if (experience.id === '12' || experience.id === '19') {
+                  console.log('✅ Navigating to interest page');
+                  router.push(`/experience/interest/${experience.id}`);
+                } else {
+                  console.log('✅ Navigating to booking page');
+                  router.push(`/booking/${experience.id}`);
+                }
+              }}
             >
-              <Text style={styles.bookButtonText}>BOOK NOW</Text>
+              <Text style={styles.bookButtonText}>
+                {(experience.id === '12' || experience.id === '19') ? "I'M INTERESTED!" : "BOOK NOW"}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -887,6 +910,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 48,
     paddingVertical: 16,
     borderRadius: 28,
+  },
+  interestButton: {
+    backgroundColor: '#8B5CF6', // Purple color for interest
   },
   bookButtonText: {
     color: colors.dark.background,

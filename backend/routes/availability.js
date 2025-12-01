@@ -6,7 +6,6 @@
 
 const express = require('express');
 const router = express.Router();
-const { param, validationResult } = require('express-validator');
 const { from } = require('../config/database');
 
 /**

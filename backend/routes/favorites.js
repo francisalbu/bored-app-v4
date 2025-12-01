@@ -6,7 +6,6 @@
 
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const { query, run, get } = require('../config/database');
