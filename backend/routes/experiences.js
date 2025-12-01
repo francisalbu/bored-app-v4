@@ -6,9 +6,8 @@
 
 const express = require('express');
 const router = express.Router();
-const { query, param } = require('express-validator');
 const Experience = require('../models/Experience');
-const { optionalAuth } = require('../middleware/auth');
+const { optionalAuth, authenticateSupabase } = require('../middleware/auth');
 
 /**
  * GET /api/experiences
@@ -136,30 +135,39 @@ router.get('/:id/reviews', async (req, res, next) => {
  * Create a new review for an experience (authenticated users only)
  * Body: { rating, comment, booking_id }
  */
-const { authenticateSupabase } = require('../middleware/auth');
-const { body, validationResult } = require('express-validator');
-
-router.post('/:id/reviews', 
-  authenticateSupabase,
-  [
-    param('id').isInt().withMessage('Experience ID must be a valid integer'),
-    body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
-    body('comment').isString().trim().isLength({ min: 10, max: 1000 }).withMessage('Comment must be between 10 and 1000 characters'),
-    body('booking_id').isInt().withMessage('Booking ID must be a valid integer'),
-  ],
-  async (req, res, next) => {
+router.post('/:id/reviews', authenticateSupabase, async (req, res, next) => {
     try {
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array()
-        });
-      }
-
       const { id } = req.params;
       const { rating, comment, booking_id } = req.body;
+      
+      // Manual validation
+      if (!id || !Number.isInteger(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Experience ID must be a valid integer'
+        });
+      }
+      
+      if (!rating || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rating must be between 1 and 5'
+        });
+      }
+      
+      if (!comment || typeof comment !== 'string' || comment.trim().length < 10 || comment.trim().length > 1000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Comment must be between 10 and 1000 characters'
+        });
+      }
+      
+      if (!booking_id || !Number.isInteger(booking_id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Booking ID must be a valid integer'
+        });
+      }
       const userId = req.user.id; // From authenticateSupabase middleware
 
       // Check if user has already reviewed this experience for this booking
