@@ -54,19 +54,8 @@ router.get('/', authenticateSupabase, async (req, res, next) => {
  */
 router.put('/',
   authenticateSupabase,
-  [
-  ],
   async (req, res, next) => {
     try {
-      // Validate input
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-      
       const updates = {};
       if (req.body.name) updates.name = req.body.name;
       if (req.body.bio !== undefined) updates.bio = req.body.bio;

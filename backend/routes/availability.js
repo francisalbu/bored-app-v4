@@ -17,19 +17,18 @@ const { from } = require('../config/database');
  * - to: end date range (YYYY-MM-DD)
  */
 router.get('/:experienceId',
-  [
-  ],
   async (req, res, next) => {
     try {
-      if (!errors.isEmpty()) {
+      const { experienceId } = req.params;
+      
+      // Manual validation
+      if (!experienceId || isNaN(parseInt(experienceId)) || parseInt(experienceId) < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid experience ID',
-          errors: errors.array()
+          message: 'Valid experience ID required'
         });
       }
       
-      const { experienceId } = req.params;
       const { date, from: fromDate, to: toDate } = req.query;
       
       console.log('📅 Availability request:', { experienceId, date, fromDate, toDate });
@@ -115,19 +114,17 @@ router.get('/:experienceId',
  * Get specific slot details
  */
 router.get('/slot/:slotId',
-  [
-  ],
   async (req, res, next) => {
     try {
-      if (!errors.isEmpty()) {
+      const { slotId } = req.params;
+      
+      // Manual validation
+      if (!slotId || isNaN(parseInt(slotId)) || parseInt(slotId) < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid slot ID',
-          errors: errors.array()
+          message: 'Valid slot ID required'
         });
       }
-      
-      const { slotId } = req.params;
       
       const { data: slot, error } = await from('availability_slots')
         .select(`
