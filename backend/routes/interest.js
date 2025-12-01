@@ -6,36 +6,39 @@
 
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
 const { from } = require('../config/database');
 
 /**
  * POST /api/interest
  * Submit interest for an experience
  */
-router.post('/',
-  [
-    body('experience_id').isInt({ min: 1 }).withMessage('Valid experience ID required'),
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('phone').optional().trim(),
-    body('notes').optional().trim(),
-    body('user_id').optional(),
-  ],
-  async (req, res, next) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-      
-      const { experience_id, name, email, phone, notes, user_id } = req.body;
-      
-      console.log('📝 New interest submission:', { experience_id, name, email });
+router.post('/', async (req, res, next) => {
+  try {
+    const { experience_id, name, email, phone, notes, user_id } = req.body;
+    
+    // Manual validation
+    if (!experience_id || !Number.isInteger(experience_id) || experience_id < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid experience ID required'
+      });
+    }
+    
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required'
+      });
+    }
+    
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid email is required'
+      });
+    }
+    
+    console.log('📝 New interest submission:', { experience_id, name, email });
       
       // Insert into Supabase
       const { data, error } = await from('experience_interests')
@@ -69,13 +72,11 @@ router.post('/',
           experience_id: data.experience_id,
         }
       });
-      
-    } catch (error) {
-      console.error('Error submitting interest:', error);
-      next(error);
-    }
+  } catch (error) {
+    console.error('Error submitting interest:', error);
+    next(error);
   }
-);
+});
 
 /**
  * GET /api/interest/:experienceId
