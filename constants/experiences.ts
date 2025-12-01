@@ -554,7 +554,7 @@ export const EXPERIENCES: Experience[] = [
     duration: '1h',
     rating: 5.0,
     reviewCount: 142,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1600593483498-4f0b5e5f5e0a?w=800&q=80',
     category: 'Adventure',
     tags: ['Buggy', 'Off-road', 'Adrenaline'],
     description: 'Experience the thrill of driving a buggy through stunning landscapes. Price is per buggy (fits 2 people).',
