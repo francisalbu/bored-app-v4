@@ -33,6 +33,7 @@ const availabilityRoutes = require('./routes/availability');
 const paymentsRoutes = require('./routes/payments');
 const reviewsRoutes = require('./routes/reviews');
 const usersRoutes = require('./routes/users');
+const interestRoutes = require('./routes/interest');
 
 // Initialize Express app
 const app = express();
@@ -88,6 +89,7 @@ app.use('/api/availability', availabilityRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/interest', interestRoutes);
 
 // 404 handler
 app.use((req, res) => {
