@@ -86,6 +86,9 @@ export default function PaymentScreen() {
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   
+  // Early access confirmation modal
+  const [showEarlyAccessModal, setShowEarlyAccessModal] = useState(false);
+  
   // Guest checkout fields
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
@@ -267,8 +270,25 @@ export default function PaymentScreen() {
     }
   };
 
+  // Show early access confirmation modal before payment
+  const handlePayButtonPress = () => {
+    if (isProcessing) return;
+    
+    // Validate guest info first if guest checkout
+    const isGuest = !user;
+    if (isGuest && !validateGuestInfo()) {
+      return;
+    }
+    
+    // Show the early access confirmation modal
+    setShowEarlyAccessModal(true);
+  };
+
   const handlePayment = async () => {
     if (isProcessing) return;
+    
+    // Close the modal first
+    setShowEarlyAccessModal(false);
     
     console.log('🔵 [PAYMENT] User clicked Pay button');
     console.log('🔵 [PAYMENT] slotId:', slotId, 'user:', user?.email);
@@ -669,7 +689,7 @@ export default function PaymentScreen() {
             styles.confirmButton, 
             (!isFormValid || isProcessing) && styles.confirmButtonDisabled
           ]} 
-          onPress={handlePayment}
+          onPress={handlePayButtonPress}
           disabled={!isFormValid || isProcessing}
         >
           {isProcessing ? (
@@ -682,6 +702,58 @@ export default function PaymentScreen() {
           )}
         </Pressable>
       </View>
+      
+      {/* Early Access Confirmation Modal */}
+      <Modal
+        visible={showEarlyAccessModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowEarlyAccessModal(false)}
+      >
+        <View style={styles.earlyAccessOverlay}>
+          <View style={styles.earlyAccessModal}>
+            <Text style={styles.earlyAccessTitle}>🎉 Early Access Booking</Text>
+            
+            <Text style={styles.earlyAccessIntro}>
+              Bored Tourist is a new community platform. This experience requires a quick, manual confirmation to ensure you get the best deal!
+            </Text>
+            
+            <Text style={styles.earlyAccessSubtitle}>What to Expect:</Text>
+            
+            <View style={styles.earlyAccessBullets}>
+              <Text style={styles.earlyAccessBullet}>
+                <Text style={styles.bulletNumber}>1.</Text> Your payment secures your spot now.
+              </Text>
+              <Text style={styles.earlyAccessBullet}>
+                <Text style={styles.bulletNumber}>2.</Text> Official confirmation from the partner will arrive within <Text style={styles.boldText}>24 hours (business days).</Text>
+              </Text>
+              <Text style={styles.earlyAccessBullet}>
+                <Text style={styles.bulletNumber}>3.</Text> <Text style={styles.boldText}>Full Refund Guarantee:</Text> If we can't secure your spot (due to capacity), you get <Text style={styles.boldText}>100% of your money back</Text> within 24 hours of notification.
+              </Text>
+            </View>
+            
+            <Text style={styles.earlyAccessFooter}>
+              By proceeding, you agree to this special, early-access process.
+            </Text>
+            
+            <View style={styles.earlyAccessButtons}>
+              <Pressable 
+                style={styles.earlyAccessBackButton}
+                onPress={() => setShowEarlyAccessModal(false)}
+              >
+                <Text style={styles.earlyAccessBackButtonText}>Back</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={styles.earlyAccessProceedButton}
+                onPress={handlePayment}
+              >
+                <Text style={styles.earlyAccessProceedButtonText}>Proceed to Payment</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       
       {/* Auth Bottom Sheet for Guest Sign In */}
       <AuthBottomSheet 
@@ -1131,5 +1203,92 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.dark.text,
     lineHeight: 20,
+  },
+  // Early Access Modal Styles
+  earlyAccessOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  earlyAccessModal: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  earlyAccessTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.dark.text,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  earlyAccessIntro: {
+    fontSize: 15,
+    color: colors.dark.text,
+    lineHeight: 22,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  earlyAccessSubtitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.dark.text,
+    marginBottom: 12,
+  },
+  earlyAccessBullets: {
+    marginBottom: 20,
+  },
+  earlyAccessBullet: {
+    fontSize: 14,
+    color: colors.dark.text,
+    lineHeight: 22,
+    marginBottom: 10,
+  },
+  bulletNumber: {
+    fontWeight: '700',
+    color: colors.dark.primary,
+  },
+  boldText: {
+    fontWeight: '700',
+  },
+  earlyAccessFooter: {
+    fontSize: 13,
+    color: colors.dark.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    fontStyle: 'italic',
+  },
+  earlyAccessButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  earlyAccessBackButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+    alignItems: 'center',
+  },
+  earlyAccessBackButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.dark.text,
+  },
+  earlyAccessProceedButton: {
+    flex: 2,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: colors.dark.primary,
+    alignItems: 'center',
+  },
+  earlyAccessProceedButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.dark.background,
   },
 });
