@@ -18,11 +18,9 @@ const { from } = require('../config/database');
  */
 router.get('/:experienceId',
   [
-    param('experienceId').isInt({ min: 1 }).withMessage('Valid experience ID required')
   ],
   async (req, res, next) => {
     try {
-      const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
@@ -118,11 +116,9 @@ router.get('/:experienceId',
  */
 router.get('/slot/:slotId',
   [
-    param('slotId').isInt({ min: 1 }).withMessage('Valid slot ID required')
   ],
   async (req, res, next) => {
     try {
-      const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,

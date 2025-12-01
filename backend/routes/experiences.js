@@ -7,7 +7,8 @@
 const express = require('express');
 const router = express.Router();
 const Experience = require('../models/Experience');
-const { optionalAuth, authenticateSupabase } = require('../middleware/auth');
+const { optionalAuth } = require('../middleware/auth');
+const { authenticateSupabase } = require('../middleware/supabaseAuth');
 
 /**
  * GET /api/experiences

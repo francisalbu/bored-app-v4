@@ -55,14 +55,10 @@ router.get('/', authenticateSupabase, async (req, res, next) => {
 router.put('/',
   authenticateSupabase,
   [
-    body('name').optional().trim().notEmpty(),
-    body('bio').optional().trim(),
-    body('avatar_url').optional().isURL()
   ],
   async (req, res, next) => {
     try {
       // Validate input
-      const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,

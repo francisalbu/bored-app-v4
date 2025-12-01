@@ -22,24 +22,28 @@ const { authenticateSupabase } = require('../middleware/supabaseAuth');
  * Note: Authentication is optional to allow guest checkout
  */
 router.post('/',
-  [
-    body('experience_id').isInt({ min: 1 }).withMessage('Valid experience ID required'),
-    body('slot_id').isInt({ min: 1 }).withMessage('Valid slot ID required'),
-    body('participants').isInt({ min: 1, max: 50 }).withMessage('Participants must be between 1 and 50'),
-    body('customer_name').trim().notEmpty().withMessage('Customer name is required'),
-    body('customer_email').isEmail().withMessage('Valid email is required'),
-    body('customer_phone').trim().notEmpty().withMessage('Phone number is required')
-  ],
   async (req, res, next) => {
     try {
-      // Validate input
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
+      // Manual validation
+      const { experience_id, slot_id, participants, customer_name, customer_email, customer_phone } = req.body;
+      
+      if (!experience_id || !Number.isInteger(parseInt(experience_id)) || parseInt(experience_id) < 1) {
+        return res.status(400).json({ success: false, message: 'Valid experience ID required' });
+      }
+      if (!slot_id || !Number.isInteger(parseInt(slot_id)) || parseInt(slot_id) < 1) {
+        return res.status(400).json({ success: false, message: 'Valid slot ID required' });
+      }
+      if (!participants || !Number.isInteger(parseInt(participants)) || parseInt(participants) < 1 || parseInt(participants) > 50) {
+        return res.status(400).json({ success: false, message: 'Participants must be between 1 and 50' });
+      }
+      if (!customer_name || !customer_name.trim()) {
+        return res.status(400).json({ success: false, message: 'Customer name is required' });
+      }
+      if (!customer_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer_email)) {
+        return res.status(400).json({ success: false, message: 'Valid email is required' });
+      }
+      if (!customer_phone || !customer_phone.trim()) {
+        return res.status(400).json({ success: false, message: 'Phone number is required' });
       }
       
       const bookingData = {
@@ -169,21 +173,14 @@ router.get('/upcoming/count', authenticateSupabase, async (req, res, next) => {
  */
 router.get('/:id',
   authenticateSupabase,
-  [
-    param('id').isInt({ min: 1 }).withMessage('Valid booking ID required')
-  ],
   async (req, res, next) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid booking ID',
-          errors: errors.array()
-        });
-      }
-      
       const { id } = req.params;
+      
+      // Manual validation
+      if (!id || !Number.isInteger(parseInt(id)) || parseInt(id) < 1) {
+        return res.status(400).json({ success: false, message: 'Valid booking ID required' });
+      }
       
       // getBookingById with userId ensures user can only see their own booking
       const booking = await Booking.getBookingById(id, req.user.id);
@@ -214,14 +211,9 @@ router.get('/:id',
 router.put('/:id',
   authenticateSupabase,
   [
-    param('id').isInt({ min: 1 }).withMessage('Valid booking ID required'),
-    body('customer_name').optional().trim().notEmpty(),
-    body('customer_email').optional().isEmail(),
-    body('customer_phone').optional().trim().notEmpty()
   ],
   async (req, res, next) => {
     try {
-      const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
@@ -270,11 +262,9 @@ router.put('/:id',
 router.put('/:id/cancel',
   authenticateSupabase,
   [
-    param('id').isInt({ min: 1 }).withMessage('Valid booking ID required')
   ],
   async (req, res, next) => {
     try {
-      const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
@@ -318,11 +308,9 @@ router.put('/:id/cancel',
 router.delete('/:id',
   authenticateSupabase,
   [
-    param('id').isInt({ min: 1 }).withMessage('Valid booking ID required')
   ],
   async (req, res, next) => {
     try {
-      const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,

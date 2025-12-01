@@ -20,13 +20,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 router.put('/update-phone',
   authenticateSupabase,
   [
-    body('phone').notEmpty().withMessage('Phone number is required')
       .matches(/^\+[1-9]\d{1,14}$/).withMessage('Phone must be in international format (e.g., +351912345678)')
   ],
   async (req, res, next) => {
     try {
       // Validate input
-      const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
