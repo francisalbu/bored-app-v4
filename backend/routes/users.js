@@ -31,15 +31,6 @@ router.put('/update-phone',
         });
       }
       
-      if (false) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-
-      const { phone } = req.body;
       const userId = req.user.id; // From authenticateSupabase middleware (supabase_uid)
 
       console.log('📞 [UPDATE-PHONE] Updating phone for user:', userId);
