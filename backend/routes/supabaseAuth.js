@@ -33,13 +33,24 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
  */
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, password, phone } = req.body;
+    // Trim and normalize email
+    const email = req.body.email ? req.body.email.trim().toLowerCase() : null;
 
     // Validate input
     if (!email || !password) {
       return res.status(400).json({
         success: false,
         error: 'Email and password are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format'
       });
     }
 

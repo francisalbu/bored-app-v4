@@ -176,14 +176,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Step 2: Sync with backend (gets/creates user in bored_tourist.db)
       const supabaseToken = authData.session.access_token;
-      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
-        ? 'http://192.168.1.136:3000/api' 
-        : 'https://bored-tourist-api.onrender.com/api';
+      // Use production backend URL
+      const backendURL = 'https://bored-tourist-api.onrender.com/api';
       
       console.log('📡 Calling backend:', `${backendURL}/auth/supabase/login`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for Render cold starts
 
       try {
         const response = await fetch(`${backendURL}/auth/supabase/login`, {
@@ -253,19 +252,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (name: string, email: string, password: string, phone?: string) => {
     try {
-      console.log('🔐 AuthContext: Starting registration...', email);
-      console.log('📋 Name:', name);
+      // Trim and normalize inputs
+      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedName = name.trim();
+      
+      console.log('🔐 AuthContext: Starting registration...', trimmedEmail);
+      console.log('📋 Name:', trimmedName);
 
       // NEW APPROACH: Call backend FIRST to create user via Supabase Admin API
       // This avoids the "User already registered" bug
       console.log('📡 Calling backend to create user...');
       
-      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
-        ? 'http://192.168.1.136:3000/api' 
-        : 'https://bored-tourist-api.onrender.com/api';
+      // Use production backend URL - local backend is not running
+      const backendURL = 'https://bored-tourist-api.onrender.com/api';
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for Render cold starts
 
       try {
         const response = await fetch(`${backendURL}/auth/supabase/register`, {
@@ -273,7 +275,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ name, email, password, phone }),
+          body: JSON.stringify({ 
+            name: trimmedName, 
+            email: trimmedEmail, 
+            password, 
+            phone: phone?.trim() 
+          }),
           signal: controller.signal,
         });
 
@@ -420,10 +427,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✅ Session found:', session.user.email);
       console.log('🔑 Token (first 20 chars):', session.access_token.substring(0, 20) + '...');
 
-      // Sync with backend
-      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
-        ? 'http://192.168.1.136:3000/api' 
-        : 'https://bored-tourist-api.onrender.com/api';
+      // Sync with backend - use production URL
+      const backendURL = 'https://bored-tourist-api.onrender.com/api';
 
       console.log('📡 Calling backend:', `${backendURL}/auth/supabase/me`);
 
