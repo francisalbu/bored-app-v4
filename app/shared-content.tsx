@@ -251,6 +251,8 @@ export default function SharedContentScreen() {
     const url = params.url as string;
     const text = params.text as string;
     
+    console.log('📤 [shared-content] Received params:', { url, text });
+    
     if (url) setSharedUrl(url);
     if (text) setSharedText(text);
     
@@ -287,8 +289,16 @@ export default function SharedContentScreen() {
   const analyzeAndMatch = async (url?: string, text?: string, metadata?: SocialMediaMetadata | null) => {
     
     try {
+      console.log('🔍 [analyzeAndMatch] Starting with:', { url, text, metadata });
+      
       // Combine URL, text, AND social media metadata for analysis
       let contentToAnalyze = `${url || sharedUrl || ''} ${text || sharedText || ''}`.toLowerCase();
+      
+      // Extract hashtags directly from the shared text (Instagram includes them!)
+      const hashtagRegex = /#[\w\u00C0-\u024F]+/gi;
+      const hashtagsFromText = (text || sharedText || '').match(hashtagRegex) || [];
+      
+      console.log('📱 Hashtags found in shared text:', hashtagsFromText);
       
       // Use passed metadata or fall back to state
       const metadataToUse = metadata || socialMetadata;
@@ -309,6 +319,12 @@ export default function SharedContentScreen() {
           description: metadataToUse.description,
           hashtags: metadataToUse.hashtags,
         });
+      }
+      
+      // Add extracted hashtags to content (in case API failed but text has hashtags)
+      if (hashtagsFromText.length > 0) {
+        contentToAnalyze += ' ' + hashtagsFromText.join(' ').toLowerCase();
+        console.log('📱 Added hashtags from text to analysis');
       }
       
       // Extract platform info

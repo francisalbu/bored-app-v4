@@ -56,6 +56,7 @@ async function extractTikTokMetadata(url) {
 /**
  * Extract metadata from Instagram Reel URL
  * Uses Instagram's oEmbed API (free, no auth required)
+ * Falls back to page scraping if oEmbed fails (for Reels)
  */
 async function extractInstagramMetadata(url) {
   try {
@@ -69,35 +70,89 @@ async function extractInstagramMetadata(url) {
       cleanUrl = redirectResponse.url;
     }
     
-    // Instagram oEmbed API
+    // Try oEmbed API first
     const oembedUrl = `https://api.instagram.com/oembed?url=${encodeURIComponent(cleanUrl)}`;
     const response = await fetch(oembedUrl);
     
-    if (!response.ok) {
-      throw new Error('Failed to fetch Instagram metadata');
+    if (response.ok) {
+      const data = await response.json();
+      
+      // Extract hashtags from title
+      const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
+      const hashtags = data.title?.match(hashtagRegex) || [];
+      
+      // Clean description (remove hashtags for cleaner text)
+      const description = data.title?.replace(hashtagRegex, '').trim() || '';
+      
+      return {
+        platform: 'instagram',
+        success: true,
+        username: data.author_name || null,
+        userUrl: data.author_url || null,
+        description: description,
+        fullTitle: data.title || null,
+        hashtags: hashtags,
+        thumbnailUrl: data.thumbnail_url || null,
+        thumbnailWidth: data.thumbnail_width || null,
+        thumbnailHeight: data.thumbnail_height || null,
+      };
     }
     
-    const data = await response.json();
+    // oEmbed failed (common for Reels), try scraping the page
+    console.log('oEmbed failed, trying page scraping for:', cleanUrl);
     
-    // Extract hashtags from title
-    const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
-    const hashtags = data.title?.match(hashtagRegex) || [];
+    const pageResponse = await fetch(cleanUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+      }
+    });
     
-    // Clean description (remove hashtags for cleaner text)
-    const description = data.title?.replace(hashtagRegex, '').trim() || '';
+    if (pageResponse.ok) {
+      const html = await pageResponse.text();
+      
+      // Try to extract from meta tags
+      const titleMatch = html.match(/<meta property="og:title" content="([^"]*)"/) ||
+                         html.match(/<meta name="twitter:title" content="([^"]*)"/) ||
+                         html.match(/<title>([^<]*)<\/title>/);
+      
+      const descMatch = html.match(/<meta property="og:description" content="([^"]*)"/) ||
+                        html.match(/<meta name="description" content="([^"]*)"/) ||
+                        html.match(/<meta name="twitter:description" content="([^"]*)"/);
+      
+      const imageMatch = html.match(/<meta property="og:image" content="([^"]*)"/);
+      
+      // Extract username from URL or meta
+      const usernameMatch = cleanUrl.match(/instagram\.com\/([^\/]+)\//) ||
+                           html.match(/"username":"([^"]+)"/);
+      
+      const fullTitle = titleMatch ? titleMatch[1] : '';
+      const fullDesc = descMatch ? descMatch[1] : '';
+      const combinedText = `${fullTitle} ${fullDesc}`;
+      
+      // Extract hashtags from the content
+      const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
+      const hashtags = combinedText.match(hashtagRegex) || [];
+      
+      // Clean description
+      const description = combinedText.replace(hashtagRegex, '').trim();
+      
+      return {
+        platform: 'instagram',
+        success: hashtags.length > 0 || description.length > 0,
+        username: usernameMatch ? usernameMatch[1] : null,
+        userUrl: usernameMatch ? `https://instagram.com/${usernameMatch[1]}` : null,
+        description: description,
+        fullTitle: fullTitle,
+        hashtags: hashtags,
+        thumbnailUrl: imageMatch ? imageMatch[1] : null,
+        thumbnailWidth: null,
+        thumbnailHeight: null,
+        method: 'scraping',
+      };
+    }
     
-    return {
-      platform: 'instagram',
-      success: true,
-      username: data.author_name || null,
-      userUrl: data.author_url || null,
-      description: description,
-      fullTitle: data.title || null,
-      hashtags: hashtags,
-      thumbnailUrl: data.thumbnail_url || null,
-      thumbnailWidth: data.thumbnail_width || null,
-      thumbnailHeight: data.thumbnail_height || null,
-    };
+    throw new Error('Both oEmbed and scraping failed');
+    
   } catch (error) {
     console.error('Instagram extraction error:', error);
     return {
