@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ import { BookingsProvider } from '@/contexts/BookingsContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
+import { useShareIntent } from 'expo-share-intent';
 
 // Stripe publishable key - TEST MODE 🧪
 // ⚠️ IMPORTANT: This is a TEST key - no real money will be charged!
@@ -39,6 +40,7 @@ function RootLayoutNav() {
         <Stack.Screen name="info/terms" options={{ headerShown: false }} />
         <Stack.Screen name="info/privacy" options={{ headerShown: false }} />
         <Stack.Screen name="info/cancellation" options={{ headerShown: false }} />
+        <Stack.Screen name="shared-content" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
     </>
   );
@@ -53,12 +55,57 @@ export default function RootLayout() {
     Inter_900Black,
   });
 
+  // Handle shared content from other apps (TikTok, Instagram, etc.)
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent({
+    debug: true,
+    resetOnBackground: true,
+  });
+
+  // Navigate to shared-content screen when share intent is received
+  useEffect(() => {
+    if (hasShareIntent && shareIntent) {
+      console.log('📤 [ROOT] Share intent received:', shareIntent);
+      
+      // Extract URL or text from the shared content
+      const sharedUrl = shareIntent.webUrl || shareIntent.text || '';
+      const sharedText = shareIntent.text || '';
+      
+      // Navigate to the shared content screen
+      router.push({
+        pathname: '/shared-content',
+        params: { 
+          url: sharedUrl,
+          text: sharedText
+        }
+      });
+      
+      // Reset the share intent after handling
+      resetShareIntent();
+    }
+  }, [hasShareIntent, shareIntent]);
+
   useEffect(() => {
     console.log('[Bored App] App is starting...');
     
     // Listen for deep links (OAuth callbacks)
     const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 [ROOT] Deep link received:', event.url);
+      
+      // Check if it's a shared content URL (from TikTok, Instagram, etc.)
+      if (event.url.includes('share') || event.url.includes('shared-content')) {
+        console.log('📤 [ROOT] Shared content detected!');
+        const url = new URL(event.url);
+        const sharedUrl = url.searchParams.get('url');
+        const sharedText = url.searchParams.get('text');
+        
+        if (sharedUrl || sharedText) {
+          router.push({
+            pathname: '/shared-content',
+            params: { url: sharedUrl || '', text: sharedText || '' }
+          });
+        }
+        return;
+      }
       
       // Check if it's an OAuth callback
       if (event.url.includes('code=') || event.url.includes('access_token')) {

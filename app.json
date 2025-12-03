@@ -78,6 +78,16 @@
           "merchantIdentifier": "merchant.app.rork.bored-explorer",
           "enableGooglePay": true
         }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosShareExtensionName": "Save to Bored Tourist",
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          }
+        }
       ]
     ],
     "experiments": {

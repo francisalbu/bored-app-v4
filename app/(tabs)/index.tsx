@@ -461,10 +461,10 @@ Book this amazing experience on BoredTourist!`;
             <Pressable
               style={[
                 styles.bookButton,
-                (experience.id === '12' || experience.id === '19') && styles.interestButton
+                ['12', '19', '33', '38', '40'].includes(experience.id) && styles.interestButton
               ]}
               onPress={() => {
-                if (experience.id === '12' || experience.id === '19') {
+                if (['12', '19', '33', '38', '40'].includes(experience.id)) {
                   router.push(`/experience/interest/${experience.id}`);
                 } else {
                   router.push(`/booking/${experience.id}`);
@@ -472,7 +472,7 @@ Book this amazing experience on BoredTourist!`;
               }}
             >
               <Text style={styles.bookButtonText}>
-                {(experience.id === '12' || experience.id === '19') ? "I'M INTERESTED!" : t('feed.bookNow').toUpperCase()}
+                {['12', '19', '33', '38', '40'].includes(experience.id) ? "I'M INTERESTED!" : t('feed.bookNow').toUpperCase()}
               </Text>
             </Pressable>
           </Pressable>
