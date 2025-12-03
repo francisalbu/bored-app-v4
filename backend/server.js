@@ -93,6 +93,91 @@ app.use('/api/users', usersRoutes);
 app.use('/api/interest', interestRoutes);
 app.use('/api/social-media', socialMediaRoutes);
 
+// Privacy Policy page (required for Facebook App)
+app.get('/privacy', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Privacy Policy - Bored Tourist</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        h1 { color: #F4E04D; }
+        h2 { color: #333; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <h1>🌍 Bored Tourist - Privacy Policy</h1>
+      <p><strong>Last updated:</strong> December 2025</p>
+      
+      <h2>1. Information We Collect</h2>
+      <p>We collect information you provide directly, including your name, email address, and booking preferences when you use our app.</p>
+      
+      <h2>2. How We Use Your Information</h2>
+      <p>We use your information to provide and improve our travel experience booking services, process your bookings, and communicate with you about your reservations.</p>
+      
+      <h2>3. Information Sharing</h2>
+      <p>We do not sell your personal information. We may share your information with experience providers to fulfill your bookings.</p>
+      
+      <h2>4. Data Security</h2>
+      <p>We implement appropriate security measures to protect your personal information.</p>
+      
+      <h2>5. Your Rights</h2>
+      <p>You have the right to access, correct, or delete your personal information. Contact us at support@boredtourist.com.</p>
+      
+      <h2>6. Contact Us</h2>
+      <p>For questions about this Privacy Policy, contact us at: <a href="mailto:support@boredtourist.com">support@boredtourist.com</a></p>
+    </body>
+    </html>
+  `);
+});
+
+// Terms of Service page (required for Facebook App)
+app.get('/terms', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Terms of Service - Bored Tourist</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        h1 { color: #F4E04D; }
+        h2 { color: #333; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <h1>🌍 Bored Tourist - Terms of Service</h1>
+      <p><strong>Last updated:</strong> December 2025</p>
+      
+      <h2>1. Acceptance of Terms</h2>
+      <p>By using Bored Tourist, you agree to these Terms of Service. If you do not agree, please do not use our services.</p>
+      
+      <h2>2. Description of Service</h2>
+      <p>Bored Tourist is a platform for discovering and booking unique travel experiences in Portugal.</p>
+      
+      <h2>3. User Responsibilities</h2>
+      <p>You agree to provide accurate information and use our services in compliance with applicable laws.</p>
+      
+      <h2>4. Bookings and Payments</h2>
+      <p>All bookings are subject to availability. Cancellation policies vary by experience provider.</p>
+      
+      <h2>5. Intellectual Property</h2>
+      <p>All content on Bored Tourist is protected by copyright and other intellectual property laws.</p>
+      
+      <h2>6. Limitation of Liability</h2>
+      <p>Bored Tourist is not liable for any damages arising from your use of our services or third-party experience providers.</p>
+      
+      <h2>7. Contact Us</h2>
+      <p>For questions about these Terms, contact us at: <a href="mailto:support@boredtourist.com">support@boredtourist.com</a></p>
+    </body>
+    </html>
+  `);
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
