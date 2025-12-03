@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
+    <key>AppGroupIdentifier</key>
+    <string>group.app.rork.bored-explorer</string>
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
     <key>CFBundleDevelopmentRegion</key>
@@ -19,17 +21,19 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.1</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
     <array>
       <dict>
+        <key>CFBundleURLName</key>
+        <string>com.rork.boredtourist.oauth</string>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>boredtourist</string>
           <string>app.rork.bored-explorer</string>
-          <string>boredtravel</string>
+          <string>boredtourist</string>
+          <string>com.googleusercontent.apps.2440322136358i7hsc8mco161ahd0bc5jgnnnlcsc851</string>
         </array>
       </dict>
     </array>

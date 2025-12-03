@@ -35,7 +35,7 @@ const EXPERIENCE_KEYWORDS: Record<string, string[]> = {
   'climbing': ['climbing', 'climb', 'rock climbing', 'bouldering', 'escalada', 'bridge', 'ponte', '25 abril', 'rappel', 'abseil'],
   
   // 🐬 Dolphins & Marine Life (Experience 4)
-  'dolphins': ['dolphin', 'dolphins', 'golfinhos', 'golfinho', 'whale', 'whales', 'baleia', 'marine', 'ocean', 'oceano', 'sea life', 'cetacean', 'wildlife', 'safari', 'boat tour'],
+  'dolphins': ['dolphin', 'dolphins', 'golfinhos', 'golfinho', 'whale', 'whales', 'baleia', 'marine', 'cetacean', 'wildlife', 'safari', 'boat tour'],
   
   // 🥧 Pastel de Nata / Baking (Experience 5)
   'pastry': ['pastel de nata', 'pasteis', 'pastry', 'baking', 'bakery', 'custard tart', 'portuguese tart', 'nata', 'pastelaria', 'pasteis de belem'],
@@ -80,10 +80,10 @@ const EXPERIENCE_KEYWORDS: Record<string, string[]> = {
   'skydiving': ['skydiving', 'skydive', 'sky dive', 'freefall', 'wind tunnel', 'indoor skydive', 'paraquedismo', 'adrenaline'],
   
   // 🪂 Paragliding (Experience 20)
-  'paragliding': ['paragliding', 'paraglide', 'parapente', 'gliding', 'tandem flight', 'soaring', 'flying', 'cliffs'],
+  'paragliding': ['paragliding', 'paraglide', 'parapente', 'gliding', 'tandem flight', 'soaring', 'cliffs'],
   
   // 🏄 Surfing (Experience 18, 19)
-  'surf': ['surf', 'surfing', 'surfer', 'waves', 'ondas', 'wave', 'surfboard', 'surf lesson', 'surf camp', 'surf school', 'water sport'],
+  'surf': ['surf', 'surfing', 'surfer', 'waves', 'ondas', 'wave', 'surfboard', 'surf lesson', 'surf camp', 'surf school', 'water sport', 'barrels', 'barrel'],
   
   // 🤿 Scuba Diving (Experience 21)
   'diving': ['diving', 'dive', 'scuba', 'mergulho', 'underwater', 'snorkel', 'snorkeling', 'ocean dive', 'sea dive', 'marine reserve'],
@@ -113,13 +113,44 @@ const EXPERIENCE_KEYWORDS: Record<string, string[]> = {
   'lisbon': ['lisbon', 'lisboa', 'alfama', 'belém', 'belem', 'bairro alto', 'chiado', 'baixa', 'mouraria', 'tram', 'elétrico', 'tram 28'],
   
   // 🌊 Nature / Outdoors
-  'nature': ['nature', 'natureza', 'outdoor', 'outdoors', 'ar livre', 'forest', 'floresta', 'park', 'parque', 'natural', 'green'],
+  'nature': ['nature', 'natureza', 'outdoor', 'outdoors', 'ar livre', 'forest', 'floresta', 'park', 'parque', 'natural', 'green', 'sea', 'ocean', 'oceano'],
   
   // 👨‍👩‍👧‍👦 Family / Kids
   'family': ['family', 'família', 'kids', 'crianças', 'children', 'family-friendly', 'kid-friendly'],
   
   // 💑 Romantic / Couples
   'romantic': ['romantic', 'romântico', 'couple', 'casal', 'honeymoon', 'lua de mel', 'date', 'love', 'anniversary'],
+  
+  // 🏊 Water Sports / Ocean (General)
+  'water': ['water', 'água', 'ocean', 'oceano', 'sea', 'mar', 'aquatic', 'aquático', 'corals', 'summer', 'verão'],
+};
+
+// Mapping categories to experience IDs (when available)
+const CATEGORY_TO_EXPERIENCE_IDS: Record<string, number[]> = {
+  'surf': [18, 19],
+  'beach': [10, 18, 20],
+  'yoga': [2, 16, 19],
+  'puppy': [2],
+  'quad': [1, 13, 17],
+  'dolphins': [4],
+  'boat': [4],
+  'water': [18, 19, 21, 4],
+  'diving': [21],
+  'climbing': [3, 22],
+  'horse': [10],
+  'cooking': [5, 6],
+  'pastry': [5],
+  'wine': [16],
+  'food': [6, 9],
+  'tiles': [11],
+  'beekeeping': [12],
+  'flying': [14],
+  'skydiving': [15],
+  'paragliding': [20],
+  'sintra': [8, 13],
+  'streetart': [9],
+  'music': [9],
+  'selfdrive': [7],
 };
 
 // Location keywords for better matching
@@ -227,9 +258,11 @@ export default function SharedContentScreen() {
     
     // Start extracting metadata and analyzing in parallel
     const processSharedContent = async () => {
+      let metadata: SocialMediaMetadata | null = null;
+      
       // Extract social media metadata while showing detecting animation
       if (url && (url.includes('tiktok') || url.includes('instagram') || url.includes('instagr.am'))) {
-        const metadata = await extractSocialMetadata(url);
+        metadata = await extractSocialMetadata(url);
         if (metadata) {
           setSocialMetadata(metadata);
         }
@@ -238,7 +271,7 @@ export default function SharedContentScreen() {
       // Wait a bit more for the animation, then analyze
       setTimeout(() => {
         if (experiences.length > 0) {
-          analyzeAndMatch();
+          analyzeAndMatch(url, text, metadata);
         } else {
           setAnalyzing(false);
         }
@@ -251,27 +284,30 @@ export default function SharedContentScreen() {
     }, 1500);
   }, [params, experiences]);
 
-  const analyzeAndMatch = async () => {
+  const analyzeAndMatch = async (url?: string, text?: string, metadata?: SocialMediaMetadata | null) => {
     
     try {
       // Combine URL, text, AND social media metadata for analysis
-      let contentToAnalyze = `${sharedUrl || ''} ${sharedText || ''}`.toLowerCase();
+      let contentToAnalyze = `${url || sharedUrl || ''} ${text || sharedText || ''}`.toLowerCase();
+      
+      // Use passed metadata or fall back to state
+      const metadataToUse = metadata || socialMetadata;
       
       // If we have social media metadata, add it to the analysis
-      if (socialMetadata?.success) {
+      if (metadataToUse?.success) {
         const metadataContent = [
-          socialMetadata.description || '',
-          socialMetadata.fullTitle || '',
-          socialMetadata.username || '',
-          ...(socialMetadata.hashtags || []),
+          metadataToUse.description || '',
+          metadataToUse.fullTitle || '',
+          metadataToUse.username || '',
+          ...(metadataToUse.hashtags || []),
         ].join(' ').toLowerCase();
         
         contentToAnalyze += ' ' + metadataContent;
         
         console.log('📱 Analyzing with social metadata:', {
-          username: socialMetadata.username,
-          description: socialMetadata.description,
-          hashtags: socialMetadata.hashtags,
+          username: metadataToUse.username,
+          description: metadataToUse.description,
+          hashtags: metadataToUse.hashtags,
         });
       }
       
@@ -281,68 +317,86 @@ export default function SharedContentScreen() {
       
       // Find matching experiences based on keywords
       const matches: MatchedExperience[] = [];
+      const matchedExperienceIds = new Set<string>();
+      const categoryScores: Record<string, number> = {};
       
-      for (const exp of experiences) {
-        let score = 0;
-        const matchedKeywords: string[] = [];
+      console.log('🔍 Content to analyze:', contentToAnalyze);
+      
+      // Step 1: Find which categories match the content
+      for (const [category, keywords] of Object.entries(EXPERIENCE_KEYWORDS)) {
+        for (const keyword of keywords) {
+          if (contentToAnalyze.includes(keyword)) {
+            categoryScores[category] = (categoryScores[category] || 0) + 10;
+            console.log(`✅ Matched keyword "${keyword}" -> category "${category}"`);
+          }
+        }
+      }
+      
+      console.log('📊 Category scores:', categoryScores);
+      
+      // Step 2: Find experiences that match the categories
+      const sortedCategories = Object.entries(categoryScores)
+        .sort((a, b) => b[1] - a[1])
+        .map(([cat]) => cat);
+      
+      console.log('🏆 Top categories:', sortedCategories);
+      
+      // Step 3: For each matched category, find relevant experiences by ID or content
+      for (const category of sortedCategories) {
+        const expIds = CATEGORY_TO_EXPERIENCE_IDS[category] || [];
         
-        // Check experience title, description, category, tags
-        const expContent = `${exp.title} ${exp.description} ${exp.category} ${exp.location} ${(exp.tags || []).join(' ')}`.toLowerCase();
-        
-        // Match against keyword categories
-        for (const [category, keywords] of Object.entries(EXPERIENCE_KEYWORDS)) {
-          for (const keyword of keywords) {
-            if (contentToAnalyze.includes(keyword)) {
-              // Check if experience relates to this keyword
-              if (expContent.includes(keyword) || expContent.includes(category)) {
-                score += 10;
-                if (!matchedKeywords.includes(category)) {
-                  matchedKeywords.push(category);
-                }
-              }
-            }
+        // Find experiences by ID mapping
+        for (const expId of expIds) {
+          const exp = experiences.find(e => 
+            e.id === String(expId) || 
+            e.id === expId.toString() ||
+            parseInt(e.id) === expId
+          );
+          
+          if (exp && !matchedExperienceIds.has(exp.id)) {
+            matchedExperienceIds.add(exp.id);
+            matches.push({
+              experience: exp,
+              score: categoryScores[category],
+              matchedKeywords: [category],
+            });
+            console.log(`🎯 Matched experience ${exp.id}: ${exp.title} via category "${category}"`);
           }
         }
         
-        // Location matching (higher weight)
-        for (const [location, keywords] of Object.entries(LOCATION_KEYWORDS)) {
-          for (const keyword of keywords) {
-            if (contentToAnalyze.includes(keyword) && exp.location?.toLowerCase().includes(keyword)) {
-              score += 20;
-              if (!matchedKeywords.includes(location)) {
-                matchedKeywords.push(location);
-              }
+        // Also try matching by experience content
+        for (const exp of experiences) {
+          if (matchedExperienceIds.has(exp.id)) continue;
+          
+          const expContent = `${exp.title} ${exp.description} ${exp.category} ${(exp.tags || []).join(' ')}`.toLowerCase();
+          const categoryKeywords = EXPERIENCE_KEYWORDS[category] || [];
+          
+          for (const keyword of categoryKeywords) {
+            if (expContent.includes(keyword)) {
+              matchedExperienceIds.add(exp.id);
+              matches.push({
+                experience: exp,
+                score: categoryScores[category],
+                matchedKeywords: [category],
+              });
+              console.log(`🎯 Matched experience ${exp.id}: ${exp.title} via content keyword "${keyword}"`);
+              break;
             }
           }
-        }
-        
-        // Bonus score if hashtags match experience tags
-        if (socialMetadata?.hashtags) {
-          for (const hashtag of socialMetadata.hashtags) {
-            const cleanHashtag = hashtag.replace('#', '').toLowerCase();
-            if (expContent.includes(cleanHashtag)) {
-              score += 15;
-              if (!matchedKeywords.includes(hashtag)) {
-                matchedKeywords.push(hashtag);
-              }
-            }
-          }
-        }
-        
-        // If there's a match, add to results
-        if (score > 0) {
-          matches.push({ experience: exp, score, matchedKeywords });
         }
       }
       
       // Sort by score and take top 5
       matches.sort((a, b) => b.score - a.score);
-      setMatchedExperiences(matches.slice(0, 5));
+      const topMatches = matches.slice(0, 5);
       
-      // If no keyword matches, try AI matching (if available)
-      if (matches.length === 0 && sharedUrl) {
-        // Could call Bored AI here for better matching
-        // For now, show top-rated experiences as suggestions
+      console.log('🏆 Final matches:', topMatches.map(m => `${m.experience.id}: ${m.experience.title}`));
+      
+      setMatchedExperiences(topMatches);
+      
+      // If no keyword matches, show top-rated experiences as suggestions
+      if (topMatches.length === 0) {
+        console.log('⚠️ No matches found, showing suggestions');
         const topRated = experiences
           .filter(e => e.rating >= 4.5)
           .slice(0, 3)
