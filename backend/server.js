@@ -34,6 +34,7 @@ const paymentsRoutes = require('./routes/payments');
 const reviewsRoutes = require('./routes/reviews');
 const usersRoutes = require('./routes/users');
 const interestRoutes = require('./routes/interest');
+const socialMediaRoutes = require('./routes/socialMedia');
 
 // Initialize Express app
 const app = express();
@@ -90,6 +91,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/interest', interestRoutes);
+app.use('/api/social-media', socialMediaRoutes);
 
 // 404 handler
 app.use((req, res) => {

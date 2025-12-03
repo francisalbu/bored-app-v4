@@ -20,42 +20,137 @@ import apiService from '@/services/api';
 import { useExperiences } from '@/hooks/useExperiences';
 
 // Keywords to match from social media content to experiences
+// Covers ALL experiences in the Bored Tourist platform
 const EXPERIENCE_KEYWORDS: Record<string, string[]> = {
-  // Dolphins & Marine
-  'dolphins': ['dolphin', 'golfinhos', 'whale', 'marine', 'ocean', 'sea'],
-  'boat': ['boat', 'barco', 'sailing', 'yacht', 'cruise', 'catamaran'],
+  // 🏍️ Quad Bike / Off-Road (Experience 1, 13, 17)
+  'quad': ['quad', 'quadbike', 'atv', '4x4', 'off-road', 'offroad', 'buggy', 'jeep', 'dirt', 'mud', 'terrain'],
   
-  // Wine & Food
-  'wine': ['wine', 'vinho', 'vineyard', 'winery', 'tasting', 'cellar'],
-  'food': ['food', 'comida', 'gastronomy', 'cooking', 'culinary', 'restaurant'],
+  // 🐕 Puppy Yoga (Experience 2)
+  'puppy': ['puppy', 'puppies', 'dog', 'dogs', 'cachorro', 'cão', 'pet', 'animal yoga', 'puppy yoga'],
   
-  // Adventure
-  'surf': ['surf', 'surfing', 'waves', 'beach', 'praia'],
-  'kayak': ['kayak', 'canoeing', 'paddle', 'river'],
-  'hiking': ['hiking', 'trekking', 'mountain', 'trail', 'sintra', 'arrábida'],
+  // 🧘 Yoga & Meditation (Experience 2, 16, 19)
+  'yoga': ['yoga', 'meditation', 'meditate', 'mindfulness', 'zen', 'wellness', 'wellbeing', 'relax', 'relaxation', 'stretch', 'breathing'],
   
-  // City & Culture
-  'lisbon': ['lisbon', 'lisboa', 'alfama', 'belém', 'bairro alto', 'tram'],
-  'sintra': ['sintra', 'palace', 'pena', 'castle', 'palácio'],
-  'porto': ['porto', 'douro', 'ribeira', 'gaia'],
+  // 🧗 Climbing / Bridge (Experience 3, 22)
+  'climbing': ['climbing', 'climb', 'rock climbing', 'bouldering', 'escalada', 'bridge', 'ponte', '25 abril', 'rappel', 'abseil'],
   
-  // Activities
-  'sunset': ['sunset', 'pôr do sol', 'golden hour', 'evening'],
-  'tour': ['tour', 'guided', 'experience', 'excursion', 'day trip'],
+  // 🐬 Dolphins & Marine Life (Experience 4)
+  'dolphins': ['dolphin', 'dolphins', 'golfinhos', 'golfinho', 'whale', 'whales', 'baleia', 'marine', 'ocean', 'oceano', 'sea life', 'cetacean', 'wildlife', 'safari', 'boat tour'],
+  
+  // 🥧 Pastel de Nata / Baking (Experience 5)
+  'pastry': ['pastel de nata', 'pasteis', 'pastry', 'baking', 'bakery', 'custard tart', 'portuguese tart', 'nata', 'pastelaria', 'pasteis de belem'],
+  
+  // 👨‍🍳 Cooking Class (Experience 5, 6)
+  'cooking': ['cooking', 'cook', 'chef', 'kitchen', 'recipe', 'culinary', 'gastronomia', 'gastronomy', 'cooking class', 'food making', 'cuisine'],
+  
+  // 🍷 Wine Tasting (Experience 16)
+  'wine': ['wine', 'vinho', 'vineyard', 'vineyards', 'vinha', 'winery', 'tasting', 'degustação', 'cellar', 'adega', 'sommelier', 'grapes'],
+  
+  // 🍽️ Food & Gastronomy (Experience 6, 9)
+  'food': ['food', 'comida', 'foodie', 'food tour', 'gastronomy', 'gastronomia', 'tasting', 'restaurant', 'restaurante', 'eat', 'eating', 'taste'],
+  
+  // 🚗 Self-Drive Tours / Electric Car (Experience 7)
+  'selfdrive': ['self-drive', 'self drive', 'electric car', 'carro elétrico', 'eco car', 'tuk tuk', 'tuktuk', 'rental car', 'drive tour'],
+  
+  // 🏰 Sintra / Treasure Hunt (Experience 8, 13)
+  'sintra': ['sintra', 'palace', 'palácio', 'pena', 'castle', 'castelo', 'monserrate', 'quinta da regaleira', 'treasure hunt', 'mystery'],
+  
+  // 🎨 Street Art & Culture (Experience 9)
+  'streetart': ['street art', 'graffiti', 'mural', 'murals', 'urban art', 'arte urbana', 'art tour', 'cultural', 'multicultural'],
+  
+  // 🎵 Live Music (Experience 9)
+  'music': ['music', 'música', 'live music', 'concert', 'concerto', 'fado', 'jazz', 'jam session', 'band', 'musical'],
+  
+  // 🐴 Horseback Riding (Experience 10)
+  'horse': ['horse', 'horses', 'cavalo', 'cavalos', 'horseback', 'riding', 'equestrian', 'equitação', 'pony', 'stable'],
+  
+  // 🏖️ Beach / Comporta (Experience 10, 18, 20)
+  'beach': ['beach', 'praia', 'coast', 'costa', 'coastline', 'seaside', 'comporta', 'caparica', 'sand', 'shore', 'atlantic'],
+  
+  // 🎨 Tile Workshop / Azulejos (Experience 11)
+  'tiles': ['tiles', 'azulejos', 'azulejo', 'ceramic', 'ceramics', 'pottery', 'workshop', 'art workshop', 'craft', 'crafts', 'handmade', 'diy'],
+  
+  // 🐝 Beekeeping / Honey (Experience 12)
+  'beekeeping': ['beekeeping', 'bees', 'bee', 'abelha', 'abelhas', 'honey', 'mel', 'apicultura', 'hive', 'farm', 'quinta', 'agriculture'],
+  
+  // ✈️ Flying / Pilot Experience (Experience 14)
+  'flying': ['flying', 'fly', 'voar', 'voo', 'pilot', 'piloto', 'airplane', 'avião', 'aviation', 'aircraft', 'cockpit', 'flight'],
+  
+  // 🪂 Skydiving / Indoor Skydive (Experience 15)
+  'skydiving': ['skydiving', 'skydive', 'sky dive', 'freefall', 'wind tunnel', 'indoor skydive', 'paraquedismo', 'adrenaline'],
+  
+  // 🪂 Paragliding (Experience 20)
+  'paragliding': ['paragliding', 'paraglide', 'parapente', 'gliding', 'tandem flight', 'soaring', 'flying', 'cliffs'],
+  
+  // 🏄 Surfing (Experience 18, 19)
+  'surf': ['surf', 'surfing', 'surfer', 'waves', 'ondas', 'wave', 'surfboard', 'surf lesson', 'surf camp', 'surf school', 'water sport'],
+  
+  // 🤿 Scuba Diving (Experience 21)
+  'diving': ['diving', 'dive', 'scuba', 'mergulho', 'underwater', 'snorkel', 'snorkeling', 'ocean dive', 'sea dive', 'marine reserve'],
+  
+  // 🏔️ Adventure / Adrenaline (General)
+  'adventure': ['adventure', 'aventura', 'adrenaline', 'adrenalina', 'extreme', 'extremo', 'thrill', 'exciting', 'action'],
+  
+  // 🌅 Sunset / Golden Hour
+  'sunset': ['sunset', 'pôr do sol', 'golden hour', 'sunrise', 'nascer do sol', 'evening', 'dusk', 'twilight'],
+  
+  // 🚤 Boat Tours (Experience 4)
+  'boat': ['boat', 'barco', 'sailing', 'veleiro', 'yacht', 'iate', 'cruise', 'cruzeiro', 'catamaran', 'speedboat'],
+  
+  // 🎯 Tours & Experiences (General)
+  'tour': ['tour', 'guided', 'guiado', 'experience', 'experiência', 'excursion', 'excursão', 'day trip', 'activity', 'atividade'],
+  
+  // 🧘‍♀️ Wellness / Retreat
+  'wellness': ['wellness', 'bem-estar', 'spa', 'retreat', 'retiro', 'health', 'saúde', 'detox', 'mindful', 'self-care'],
+  
+  // 🎣 Fishing (if you add fishing experiences)
+  'fishing': ['fishing', 'fish', 'pesca', 'pescar', 'peixe', 'angling', 'deep sea fishing', 'boat fishing', 'rod'],
+  
+  // 📸 Photography / Views
+  'photography': ['photography', 'photo', 'fotografia', 'foto', 'instagram', 'instagrammable', 'viewpoint', 'miradouro', 'scenic', 'views'],
+  
+  // 🏛️ Lisbon City
+  'lisbon': ['lisbon', 'lisboa', 'alfama', 'belém', 'belem', 'bairro alto', 'chiado', 'baixa', 'mouraria', 'tram', 'elétrico', 'tram 28'],
+  
+  // 🌊 Nature / Outdoors
+  'nature': ['nature', 'natureza', 'outdoor', 'outdoors', 'ar livre', 'forest', 'floresta', 'park', 'parque', 'natural', 'green'],
+  
+  // 👨‍👩‍👧‍👦 Family / Kids
+  'family': ['family', 'família', 'kids', 'crianças', 'children', 'family-friendly', 'kid-friendly'],
+  
+  // 💑 Romantic / Couples
+  'romantic': ['romantic', 'romântico', 'couple', 'casal', 'honeymoon', 'lua de mel', 'date', 'love', 'anniversary'],
 };
 
 // Location keywords for better matching
 const LOCATION_KEYWORDS: Record<string, string[]> = {
-  'Setúbal': ['setúbal', 'setubal', 'arrábida', 'troia', 'sado'],
-  'Lisbon': ['lisbon', 'lisboa', 'cascais', 'sintra', 'belém'],
-  'Porto': ['porto', 'douro', 'gaia', 'matosinhos'],
-  'Algarve': ['algarve', 'faro', 'lagos', 'albufeira', 'benagil'],
+  'Setúbal': ['setúbal', 'setubal', 'arrábida', 'arrabida', 'troia', 'sado', 'sesimbra'],
+  'Lisbon': ['lisbon', 'lisboa', 'cascais', 'sintra', 'belém', 'belem', 'caparica', 'costa da caparica', 'almada'],
+  'Comporta': ['comporta', 'melides', 'carvalhal', 'troia'],
+  'Sintra': ['sintra', 'colares', 'praia das maçãs', 'cabo da roca'],
+  'Cascais': ['cascais', 'estoril', 'carcavelos', 'guincho'],
+  'Algarve': ['algarve', 'faro', 'lagos', 'albufeira', 'benagil', 'portimão', 'tavira', 'vilamoura'],
+  'Porto': ['porto', 'douro', 'gaia', 'matosinhos', 'foz'],
+  'Tomar': ['tomar', 'tejo', 'ribatejo', 'santarém'],
+  'Portugal': ['portugal', 'portuguese', 'português', 'portuguesa', 'pt'],
 };
 
 interface MatchedExperience {
   experience: any;
   score: number;
   matchedKeywords: string[];
+}
+
+interface SocialMediaMetadata {
+  platform: 'tiktok' | 'instagram';
+  success: boolean;
+  username?: string;
+  userUrl?: string;
+  description?: string;
+  fullTitle?: string;
+  hashtags?: string[];
+  thumbnailUrl?: string;
+  error?: string;
 }
 
 export default function SharedContentScreen() {
@@ -70,6 +165,7 @@ export default function SharedContentScreen() {
   const [analyzing, setAnalyzing] = useState(true); // Start with analyzing state
   const [scanProgress] = useState(new Animated.Value(0));
   const [scanLineAnim] = useState(new Animated.Value(0));
+  const [socialMetadata, setSocialMetadata] = useState<SocialMediaMetadata | null>(null);
 
   // Scanning line animation
   useEffect(() => {
@@ -104,6 +200,21 @@ export default function SharedContentScreen() {
     }
   }, [analyzing]);
 
+  // Extract social media metadata when URL is available
+  const extractSocialMetadata = async (url: string): Promise<SocialMediaMetadata | null> => {
+    try {
+      const response = await apiService.post('/social-media/extract', { url });
+      if (response.success !== false) {
+        console.log('📱 Social media metadata extracted:', response);
+        return response as SocialMediaMetadata;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to extract social metadata:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     // Get the shared content from params
     const url = params.url as string;
@@ -114,25 +225,55 @@ export default function SharedContentScreen() {
     
     setLoading(false);
     
-    // Start with a delay to show the detecting animation
-    setTimeout(() => {
-      if (experiences.length > 0) {
-        analyzeAndMatch();
+    // Start extracting metadata and analyzing in parallel
+    const processSharedContent = async () => {
+      // Extract social media metadata while showing detecting animation
+      if (url && (url.includes('tiktok') || url.includes('instagram') || url.includes('instagr.am'))) {
+        const metadata = await extractSocialMetadata(url);
+        if (metadata) {
+          setSocialMetadata(metadata);
+        }
       }
-    }, 3500); // Show detecting screen for 3.5 seconds
-  }, [params]);
-
-  useEffect(() => {
-    if ((sharedUrl || sharedText) && experiences.length > 0 && !analyzing) {
-      // Already handled in the timeout above
-    }
-  }, [sharedUrl, sharedText, experiences]);
+      
+      // Wait a bit more for the animation, then analyze
+      setTimeout(() => {
+        if (experiences.length > 0) {
+          analyzeAndMatch();
+        } else {
+          setAnalyzing(false);
+        }
+      }, 2000);
+    };
+    
+    // Start after a short delay to show animation
+    setTimeout(() => {
+      processSharedContent();
+    }, 1500);
+  }, [params, experiences]);
 
   const analyzeAndMatch = async () => {
     
     try {
-      // Combine URL and text for analysis
-      const contentToAnalyze = `${sharedUrl || ''} ${sharedText || ''}`.toLowerCase();
+      // Combine URL, text, AND social media metadata for analysis
+      let contentToAnalyze = `${sharedUrl || ''} ${sharedText || ''}`.toLowerCase();
+      
+      // If we have social media metadata, add it to the analysis
+      if (socialMetadata?.success) {
+        const metadataContent = [
+          socialMetadata.description || '',
+          socialMetadata.fullTitle || '',
+          socialMetadata.username || '',
+          ...(socialMetadata.hashtags || []),
+        ].join(' ').toLowerCase();
+        
+        contentToAnalyze += ' ' + metadataContent;
+        
+        console.log('📱 Analyzing with social metadata:', {
+          username: socialMetadata.username,
+          description: socialMetadata.description,
+          hashtags: socialMetadata.hashtags,
+        });
+      }
       
       // Extract platform info
       const isTikTok = contentToAnalyze.includes('tiktok');
@@ -175,6 +316,19 @@ export default function SharedContentScreen() {
           }
         }
         
+        // Bonus score if hashtags match experience tags
+        if (socialMetadata?.hashtags) {
+          for (const hashtag of socialMetadata.hashtags) {
+            const cleanHashtag = hashtag.replace('#', '').toLowerCase();
+            if (expContent.includes(cleanHashtag)) {
+              score += 15;
+              if (!matchedKeywords.includes(hashtag)) {
+                matchedKeywords.push(hashtag);
+              }
+            }
+          }
+        }
+        
         // If there's a match, add to results
         if (score > 0) {
           matches.push({ experience: exp, score, matchedKeywords });
@@ -204,7 +358,15 @@ export default function SharedContentScreen() {
   };
 
   const handleClose = () => {
-    router.back();
+    // If we can go back (there's navigation history), go back
+    // Otherwise, the share extension will close and return to the source app
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // If opened from share intent with no history, just dismiss
+      // This will close the share extension and return to Instagram/TikTok
+      router.replace('/');
+    }
   };
 
   const handleExperiencePress = (experienceId: string) => {
@@ -399,18 +561,53 @@ export default function SharedContentScreen() {
           </View>
         )}
 
-        {/* No Matches */}
+        {/* No Matches - Show top experiences instead */}
         {!analyzing && matchedExperiences.length === 0 && !loading && (
           <View style={styles.noMatchesContainer}>
-            <Text style={styles.noMatchesTitle}>No exact matches found</Text>
+            <Text style={styles.noMatchesEmoji}>🔍</Text>
+            <Text style={styles.noMatchesTitle}>We're still learning!</Text>
             <Text style={styles.noMatchesText}>
-              We couldn't find experiences matching this content. Try browsing our full catalog!
+              We couldn't find a perfect match for this content yet, but check out our top experiences below!
             </Text>
+            
+            {/* Show some suggested experiences anyway */}
+            {experiences.slice(0, 3).map((experience) => (
+              <Pressable
+                key={experience.id}
+                style={styles.experienceCard}
+                onPress={() => handleExperiencePress(experience.id)}
+              >
+                <Image
+                  source={{ uri: experience.image }}
+                  style={styles.experienceImage}
+                />
+                <View style={styles.experienceInfo}>
+                  <Text style={styles.experienceTitle} numberOfLines={2}>
+                    {experience.title}
+                  </Text>
+                  <View style={styles.experienceMeta}>
+                    <View style={styles.metaItem}>
+                      <MapPin size={12} color={colors.dark.textSecondary} />
+                      <Text style={styles.metaText}>{experience.location}</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <Star size={12} color="#FFB800" fill="#FFB800" />
+                      <Text style={styles.metaText}>{experience.rating}</Text>
+                    </View>
+                  </View>
+                </View>
+                <Text style={styles.experiencePrice}>
+                  €{experience.price}
+                </Text>
+              </Pressable>
+            ))}
+            
+            {/* Back to Instagram/TikTok button */}
             <Pressable 
-              style={styles.browseButton}
-              onPress={() => router.push('/')}
+              style={styles.backToAppButton}
+              onPress={handleClose}
             >
-              <Text style={styles.browseButtonText}>Browse Experiences</Text>
+              <Text style={styles.backToAppButtonText}>← Back to {getPlatformName()}</Text>
             </Pressable>
           </View>
         )}
@@ -439,7 +636,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerTitle: {
-    ...typography.h3,
+    fontFamily: typography.fonts.extrabold,
+    fontSize: typography.sizes['2xl'],
+    lineHeight: 30,
     color: colors.dark.text,
   },
   closeButton: {
@@ -456,7 +655,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sharedLabel: {
-    ...typography.caption,
+    fontFamily: typography.fonts.regular,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
     color: colors.dark.textSecondary,
     marginBottom: 8,
   },
@@ -466,12 +667,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sharedUrl: {
-    ...typography.body,
+    fontFamily: typography.fonts.regular,
+    fontSize: typography.sizes.base,
+    lineHeight: 24,
     color: colors.dark.accent,
     flex: 1,
   },
   sharedText: {
-    ...typography.body,
+    fontFamily: typography.fonts.regular,
+    fontSize: typography.sizes.base,
+    lineHeight: 24,
     color: colors.dark.text,
   },
   analyzingContainer: {
@@ -482,19 +687,25 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   analyzingText: {
-    ...typography.body,
+    fontFamily: typography.fonts.regular,
+    fontSize: typography.sizes.base,
+    lineHeight: 24,
     color: colors.dark.textSecondary,
   },
   matchesSection: {
     marginTop: 10,
   },
   sectionTitle: {
-    ...typography.h3,
+    fontFamily: typography.fonts.extrabold,
+    fontSize: typography.sizes['2xl'],
+    lineHeight: 30,
     color: colors.dark.text,
     marginBottom: 4,
   },
   sectionSubtitle: {
-    ...typography.caption,
+    fontFamily: typography.fonts.regular,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
     color: colors.dark.textSecondary,
     marginBottom: 16,
   },
@@ -514,7 +725,9 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   experienceTitle: {
-    ...typography.bodyBold,
+    fontFamily: typography.fonts.semibold,
+    fontSize: typography.sizes.base,
+    lineHeight: 24,
     color: colors.dark.text,
     marginBottom: 6,
   },
@@ -530,7 +743,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    ...typography.caption,
+    fontFamily: typography.fonts.regular,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
     color: colors.dark.textSecondary,
   },
   keywordsContainer: {
@@ -545,30 +760,55 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   keywordText: {
-    ...typography.caption,
-    color: colors.dark.accent,
+    fontFamily: typography.fonts.regular,
     fontSize: 10,
+    lineHeight: 16,
+    color: colors.dark.accent,
   },
   experiencePrice: {
-    ...typography.bodyBold,
+    fontFamily: typography.fonts.semibold,
+    fontSize: typography.sizes.base,
+    lineHeight: 24,
     color: colors.dark.accent,
     padding: 12,
     alignSelf: 'center',
   },
   noMatchesContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+  noMatchesEmoji: {
+    fontSize: 48,
+    marginBottom: 16,
   },
   noMatchesTitle: {
-    ...typography.h3,
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.dark.text,
     marginBottom: 8,
+    textAlign: 'center',
   },
   noMatchesText: {
-    ...typography.body,
+    fontSize: 14,
     color: colors.dark.textSecondary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  backToAppButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+    borderRadius: 12,
+  },
+  backToAppButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.dark.textSecondary,
   },
   browseButton: {
     backgroundColor: colors.dark.accent,
@@ -577,7 +817,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   browseButtonText: {
-    ...typography.bodyBold,
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.dark.background,
   },
   // Detecting screen styles
