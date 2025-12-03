@@ -732,7 +732,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   interestButton: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: colors.dark.primary,
   },
   bookButtonText: {
     color: colors.dark.background,

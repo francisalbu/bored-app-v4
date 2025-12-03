@@ -14,7 +14,6 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFonts, PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
 
 import colors from '@/constants/colors';
 import { getVibeCheckRecommendation, type VibeCheckResponse } from '@/services/boredAI';
@@ -33,10 +32,6 @@ export default function BoredAITab() {
   const [userVibe, setUserVibe] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentResponse, setCurrentResponse] = useState<VibeResponse | null>(null);
-
-  const [fontsLoaded] = useFonts({
-    PermanentMarker_400Regular,
-  });
 
   const moods = [
     { emoji: '🎉', label: t('boredAI.moods.chaos'), vibe: t('boredAI.vibes.chaos') },
@@ -190,15 +185,9 @@ export default function BoredAITab() {
                   <Text style={styles.aiChoiceText}>{t('boredAI.aiChoice')}</Text>
                 </View>
               </View>
-              {fontsLoaded ? (
-                <Text style={[styles.responseText, { fontFamily: 'PermanentMarker_400Regular' }]}>
-                  {renderTextWithHighlight(currentResponse.recommendation.text, currentResponse.recommendation.placeName)}
-                </Text>
-              ) : (
-                <Text style={styles.responseText}>
-                  {renderTextWithHighlight(currentResponse.recommendation.text, currentResponse.recommendation.placeName)}
-                </Text>
-              )}
+              <Text style={styles.responseText}>
+                {renderTextWithHighlight(currentResponse.recommendation.text, currentResponse.recommendation.placeName)}
+              </Text>
               {currentResponse.recommendation.mapsUrl && (
                 <Pressable 
                   style={styles.mapsButton}

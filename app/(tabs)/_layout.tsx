@@ -44,6 +44,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="nearby"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="saved"
         options={{
           title: 'Bored AI',

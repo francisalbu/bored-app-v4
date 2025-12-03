@@ -910,7 +910,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
   },
   interestButton: {
-    backgroundColor: '#8B5CF6', // Purple color for interest
+    backgroundColor: colors.dark.primary, // Lime color for interest
   },
   bookButtonText: {
     color: colors.dark.background,
