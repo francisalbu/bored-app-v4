@@ -52,37 +52,23 @@ router.post('/register', async (req, res) => {
 
     console.log(`📝 Registering user: ${email}`);
 
-    // Create user in Supabase with Admin API (auto-confirmed) if available
+    // Create user in Supabase - ALWAYS require email confirmation in production
     let authData, authError;
     
-    if (supabaseAdmin) {
-      console.log('🔑 Using Admin API to create user (auto-confirmed)');
-      const result = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
+    // Use regular signup to require email confirmation
+    console.log('📧 Creating user with email confirmation required');
+    const result = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
           name,
           phone: phone || null
         }
-      });
-      authData = result.data;
-      authError = result.error;
-    } else {
-      console.log('📧 Using regular signup (requires email confirmation)');
-      const result = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            phone: phone || null
-          }
-        }
-      });
-      authData = result.data;
-      authError = result.error;
-    }
+      }
+    });
+    authData = result.data;
+    authError = result.error;
 
     if (authError) {
       console.error('❌ Supabase registration error:', authError.message);
