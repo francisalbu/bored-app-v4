@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
   },
   comingSoonText: {
-    color: '#FF8C00',
+    color: '#FFD700',
     fontSize: 10,
     fontWeight: '600' as const,
     marginTop: 2,
