@@ -35,7 +35,8 @@ export function useExperiences() {
 
 export function useExperience(id: string) {
   const [experience, setExperience] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // Start with loading=false if no ID provided (means we don't need to fetch)
+  const [loading, setLoading] = useState(!!id);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,6 +57,9 @@ export function useExperience(id: string) {
 
     if (id) {
       fetchExperience();
+    } else {
+      // No ID provided, nothing to load
+      setLoading(false);
     }
   }, [id]);
 

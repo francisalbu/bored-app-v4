@@ -21,11 +21,11 @@ import { useStripe } from '@stripe/stripe-react-native';
 
 import colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
-import { EXPERIENCES } from '@/constants/experiences';
 import { useBookings } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
+import { useExperience } from '@/hooks/useApi';
 
 // Production API URL - always use production in builds
 const API_URL = __DEV__ 
@@ -189,7 +189,9 @@ export default function PaymentScreen() {
     };
   }, []);
 
-  const experience = EXPERIENCES.find((exp) => exp.id === experienceId);
+  // Always fetch from API
+  const { experience, loading: isLoadingExperience } = useExperience(experienceId || '');
+  
   const adultsCount = parseInt(adults || '1');
   const pricePerGuest = parseFloat(price || '0');
   const totalPrice = pricePerGuest * adultsCount;
@@ -200,10 +202,25 @@ export default function PaymentScreen() {
     validateEmail(guestEmail) &&
     validatePhone(guestPhone);
 
-  if (!experience) {
+  // Show loading or error as full screen with same background
+  if (isLoadingExperience || !experience) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Experience not found</Text>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color={colors.dark.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{t('booking.checkout')}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {isLoadingExperience ? (
+            <ActivityIndicator size="large" color={colors.dark.primary} />
+          ) : (
+            <Text style={styles.errorText}>Experience not found</Text>
+          )}
+        </View>
       </View>
     );
   }
@@ -322,13 +339,25 @@ export default function PaymentScreen() {
     setIsProcessing(true);
 
     try {
+      // Wake up server first (cold start protection)
+      console.log('🔵 [PAYMENT] Waking up server...');
+      try {
+        await fetch(`${API_URL}/health`, { 
+          method: 'GET',
+          signal: AbortSignal.timeout(10000) 
+        });
+        console.log('✅ [PAYMENT] Server is awake');
+      } catch (wakeError) {
+        console.log('⚠️ [PAYMENT] Wake-up call failed, continuing anyway');
+      }
+
       // Step 1: Create payment intent FIRST (without booking)
-      console.log('� [PAYMENT] Step 1: Creating payment intent...');
+      console.log('🔵 [PAYMENT] Step 1: Creating payment intent...');
       console.log('🔵 [PAYMENT] URL:', `${API_URL}/api/payments/create-intent`);
       console.log('🔵 [PAYMENT] Amount:', totalPrice);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
       
       let response;
       try {
@@ -343,6 +372,7 @@ export default function PaymentScreen() {
         });
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
+        console.log('❌ [PAYMENT] Fetch error:', fetchError);
         if (fetchError.name === 'AbortError') {
           console.log('❌ [PAYMENT] Request timed out');
           Alert.alert(
@@ -350,13 +380,25 @@ export default function PaymentScreen() {
             'The server is taking too long to respond. This might be because the server is starting up (cold start). Please try again in a minute.',
             [{ text: 'OK' }]
           );
-          setIsProcessing(false);
-          return;
+        } else {
+          Alert.alert(
+            'Connection Error',
+            'Failed to connect to payment server. Please check your internet connection and try again.',
+            [{ text: 'OK' }]
+          );
         }
-        throw fetchError;
+        setIsProcessing(false);
+        return;
       }
       
       clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.log('❌ [PAYMENT] Response not OK:', response.status);
+        Alert.alert('Error', `Server error: ${response.status}. Please try again.`);
+        setIsProcessing(false);
+        return;
+      }
 
       const data = await response.json();
       console.log('🔵 [PAYMENT] Payment intent response:', data);
@@ -447,36 +489,39 @@ export default function PaymentScreen() {
         await updateUserPhoneInDatabase(fullPhone);
       }
 
-        // Show success message with account creation prompt for guests
-        if (isGuest) {
-          Alert.alert(
-            '✅ Booking Confirmed!',
-            'Your booking is confirmed! Check your email for details.\n\n💡 Create an account to:\n• Track all your bookings\n• Get exclusive deals\n• Faster future checkouts',
-            [
-              { 
-                text: 'Maybe Later', 
-                style: 'cancel',
-                onPress: () => router.push('/(tabs)/index' as any)
-              },
-              { 
-                text: 'Create Account', 
-                onPress: () => {
-                  // Open auth sheet with Google OAuth option
-                  setShowAuthSheet(true);
-                }
+      // Payment and booking complete - stop processing
+      setIsProcessing(false);
+
+      // Show success message with account creation prompt for guests
+      if (isGuest) {
+        Alert.alert(
+          '✅ Booking Confirmed!',
+          'Your booking is confirmed! Check your email for details.\n\n💡 Create an account to:\n• Track all your bookings\n• Get exclusive deals\n• Faster future checkouts',
+          [
+            { 
+              text: 'Maybe Later', 
+              style: 'cancel',
+              onPress: () => router.push('/(tabs)/index' as any)
+            },
+            { 
+              text: 'Create Account', 
+              onPress: () => {
+                // Open auth sheet with Google OAuth option
+                setShowAuthSheet(true);
               }
-            ]
-          );
-        } else {
-          Alert.alert(
-            'Payment Successful!',
-            'Your booking is confirmed. Check your email for details.',
-            [{ 
-              text: 'OK', 
-              onPress: () => router.push('/(tabs)/bookings' as any)
-            }]
-          );
-        }
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Payment Successful!',
+          'Your booking is confirmed. Check your email for details.',
+          [{ 
+            text: 'OK', 
+            onPress: () => router.push('/(tabs)/bookings' as any)
+          }]
+        );
+      }
     } catch (error) {
       console.error('❌ [PAYMENT] Error:', error);
       Alert.alert('Error', 'Failed to process payment');

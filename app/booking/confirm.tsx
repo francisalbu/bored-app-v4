@@ -15,9 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
 import colors from '@/constants/colors';
-import { EXPERIENCES } from '@/constants/experiences';
 import { useBookings } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useExperience } from '@/hooks/useApi';
 
 export default function ConfirmBookingScreen() {
   const { experienceId, slotId, date, time, adults, price } = useLocalSearchParams<{
@@ -31,16 +31,33 @@ export default function ConfirmBookingScreen() {
   
   const insets = useSafeAreaInsets();
 
-  const experience = EXPERIENCES.find((exp) => exp.id === experienceId);
+  // Always fetch from API
+  const { experience, loading: isLoadingExperience } = useExperience(experienceId || '');
+  
   const adultsCount = parseInt(adults || '1');
   const pricePerGuest = parseFloat(price || '0');
   const totalPrice = pricePerGuest * adultsCount;
   const bookingDate = date ? new Date(date) : new Date();
 
-  if (!experience) {
+  // Show loading or error as full screen with same background
+  if (isLoadingExperience || !experience) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Experience not found</Text>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color={colors.dark.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Confirm Booking</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {isLoadingExperience ? (
+            <ActivityIndicator size="large" color={colors.dark.primary} />
+          ) : (
+            <Text style={styles.errorText}>Experience not found</Text>
+          )}
+        </View>
       </View>
     );
   }

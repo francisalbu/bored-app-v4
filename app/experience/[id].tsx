@@ -11,7 +11,7 @@ import {
   Star,
 } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, Dimensions, FlatList, Linking, Alert, Share } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, Dimensions, FlatList, Linking, Alert, Share, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -131,10 +131,27 @@ export default function ExperienceDetailScreen() {
     fetchReviews();
   }, [experience?.id]);
 
-  if (!experience && !loading) {
+  // Show loading or error state with consistent background
+  if (loading || !experience) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.errorText}>Experience not found</Text>
+      <View style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.topActions, { paddingTop: insets.top + 8 }]}>
+          <Pressable style={styles.iconButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color={colors.dark.text} />
+          </Pressable>
+          <View style={styles.topRightActions}>
+            <View style={styles.iconButton} />
+            <View style={styles.iconButton} />
+          </View>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {loading ? (
+            <ActivityIndicator size="large" color={colors.dark.primary} />
+          ) : (
+            <Text style={styles.errorText}>Experience not found</Text>
+          )}
+        </View>
       </View>
     );
   }

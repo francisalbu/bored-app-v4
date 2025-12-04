@@ -16,8 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
 import colors from '@/constants/colors';
-import { EXPERIENCES } from '@/constants/experiences';
 import { api } from '@/services/api';
+import { useExperience } from '@/hooks/useApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -61,12 +61,28 @@ export default function BookingScreen() {
   const [selectedSlot, setSelectedSlot] = useState<{ schedule: DaySchedule; slot: TimeSlot } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const experience = EXPERIENCES.find((exp) => exp.id === id);
+  // Always fetch from API
+  const { experience, loading: isLoadingExperience } = useExperience(id || '');
 
-  if (!experience) {
+  // Show loading or error as full screen with same background
+  if (isLoadingExperience || !experience) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Experience not found</Text>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color={colors.dark.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Select a time</Text>
+          <View style={styles.closeButton} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {isLoadingExperience ? (
+            <ActivityIndicator size="large" color={colors.dark.primary} />
+          ) : (
+            <Text style={styles.errorText}>Experience not found</Text>
+          )}
+        </View>
       </View>
     );
   }
@@ -447,13 +463,11 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 16,
     paddingVertical: 24,
-    borderBottomWidth: 1,
     borderBottomColor: colors.dark.border,
     backgroundColor: colors.dark.backgroundTertiary,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
-    borderBottomWidth: 0,
   },
   sectionRow: {
     flexDirection: 'row',

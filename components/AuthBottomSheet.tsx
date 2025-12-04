@@ -183,6 +183,7 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
     try {
       setLoadingProvider('apple');
       setIsLoading(true);
+      setShowSigningIn(true);
 
       console.log('=== STARTING APPLE SIGN-IN ===');
 
@@ -194,57 +195,62 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
       });
 
       console.log('Apple credential received:', {
-        user: credential.user,
+        user: credential.user?.substring(0, 20) + '...',
         email: credential.email,
-        fullName: credential.fullName,
+        hasIdentityToken: !!credential.identityToken,
       });
 
-      if (credential.identityToken) {
-        console.log('🔑 Signing in with Supabase using Apple token...');
-        
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'apple',
-          token: credential.identityToken,
-        });
-
-        if (error) {
-          console.error('❌ Supabase Apple sign-in error:', error);
-          throw error;
-        }
-
-        console.log('✅ Apple sign-in successful!', data.user?.email);
-        
-        // Update user name if provided (Apple only gives name on first sign-in)
-        if (credential.fullName?.givenName || credential.fullName?.familyName) {
-          const fullName = [credential.fullName.givenName, credential.fullName.familyName]
-            .filter(Boolean)
-            .join(' ');
-          
-          if (fullName) {
-            await supabase.auth.updateUser({
-              data: { name: fullName }
-            });
-          }
-        }
-
-        setShowSigningIn(true);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setShowSigningIn(false);
-        onClose();
-        if (onSuccess) onSuccess();
-      } else {
+      if (!credential.identityToken) {
         throw new Error('No identity token received from Apple');
       }
+
+      console.log('🔑 Signing in with Supabase...');
+      
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) {
+        console.error('❌ Supabase error:', error.message);
+        throw error;
+      }
+
+      console.log('✅ Apple sign-in successful!', data.user?.email);
+      
+      // Update user name if provided
+      if (credential.fullName?.givenName || credential.fullName?.familyName) {
+        const fullName = [credential.fullName.givenName, credential.fullName.familyName]
+          .filter(Boolean)
+          .join(' ');
+        
+        if (fullName) {
+          await supabase.auth.updateUser({ data: { name: fullName } });
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setShowSigningIn(false);
+      onClose();
+      if (onSuccess) onSuccess();
+      
     } catch (error: any) {
       console.error('=== APPLE SIGN-IN ERROR ===');
-      console.error(error);
+      console.error('Code:', error.code);
+      console.error('Message:', error.message);
       
-      if (error.code === 'ERR_REQUEST_CANCELED') {
-        // User cancelled, don't show error
-        console.log('User cancelled Apple sign-in');
-      } else {
-        Alert.alert('Erro', error.message || 'Falha ao entrar com Apple');
+      setShowSigningIn(false);
+      
+      // User cancelled - don't show error
+      if (error.code === 'ERR_REQUEST_CANCELED' || error.code === 'ERR_CANCELED') {
+        return;
       }
+      
+      Alert.alert(
+        'Sign-In Failed', 
+        error.message || 'Unable to sign in with Apple. Please try again or use another method.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsLoading(false);
       setLoadingProvider(null);
@@ -397,22 +403,15 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
                 {/* Social Sign In Buttons */}
                 <View style={styles.socialButtons}>
-                  {/* Apple Sign In - iOS only */}
+                  {/* Apple Sign In - iOS only - Using native button */}
                   {Platform.OS === 'ios' && (
-                    <Pressable
-                      style={[styles.socialButton, styles.appleButton]}
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                      buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                      cornerRadius={12}
+                      style={{ width: '100%', height: 56 }}
                       onPress={handleAppleSignIn}
-                      disabled={isLoading}
-                    >
-                      {loadingProvider === 'apple' ? (
-                        <ActivityIndicator color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Text style={styles.appleIcon}></Text>
-                          <Text style={styles.socialButtonText}>Continue with Apple</Text>
-                        </>
-                      )}
-                    </Pressable>
+                    />
                   )}
 
                   {/* Google Sign In */}
