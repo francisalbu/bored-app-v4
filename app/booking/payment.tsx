@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Star, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown } from 'lucide-react-native';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
@@ -367,10 +367,14 @@ export default function PaymentScreen() {
       console.log('🔵 [PAYMENT] Amount:', totalPrice);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ [PAYMENT] Request timeout triggered!');
+        controller.abort();
+      }, 60000); // 60 second timeout
       
       let response;
       try {
+        console.log('🔵 [PAYMENT] Sending fetch request...');
         response = await fetch(`${API_URL}/api/payments/create-intent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -402,10 +406,13 @@ export default function PaymentScreen() {
       }
       
       clearTimeout(timeoutId);
+      console.log('✅ [PAYMENT] Fetch completed, status:', response.status);
       
       if (!response.ok) {
         console.log('❌ [PAYMENT] Response not OK:', response.status);
-        Alert.alert('Error', `Server error: ${response.status}. Please try again.`);
+        const errorData = await response.json().catch(() => ({}));
+        console.log('❌ [PAYMENT] Error data:', errorData);
+        Alert.alert('Error', errorData.error || errorData.message || `Server error: ${response.status}. Please try again.`);
         setIsProcessing(false);
         return;
       }
@@ -427,26 +434,43 @@ export default function PaymentScreen() {
 
       // Step 2: Initialize payment sheet
       console.log('🔵 [PAYMENT] Step 2: Initializing payment sheet...');
-      const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'Bored Explorer',
-        paymentIntentClientSecret: secret,
-        defaultBillingDetails: {
-          name: customerName,
-          email: customerEmail,
-        },
-        returnURL: 'boredtourist://payment',
-        applePay: {
-          merchantCountryCode: 'PT',
-        },
-        googlePay: {
-          merchantCountryCode: 'PT',
-          testEnv: false,
-        },
-      });
+      
+      // Add timeout to initPaymentSheet
+      let initResult: { error?: any } = {};
+      try {
+        const initPromise = initPaymentSheet({
+          merchantDisplayName: 'Bored Explorer',
+          paymentIntentClientSecret: secret,
+          defaultBillingDetails: {
+            name: customerName,
+            email: customerEmail,
+          },
+          returnURL: 'boredtourist://payment',
+          applePay: {
+            merchantCountryCode: 'PT',
+          },
+          googlePay: {
+            merchantCountryCode: 'PT',
+            testEnv: false,
+          },
+        });
+        
+        // Race between initPaymentSheet and a 30 second timeout
+        const timeoutPromise = new Promise<{ error: { message: string } }>((_, reject) => 
+          setTimeout(() => reject({ error: { message: 'Payment sheet initialization timed out. Please try again.' } }), 30000)
+        );
+        
+        initResult = await Promise.race([initPromise, timeoutPromise]);
+      } catch (initTimeoutError: any) {
+        console.log('❌ [PAYMENT] initPaymentSheet timeout or error:', initTimeoutError);
+        Alert.alert('Error', initTimeoutError?.error?.message || 'Payment initialization failed. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
 
-      if (initError) {
-        console.log('❌ [PAYMENT] initPaymentSheet error:', initError);
-        Alert.alert('Error', initError.message);
+      if (initResult.error) {
+        console.log('❌ [PAYMENT] initPaymentSheet error:', initResult.error);
+        Alert.alert('Error', initResult.error.message);
         setIsProcessing(false);
         return;
       }
@@ -589,12 +613,6 @@ export default function PaymentScreen() {
               <Text style={styles.experienceTitle} numberOfLines={2}>
                 {experience.title}
               </Text>
-              <View style={styles.ratingRow}>
-                <Star size={14} color={colors.dark.primary} fill={colors.dark.primary} />
-                <Text style={styles.ratingText}>
-                  {experience.rating} ({experience.reviewCount})
-                </Text>
-              </View>
             </View>
           </View>
         </View>

@@ -223,7 +223,10 @@
     "noTimeSlotsAvailable": "No time slots available for the next 5 days starting from selected date.",
     "selectDifferentDate": "Please select a different date",
     "bookingCancelled": "Booking cancelled successfully",
-    "cancellationFailed": "Failed to cancel booking"
+    "cancellationFailed": "Failed to cancel booking",
+    "cancelMyBooking": "Cancel my booking",
+    "total": "Total",
+    "writeReview": "Write a Review"
   },
   "payment": {
     "title": "Confirm and Pay",

@@ -1,44 +1,31 @@
 /**
  * Email Service
  * 
- * Handles sending booking confirmation emails
- * Uses Gmail SMTP (you can change to any email provider)
+ * Handles sending booking confirmation emails using Resend
+ * https://resend.com
+ * 
+ * From: bookings@boredtourist.com
  */
 
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-/**
- * Create email transporter
- * For Gmail, you need:
- * 1. Enable 2-Step Verification
- * 2. Generate App Password: https://myaccount.google.com/apppasswords
- * 3. Add to .env: EMAIL_USER and EMAIL_PASSWORD
- */
-function createTransporter() {
-  const emailUser = process.env.EMAIL_USER;
-  const emailPassword = process.env.EMAIL_PASSWORD;
-  
-  if (!emailUser || !emailPassword) {
-    console.warn('⚠️  Email credentials not configured. Emails will not be sent.');
-    console.warn('   Add EMAIL_USER and EMAIL_PASSWORD to your .env file');
-    return null;
-  }
-  
-  return nodemailer.createTransporter({
-    service: 'gmail',
-    auth: {
-      user: emailUser,
-      pass: emailPassword
-    }
-  });
-}
+// Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Fixed contact info for all experiences (Bored Tourist central support)
+const CONTACT = {
+  whatsapp: '+351967407859',
+  whatsappLink: 'https://wa.me/351967407859',
+  email: 'bookings@boredtourist.com',
+  fromEmail: 'Bored Tourist <bookings@boredtourist.com>',
+};
 
 /**
  * Format date for email display
  */
 function formatDate(dateString) {
   const date = new Date(dateString);
-  return date.toLocaleDateString('pt-PT', {
+  return date.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -50,502 +37,552 @@ function formatDate(dateString) {
  * Format time for email display
  */
 function formatTime(timeString) {
-  // timeString comes as "HH:MM:SS"
+  if (!timeString) return 'To be confirmed';
   return timeString.substring(0, 5); // "HH:MM"
 }
 
 /**
  * Generate HTML email template for booking confirmation
- * Professional template with app UI design system
+ * Design matches Bored Tourist app branding:
+ * - Dark theme (#0A0A0A background)
+ * - Primary green (#00FF8C)
+ * - Secondary yellow (#FFE600)
  */
 function generateBookingConfirmationHTML(booking) {
+  const ticketDate = formatDate(booking.slot_date || booking.booking_date);
+  const ticketTime = formatTime(booking.slot_start_time || booking.booking_time);
+  
   return `
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="x-apple-disable-message-reformatting">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Reserva Confirmada - Bored Tourist</title>
-  <!--[if mso]>
-  <style type="text/css">
-    body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
-  </style>
-  <![endif]-->
-  <style type="text/css">
-    /* Reset styles */
-    body {
-      margin: 0;
-      padding: 0;
-      min-width: 100%;
-      width: 100% !important;
-      height: 100% !important;
-      -webkit-text-size-adjust: 100%;
-      -ms-text-size-adjust: 100%;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    
-    body, table, td, p, a, li, blockquote {
-      -ms-text-size-adjust: 100%;
-      -webkit-text-size-adjust: 100%;
-    }
-    
-    table, td {
-      mso-table-lspace: 0pt;
-      mso-table-rspace: 0pt;
-    }
-    
-    img {
-      border: 0;
-      height: auto;
-      line-height: 100%;
-      outline: none;
-      text-decoration: none;
-      -ms-interpolation-mode: bicubic;
-    }
-    
-    /* App colors - Bored Tourist Brand */
-    .bg-gradient {
-      background: linear-gradient(135deg, #0A0A0A 0%, #1F1F1F 100%);
-    }
-    
-    .text-primary { color: #00FF8C; }
-    .text-secondary { color: #FFE600; }
-    .text-dark { color: #1a202c; }
-    .text-gray { color: #A0A0A0; }
-    .text-light { color: #cbd5e0; }
-    
-    /* Responsive */
-    @media only screen and (max-width: 600px) {
-      .email-container {
-        width: 100% !important;
-        margin: auto !important;
-      }
-      
-      .fluid {
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-      
-      .stack-column,
-      .stack-column-center {
-        display: block !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        direction: ltr !important;
-      }
-      
-      .mobile-padding {
-        padding: 20px !important;
-      }
-      
-      .mobile-hide {
-        display: none !important;
-      }
-    }
-  </style>
+  <title>Booking Confirmed - Bored Tourist</title>
 </head>
-<body width="100%" style="margin: 0; padding: 0 !important; mso-line-height-rule: exactly; background-color: #f7fafc;">
-  <center style="width: 100%; background-color: #f7fafc;">
-    <!--[if mso | IE]>
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f7fafc;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0A0A0A;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; padding: 40px 20px;">
     <tr>
-    <td>
-    <![endif]-->
-    
-    <!-- Email Container -->
-    <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto;" class="email-container">
-      
-      <!-- Hero Section with Gradient -->
-      <tr>
-        <td style="background: linear-gradient(135deg, #0A0A0A 0%, #1F1F1F 100%); padding: 40px 30px; text-align: center; border-radius: 16px 16px 0 0; border-bottom: 3px solid #00FF8C;">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-            <tr>
-              <td style="text-align: center;">
-                <h1 style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 32px; line-height: 40px; color: #00FF8C; font-weight: 700;">
-                  🎉 Reserva Confirmada!
-                </h1>
-                <div style="margin-top: 16px; display: inline-block; background-color: rgba(0,255,140,0.15); padding: 10px 24px; border-radius: 24px; border: 2px solid #00FF8C;">
-                  <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #00FF8C; font-weight: 600; letter-spacing: 0.5px;">
-                    ✅ CONFIRMADO
-                  </span>
-                </div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      
-      <!-- Main Content -->
-      <tr>
-        <td style="background-color: #ffffff; padding: 0;">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-            
-            <!-- Greeting -->
-            <tr>
-              <td style="padding: 40px 30px 20px 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 24px; color: #1a202c;">
-                <p style="margin: 0 0 16px 0;">
-                  Olá <strong style="color: #00FF8C;">${booking.customer_name}</strong>,
-                </p>
-                <p style="margin: 0; color: #4a5568;">
-                  A sua reserva foi confirmada com sucesso! Estamos ansiosos para recebê-lo(a) nesta experiência incrível.
-                </p>
-              </td>
-            </tr>
-            
-            <!-- Experience Card -->
-            <tr>
-              <td style="padding: 0 30px 30px 30px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 4px solid #00FF8C;">
-                  <tr>
-                    <td style="padding: 24px;">
-                      <h2 style="margin: 0 0 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 22px; line-height: 28px; color: #00FF8C; font-weight: 700;">
-                        ${booking.experience_title}
-                      </h2>
-                      <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 20px; color: #718096;">
-                        📍 ${booking.experience_location}
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            
-            <!-- Booking Details -->
-            <tr>
-              <td style="padding: 0 30px 30px 30px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                  
-                  <!-- Booking Reference -->
-                  <tr>
-                    <td style="padding: 16px 0; border-bottom: 1px solid #e2e8f0;">
-                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                        <tr>
-                          <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            Referência
-                          </td>
-                          <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+          
+          <!-- Logo Header -->
+          <tr>
+            <td align="center" style="padding-bottom: 30px;">
+              <h1 style="color: #FFFFFF; font-size: 28px; margin: 0; font-weight: 700;">
+                🎫 Bored Tourist
+              </h1>
+              <p style="color: #A0A0A0; font-size: 14px; margin: 8px 0 0 0;">
+                Your adventure awaits!
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Success Badge -->
+          <tr>
+            <td align="center" style="padding-bottom: 30px;">
+              <div style="display: inline-block; background: linear-gradient(135deg, #00FF8C 0%, #00CC70 100%); color: #000000; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 16px;">
+                ✓ Booking Confirmed!
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Ticket Card -->
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%); border-radius: 20px; overflow: hidden; border: 1px solid #333333;">
+                
+                <!-- Experience Image -->
+                ${booking.experience_image ? `
+                <tr>
+                  <td>
+                    <img src="${booking.experience_image}" alt="${booking.experience_title}" style="width: 100%; height: 200px; object-fit: cover; display: block;">
+                  </td>
+                </tr>
+                ` : ''}
+                
+                <!-- Ticket Content -->
+                <tr>
+                  <td style="padding: 30px;">
+                    
+                    <!-- Experience Title -->
+                    <h2 style="color: #FFFFFF; font-size: 24px; margin: 0 0 8px 0; font-weight: 700;">
+                      ${booking.experience_title}
+                    </h2>
+                    
+                    <!-- Location -->
+                    <p style="color: #A0A0A0; font-size: 14px; margin: 0 0 24px 0;">
+                      📍 ${booking.experience_location || 'Lisbon, Portugal'}
+                    </p>
+                    
+                    <!-- Divider with ticket notch effect -->
+                    <div style="border-top: 2px dashed #444444; margin: 20px -30px; position: relative;">
+                      <div style="position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; background: #0A0A0A; border-radius: 50%;"></div>
+                      <div style="position: absolute; right: -15px; top: -15px; width: 30px; height: 30px; background: #0A0A0A; border-radius: 50%;"></div>
+                    </div>
+                    
+                    <!-- Booking Details Grid -->
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+                      <tr>
+                        <td width="50%" style="padding: 12px 0;">
+                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Date</p>
+                          <p style="color: #FFFFFF; font-size: 15px; margin: 0; font-weight: 600;">📅 ${ticketDate}</p>
+                        </td>
+                        <td width="50%" style="padding: 12px 0;">
+                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Time</p>
+                          <p style="color: #FFFFFF; font-size: 15px; margin: 0; font-weight: 600;">🕐 ${ticketTime}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td width="50%" style="padding: 12px 0;">
+                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Guests</p>
+                          <p style="color: #FFFFFF; font-size: 15px; margin: 0; font-weight: 600;">👥 ${booking.participants} ${booking.participants === 1 ? 'person' : 'people'}</p>
+                        </td>
+                        <td width="50%" style="padding: 12px 0;">
+                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Total Paid</p>
+                          <p style="color: #00FF8C; font-size: 15px; margin: 0; font-weight: 700;">${booking.currency || '€'}${booking.total_amount}</p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <!-- Booking Reference Box -->
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; border-radius: 12px; margin-top: 24px;">
+                      <tr>
+                        <td style="padding: 20px; text-align: center;">
+                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 1px;">Booking Reference</p>
+                          <p style="color: #FFE600; font-size: 24px; margin: 0; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 3px;">
                             ${booking.booking_reference}
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                  
-                  <!-- Date -->
-                  <tr>
-                    <td style="padding: 16px 0; border-bottom: 1px solid #e2e8f0;">
-                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                        <tr>
-                          <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            📅 Data
-                          </td>
-                          <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
-                            ${formatDate(booking.slot_date)}
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                  
-                  <!-- Time -->
-                  <tr>
-                    <td style="padding: 16px 0; border-bottom: 1px solid #e2e8f0;">
-                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                        <tr>
-                          <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            🕐 Time
-                          </td>
-                          <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
-                            ${formatTime(booking.slot_start_time)} - ${formatTime(booking.slot_end_time)}
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                  
-                  <!-- Duration -->
-                  <tr>
-                    <td style="padding: 16px 0; border-bottom: 1px solid #e2e8f0;">
-                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                        <tr>
-                          <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            ⏱️ Duration
-                          </td>
-                          <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
-                            ${booking.experience_duration}
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                  
-                  <!-- Participants -->
-                  <tr>
-                    <td style="padding: 16px 0; border-bottom: 1px solid #e2e8f0;">
-                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                        <tr>
-                          <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #718096; font-weight: 600;">
-                            👥 Participants
-                          </td>
-                          <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1a202c; font-weight: 600;">
-                            ${booking.participants} person${booking.participants > 1 ? 's' : ''}
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                  
-                  <!-- Total Amount -->
-                  <tr>
-                    <td style="padding: 16px 0;">
-                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                        <tr>
-                          <td width="50%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #00FF8C; font-weight: 700;">
-                            💰 Total Amount
-                          </td>
-                          <td width="50%" align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; color: #00FF8C; font-weight: 700;">
-                            ${booking.total_amount}€
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                  
-                </table>
-              </td>
-            </tr>
-            
-            <!-- Important Info Box -->
-            <tr>
-              <td style="padding: 0 30px 30px 30px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef5e7; border-left: 4px solid #f59e0b; border-radius: 8px;">
-                  <tr>
-                    <td style="padding: 20px;">
-                      <p style="margin: 0 0 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #92400e; font-weight: 700;">
-                        📝 Important Information
-                      </p>
-                      <ul style="margin: 0; padding-left: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 22px; color: #78350f;">
-                        <li style="margin-bottom: 8px;">Arrive <strong>15 minutes early</strong> for your scheduled time</li>
-                        <li style="margin-bottom: 8px;">Save this reference: <strong>${booking.booking_reference}</strong></li>
-                        <li>If you have any questions, contact us at <strong>boredtouristt@gmail.com</strong></li>
-                      </ul>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            
-          </table>
-        </td>
-      </tr>
-      
-      <!-- Footer -->
-      <tr>
-        <td style="background-color: #ffffff; padding: 30px; text-align: center; border-radius: 0 0 16px 16px; border-top: 1px solid #e2e8f0;">
-          <p style="margin: 0 0 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #1a202c; font-weight: 600;">
-            Thank you for choosing Bored Tourist! 🎊
-          </p>
-          <p style="margin: 0 0 16px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 20px; color: #718096;">
-            We're here to make your experience unforgettable
-          </p>
-          <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #cbd5e0;">
-            © 2025 Bored Tourist. All rights reserved.
-          </p>
-        </td>
-      </tr>
-      
-      <!-- Spacer -->
-      <tr>
-        <td style="height: 20px; background-color: #f7fafc;"></td>
-      </tr>
-      
-    </table>
-    
-    <!--[if mso | IE]>
-    </td>
+                          </p>
+                          <p style="color: #666666; font-size: 12px; margin: 8px 0 0 0;">
+                            Show this code when you arrive
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Guest Information -->
+          <tr>
+            <td style="padding-top: 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #333333;">
+                <tr>
+                  <td style="padding: 24px;">
+                    <h3 style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">👤 Guest Information</h3>
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="color: #A0A0A0; font-size: 14px;">Name:</span>
+                          <span style="color: #FFFFFF; font-size: 14px; font-weight: 500; margin-left: 8px;">${booking.customer_name}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="color: #A0A0A0; font-size: 14px;">Email:</span>
+                          <span style="color: #FFFFFF; font-size: 14px; font-weight: 500; margin-left: 8px;">${booking.customer_email}</span>
+                        </td>
+                      </tr>
+                      ${booking.customer_phone ? `
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="color: #A0A0A0; font-size: 14px;">Phone:</span>
+                          <span style="color: #FFFFFF; font-size: 14px; font-weight: 500; margin-left: 8px;">${booking.customer_phone}</span>
+                        </td>
+                      </tr>
+                      ` : ''}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Need Help Section -->
+          <tr>
+            <td style="padding-top: 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #333333;">
+                <tr>
+                  <td style="padding: 24px;">
+                    <h3 style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">🆘 Need Help?</h3>
+                    <p style="color: #A0A0A0; font-size: 14px; margin: 0 0 16px 0;">
+                      Questions about your booking? We're here to help!
+                    </p>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <!-- WhatsApp -->
+                      <tr>
+                        <td style="padding: 10px 0;">
+                          <a href="${CONTACT.whatsappLink}" style="color: #00FF8C; text-decoration: none; font-size: 14px; display: block;">
+                            <table cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td style="width: 32px; vertical-align: middle;">
+                                  <span style="font-size: 18px;">📱</span>
+                                </td>
+                                <td style="vertical-align: middle;">
+                                  <span style="color: #A0A0A0;">WhatsApp:</span>
+                                  <span style="color: #00FF8C; font-weight: 600; margin-left: 4px;">${CONTACT.whatsapp}</span>
+                                </td>
+                              </tr>
+                            </table>
+                          </a>
+                        </td>
+                      </tr>
+                      
+                      <!-- Email -->
+                      <tr>
+                        <td style="padding: 10px 0;">
+                          <a href="mailto:${CONTACT.email}" style="color: #00FF8C; text-decoration: none; font-size: 14px; display: block;">
+                            <table cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td style="width: 32px; vertical-align: middle;">
+                                  <span style="font-size: 18px;">✉️</span>
+                                </td>
+                                <td style="vertical-align: middle;">
+                                  <span style="color: #A0A0A0;">Email:</span>
+                                  <span style="color: #00FF8C; font-weight: 600; margin-left: 4px;">${CONTACT.email}</span>
+                                </td>
+                              </tr>
+                            </table>
+                          </a>
+                        </td>
+                      </tr>
+                      
+                      <!-- Meeting Point -->
+                      <tr>
+                        <td style="padding: 10px 0;">
+                          <a href="https://maps.google.com/?q=${encodeURIComponent(booking.experience_location || 'Lisbon, Portugal')}" style="color: #00FF8C; text-decoration: none; font-size: 14px; display: block;">
+                            <table cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td style="width: 32px; vertical-align: middle;">
+                                  <span style="font-size: 18px;">📍</span>
+                                </td>
+                                <td style="vertical-align: middle;">
+                                  <span style="color: #A0A0A0;">Meeting Point:</span>
+                                  <span style="color: #00FF8C; font-weight: 600; margin-left: 4px;">View on Maps</span>
+                                </td>
+                              </tr>
+                            </table>
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Important Info -->
+          <tr>
+            <td style="padding-top: 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #FFE600;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <h3 style="color: #FFE600; font-size: 14px; margin: 0 0 12px 0; font-weight: 600;">⚡ Important Information</h3>
+                    <ul style="color: #A0A0A0; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                      <li>Please arrive <strong style="color: #FFFFFF;">15 minutes before</strong> your scheduled time</li>
+                      <li>Bring a valid <strong style="color: #FFFFFF;">ID document</strong></li>
+                      <li>Show your <strong style="color: #FFE600;">booking reference</strong> when you arrive</li>
+                      <li>Check the weather and dress appropriately</li>
+                    </ul>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top: 40px; text-align: center;">
+              <p style="color: #FFFFFF; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">
+                Thank you for booking with Bored Tourist! 🎉
+              </p>
+              <p style="color: #A0A0A0; font-size: 13px; margin: 0 0 24px 0;">
+                We hope you have an amazing experience!
+              </p>
+              <p style="color: #666666; font-size: 11px; margin: 0;">
+                © ${new Date().getFullYear()} Bored Tourist. All rights reserved.
+              </p>
+              <p style="color: #444444; font-size: 11px; margin: 8px 0 0 0;">
+                Lisbon, Portugal 🇵🇹
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
     </tr>
-    </table>
-    <![endif]-->
-  </center>
+  </table>
 </body>
 </html>
   `;
 }
 
 /**
+ * Generate plain text version of booking confirmation
+ */
+function generateBookingConfirmationText(booking) {
+  const ticketDate = formatDate(booking.slot_date || booking.booking_date);
+  const ticketTime = formatTime(booking.slot_start_time || booking.booking_time);
+  
+  return `
+🎫 BOOKING CONFIRMED - BORED TOURIST
+=====================================
+
+Hello ${booking.customer_name}!
+
+Your booking has been confirmed. Here are the details:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 EXPERIENCE
+${booking.experience_title}
+📍 ${booking.experience_location || 'Lisbon, Portugal'}
+
+📅 DATE & TIME
+${ticketDate} at ${ticketTime}
+
+👥 GUESTS
+${booking.participants} ${booking.participants === 1 ? 'person' : 'people'}
+
+💰 TOTAL PAID
+${booking.currency || '€'}${booking.total_amount}
+
+🎟️ BOOKING REFERENCE
+${booking.booking_reference}
+(Show this code when you arrive)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👤 GUEST INFORMATION
+Name: ${booking.customer_name}
+Email: ${booking.customer_email}
+${booking.customer_phone ? `Phone: ${booking.customer_phone}` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🆘 NEED HELP?
+📱 WhatsApp: ${CONTACT.whatsapp}
+✉️ Email: ${CONTACT.email}
+📍 Meeting Point: ${booking.experience_location || 'Check app for details'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ IMPORTANT INFORMATION
+• Please arrive 15 minutes before your scheduled time
+• Bring a valid ID document
+• Show your booking reference when you arrive
+• Check the weather and dress appropriately
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thank you for booking with Bored Tourist! 🎉
+We hope you have an amazing experience!
+
+© ${new Date().getFullYear()} Bored Tourist
+Lisbon, Portugal 🇵🇹
+  `.trim();
+}
+
+/**
  * Send booking confirmation email
  */
 async function sendBookingConfirmation(booking) {
-  const transporter = createTransporter();
-  
-  if (!transporter) {
-    console.log('⚠️  Email not sent - credentials not configured');
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY not configured. Email not sent.');
     return { success: false, message: 'Email service not configured' };
   }
-  
+
   try {
-    console.log(`📧 Sending booking confirmation to: ${booking.customer_email}`);
+    console.log(`📧 Sending booking confirmation to ${booking.customer_email}...`);
     
-    const mailOptions = {
-      from: {
-        name: 'Bored Tourist',
-        address: process.env.EMAIL_USER
-      },
+    const { data, error } = await resend.emails.send({
+      from: CONTACT.fromEmail,
       to: booking.customer_email,
-      subject: `✅ Booking Confirmed - ${booking.experience_title}`,
+      subject: `✅ Booking Confirmed: ${booking.experience_title} - ${booking.booking_reference}`,
       html: generateBookingConfirmationHTML(booking),
-      // Plain text fallback
-      text: `
-Hello ${booking.customer_name},
+      text: generateBookingConfirmationText(booking),
+    });
 
-Your booking has been confirmed successfully!
+    if (error) {
+      console.error('❌ Resend error:', error);
+      return { success: false, message: error.message };
+    }
 
-Experience: ${booking.experience_title}
-Reference: ${booking.booking_reference}
-Date: ${formatDate(booking.slot_date)}
-Time: ${formatTime(booking.slot_start_time)} - ${formatTime(booking.slot_end_time)}
-Participants: ${booking.participants}
-Total Amount: ${booking.total_amount}€
-
-Please arrive 15 minutes before your scheduled time.
-
-Thank you for choosing Bored Tourist!
-      `
-    };
+    console.log(`✅ Booking confirmation email sent! ID: ${data.id}`);
+    return { success: true, message: 'Email sent successfully', emailId: data.id };
     
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully! Message ID: ${info.messageId}`);
-    
-    return { 
-      success: true, 
-      message: 'Email sent successfully',
-      messageId: info.messageId 
-    };
   } catch (error) {
-    console.error('❌ Error sending email:', error);
-    return { 
-      success: false, 
-      message: error.message 
-    };
+    console.error('❌ Error sending booking confirmation:', error);
+    return { success: false, message: error.message };
   }
+}
+
+/**
+ * Generate HTML for cancellation email
+ */
+function generateCancellationHTML(booking) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Cancelled - Bored Tourist</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0A0A0A;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+          
+          <!-- Logo Header -->
+          <tr>
+            <td align="center" style="padding-bottom: 30px;">
+              <h1 style="color: #FFFFFF; font-size: 28px; margin: 0; font-weight: 700;">
+                🎫 Bored Tourist
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Cancellation Badge -->
+          <tr>
+            <td align="center" style="padding-bottom: 30px;">
+              <div style="display: inline-block; background: #FF3B30; color: #FFFFFF; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 16px;">
+                ❌ Booking Cancelled
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Content Card -->
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 20px; border: 1px solid #333333;">
+                <tr>
+                  <td style="padding: 30px;">
+                    <p style="color: #FFFFFF; font-size: 16px; margin: 0 0 20px 0;">
+                      Hello <strong>${booking.customer_name}</strong>,
+                    </p>
+                    
+                    <p style="color: #A0A0A0; font-size: 14px; margin: 0 0 24px 0;">
+                      Your booking has been cancelled as requested.
+                    </p>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; border-radius: 12px;">
+                      <tr>
+                        <td style="padding: 20px;">
+                          <p style="color: #A0A0A0; font-size: 12px; margin: 0 0 4px 0; text-transform: uppercase;">REFERENCE</p>
+                          <p style="color: #FF3B30; font-size: 18px; margin: 0 0 16px 0; font-weight: 600; font-family: monospace;">${booking.booking_reference}</p>
+                          
+                          <p style="color: #A0A0A0; font-size: 12px; margin: 0 0 4px 0; text-transform: uppercase;">EXPERIENCE</p>
+                          <p style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0;">${booking.experience_title}</p>
+                          
+                          <p style="color: #A0A0A0; font-size: 12px; margin: 0 0 4px 0; text-transform: uppercase;">DATE</p>
+                          <p style="color: #FFFFFF; font-size: 16px; margin: 0;">${formatDate(booking.slot_date || booking.booking_date)}</p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <p style="color: #A0A0A0; font-size: 14px; margin: 24px 0 0 0;">
+                      If you have any questions about your refund, please contact us.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Help Section -->
+          <tr>
+            <td style="padding-top: 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #333333;">
+                <tr>
+                  <td style="padding: 24px;">
+                    <h3 style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">🆘 Need Help?</h3>
+                    <p style="color: #A0A0A0; font-size: 14px; margin: 0;">
+                      📱 <a href="${CONTACT.whatsappLink}" style="color: #00FF8C; text-decoration: none;">WhatsApp: ${CONTACT.whatsapp}</a>
+                    </p>
+                    <p style="color: #A0A0A0; font-size: 14px; margin: 8px 0 0 0;">
+                      ✉️ <a href="mailto:${CONTACT.email}" style="color: #00FF8C; text-decoration: none;">${CONTACT.email}</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top: 40px; text-align: center;">
+              <p style="color: #A0A0A0; font-size: 13px; margin: 0 0 8px 0;">
+                We hope to see you again soon!
+              </p>
+              <p style="color: #666666; font-size: 11px; margin: 0;">
+                © ${new Date().getFullYear()} Bored Tourist. All rights reserved.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
 }
 
 /**
  * Send booking cancellation email
  */
 async function sendBookingCancellation(booking) {
-  const transporter = createTransporter();
-  
-  if (!transporter) {
-    console.log('⚠️  Email not sent - credentials not configured');
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY not configured. Email not sent.');
     return { success: false, message: 'Email service not configured' };
   }
-  
+
   try {
-    console.log(`📧 Sending cancellation email to: ${booking.customer_email}`);
+    console.log(`📧 Sending cancellation email to ${booking.customer_email}...`);
     
-    const mailOptions = {
-      from: {
-        name: 'Bored Tourist',
-        address: process.env.EMAIL_USER
-      },
+    const { data, error } = await resend.emails.send({
+      from: CONTACT.fromEmail,
       to: booking.customer_email,
-      subject: `❌ Reserva Cancelada - ${booking.experience_title}`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }
-    .container {
-      background-color: white;
-      border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .header {
-      text-align: center;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #FF3B30;
-    }
-    .header h1 {
-      color: #FF3B30;
-      margin: 0;
-    }
-    .status-badge {
-      display: inline-block;
-      background-color: #FF3B30;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 14px;
-      margin-top: 10px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Reserva Cancelada</h1>
-      <div class="status-badge">❌ CANCELADO</div>
-    </div>
-    <p>Olá <strong>${booking.customer_name}</strong>,</p>
-    <p>A sua reserva foi cancelada conforme solicitado.</p>
-    <p><strong>Referência:</strong> ${booking.booking_reference}</p>
-    <p><strong>Experiência:</strong> ${booking.experience_title}</p>
-    <p><strong>Data:</strong> ${formatDate(booking.slot_date)}</p>
-    <p>Se tiver alguma dúvida, não hesite em contactar-nos.</p>
-    <p>Esperamos vê-lo(a) em breve!</p>
-    <p style="margin-top: 30px; color: #999; font-size: 12px;">Bored Tourist Team</p>
-  </div>
-</body>
-</html>
-      `,
+      subject: `❌ Booking Cancelled: ${booking.experience_title} - ${booking.booking_reference}`,
+      html: generateCancellationHTML(booking),
       text: `
-Olá ${booking.customer_name},
+Hello ${booking.customer_name},
 
-A sua reserva foi cancelada.
+Your booking has been cancelled.
 
-Referência: ${booking.booking_reference}
-Experiência: ${booking.experience_title}
-Data: ${formatDate(booking.slot_date)}
+Reference: ${booking.booking_reference}
+Experience: ${booking.experience_title}
+Date: ${formatDate(booking.slot_date || booking.booking_date)}
 
-Esperamos vê-lo(a) em breve!
+If you have any questions about your refund, please contact us:
+📱 WhatsApp: ${CONTACT.whatsapp}
+✉️ Email: ${CONTACT.email}
+
+We hope to see you again soon!
 
 Bored Tourist Team
-      `
-    };
+      `.trim(),
+    });
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+      return { success: false, message: error.message };
+    }
+
+    console.log(`✅ Cancellation email sent! ID: ${data.id}`);
+    return { success: true, message: 'Email sent successfully', emailId: data.id };
     
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Cancellation email sent! Message ID: ${info.messageId}`);
-    
-    return { 
-      success: true, 
-      message: 'Email sent successfully',
-      messageId: info.messageId 
-    };
   } catch (error) {
     console.error('❌ Error sending cancellation email:', error);
-    return { 
-      success: false, 
-      message: error.message 
-    };
+    return { success: false, message: error.message };
   }
 }
 

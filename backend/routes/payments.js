@@ -6,6 +6,9 @@
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const db = require('../db');
+const stripeService = require('../services/stripeService');
+const emailService = require('../services/emailService');
 
 /**
  * POST /api/payments/create-intent
@@ -94,6 +97,35 @@ router.post('/confirm', async (req, res) => {
         [bookingId, paymentIntentId]
       );
 
+      // Fetch complete booking data for email
+      const booking = await db.get(
+        `SELECT b.*, 
+                e.title as experience_title,
+                e.location as experience_location,
+                e.duration as experience_duration,
+                e.image_url as experience_image,
+                s.slot_date,
+                s.start_time as slot_start_time,
+                s.end_time as slot_end_time
+         FROM bookings b
+         LEFT JOIN experiences e ON b.experience_id = e.id
+         LEFT JOIN slots s ON b.slot_id = s.id
+         WHERE b.id = ?`,
+        [bookingId]
+      );
+
+      // Send confirmation email
+      if (booking && booking.customer_email) {
+        try {
+          console.log('📧 Sending booking confirmation email to:', booking.customer_email);
+          await emailService.sendBookingConfirmation(booking);
+          console.log('✅ Booking confirmation email sent successfully');
+        } catch (emailError) {
+          // Don't fail the payment confirmation if email fails
+          console.error('⚠️ Failed to send confirmation email:', emailError.message);
+        }
+      }
+
       res.json({
         success: true,
         message: 'Payment confirmed successfully',
@@ -145,6 +177,32 @@ router.post('/webhook', async (req, res) => {
             [bookingId, paymentIntent.id]
           );
           console.log(`✅ Payment succeeded for booking ${bookingId}`);
+
+          // Send confirmation email
+          try {
+            const booking = await db.get(
+              `SELECT b.*, 
+                      e.title as experience_title,
+                      e.location as experience_location,
+                      e.duration as experience_duration,
+                      e.image_url as experience_image,
+                      s.slot_date,
+                      s.start_time as slot_start_time,
+                      s.end_time as slot_end_time
+               FROM bookings b
+               LEFT JOIN experiences e ON b.experience_id = e.id
+               LEFT JOIN slots s ON b.slot_id = s.id
+               WHERE b.id = ?`,
+              [bookingId]
+            );
+            
+            if (booking && booking.customer_email) {
+              await emailService.sendBookingConfirmation(booking);
+              console.log(`📧 Confirmation email sent for booking ${bookingId}`);
+            }
+          } catch (emailError) {
+            console.error('⚠️ Failed to send confirmation email:', emailError.message);
+          }
         }
         break;
 

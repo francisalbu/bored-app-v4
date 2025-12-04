@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Star, Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
@@ -30,7 +30,7 @@ export default function InterestScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [name, setName] = useState(user?.user_metadata?.name || '');
+  const [name, setName] = useState((user as any)?.user_metadata?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
@@ -173,8 +173,6 @@ export default function InterestScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Stack.Screen options={{ headerShown: false }} />
-      
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -396,7 +394,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    fontFamily: typography.fonts.medium,
+    fontFamily: typography.fonts.semibold,
     color: colors.dark.text,
     marginBottom: 8,
     marginTop: 16,

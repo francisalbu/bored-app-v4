@@ -1,5 +1,5 @@
 import { Calendar, Clock, MapPin, RefreshCw, X, Star } from 'lucide-react-native';
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,8 +8,6 @@ import {
   StyleSheet,
   Text,
   View,
-  FlatList,
-  Dimensions,
   Linking,
   Modal,
   TextInput,
@@ -19,9 +17,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import apiService from '@/services/api';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 32; // 16px margin on each side
 
 import colors from '@/constants/colors';
 import { useBookings, type Booking } from '@/contexts/BookingsContext';
@@ -39,8 +34,6 @@ export default function BookingsScreen() {
   const { upcomingBookings, pastBookings, isLoading, refreshBookings, cancelBooking } = useBookings();
   const [filter, setFilter] = useState<BookingFilter>('upcoming');
   const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const [currentTicketIndex, setCurrentTicketIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<Booking | null>(null);
 
@@ -191,53 +184,22 @@ export default function BookingsScreen() {
           </Pressable>
         </View>
       ) : filter === 'upcoming' ? (
-        // Carousel view for upcoming bookings (GetYourGuide style)
-        <View style={styles.carouselContainer}>
-          {filteredBookings.length > 1 && (
-            <View style={styles.pageIndicator}>
-              <Text style={styles.pageIndicatorText}>
-                {currentTicketIndex + 1}/{filteredBookings.length}
-              </Text>
-            </View>
-          )}
-          {filteredBookings.length === 1 ? (
-            // Single booking - centered
-            <View style={styles.singleBookingContainer}>
-              <BookingCard 
-                booking={filteredBookings[0]}
-                onCancel={handleCancelBooking}
-                isCancelling={cancellingId === filteredBookings[0].id}
-                onWriteReview={handleOpenReviewModal}
-              />
-            </View>
-          ) : (
-            // Multiple bookings - carousel
-            <FlatList
-              ref={flatListRef}
-              data={filteredBookings}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              snapToAlignment="center"
-              decelerationRate="fast"
-              onMomentumScrollEnd={(event) => {
-                const index = Math.round(event.nativeEvent.contentOffset.x / CARD_WIDTH);
-                setCurrentTicketIndex(index);
-              }}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <View style={styles.carouselItem}>
-                  <BookingCard 
-                    booking={item}
-                    onCancel={handleCancelBooking}
-                    isCancelling={cancellingId === item.id}
-                    onWriteReview={handleOpenReviewModal}
-                  />
-                </View>
-              )}
+        // Scroll view for upcoming bookings
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredBookings.map((booking) => (
+            <BookingCard 
+              key={booking.id} 
+              booking={booking}
+              onCancel={handleCancelBooking}
+              isCancelling={cancellingId === booking.id}
+              onWriteReview={handleOpenReviewModal}
             />
-          )}
-        </View>
+          ))}
+        </ScrollView>
       ) : (
         // Regular scroll view for past bookings
         <ScrollView
@@ -299,152 +261,139 @@ function BookingCard({ booking, onCancel, isCancelling, onWriteReview }: Booking
   const isUpcoming = activityEndDateTime >= new Date() && booking.status !== 'cancelled';
   const isCancelled = booking.status === 'cancelled';
 
-  // Get experience details for better images
-  const experience = require('@/constants/experiences').EXPERIENCES.find(
-    (exp: any) => exp.id === booking.experience_id.toString()
-  );
-
   return (
-    <Pressable style={styles.card}>
-      {/* Ticket notches */}
-      <View style={styles.ticketNotchLeft} />
-      <View style={styles.ticketNotchRight} />
-      
-      <Image
-        source={experience?.images?.[0] || { uri: booking.experience_image }}
-        style={styles.cardImage}
-        contentFit="cover"
-      />
-      
-      {/* Provider Logo as small profile picture */}
-      {experience?.providerLogo && (
-        <View style={styles.providerLogoContainer}>
-          <Image
-            source={experience.providerLogo}
-            style={styles.providerLogo}
-            contentFit="contain"
-          />
+    <View style={styles.bookingContainer}>
+      {/* Main Ticket Card */}
+      <View style={styles.card}>
+        {/* Ticket notches */}
+        <View style={styles.ticketNotchLeft} />
+        <View style={styles.ticketNotchRight} />
+        
+        <Image
+          source={{ uri: booking.experience_image }}
+          style={styles.cardImage}
+          contentFit="cover"
+        />
+        
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <View style={[
+              styles.statusBadge,
+              isCancelled && styles.statusBadgeCancelled
+            ]}>
+              <Text style={styles.statusText}>
+                {isCancelled ? '❌ Cancelled' : isUpcoming ? '⏱️ Upcoming' : '✅ Completed'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.cardTitle}>{booking.experience_title}</Text>
+          <Text style={styles.cardProvider}>{booking.experience_location}</Text>
+
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailRow}>
+              <Calendar size={16} color={colors.dark.textSecondary} />
+              <Text style={styles.detailText}>{formattedDate}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Clock size={16} color={colors.dark.textSecondary} />
+              <Text style={styles.detailText}>
+                {booking.slot_start_time || booking.booking_time || 'Time TBD'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <MapPin size={16} color={colors.dark.textSecondary} />
+              <Text style={styles.detailText} numberOfLines={1}>{booking.experience_location}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.guestsText}>
+                👥 {booking.participants} {booking.participants === 1 ? 'person' : 'people'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.cardFooter}>
+            <View>
+              <Text style={styles.referenceLabel}>Booking Reference</Text>
+              <Text style={styles.referenceText}>{booking.booking_reference}</Text>
+            </View>
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceLabel}>Total</Text>
+              <Text style={styles.price}>
+                {booking.currency}{booking.total_amount}
+              </Text>
+            </View>
+          </View>
+
+          {isUpcoming && !isCancelled && (
+            <Pressable 
+              style={styles.cancelLink}
+              onPress={() => onCancel(booking.id, booking.experience_title || 'this booking')}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <ActivityIndicator size="small" color={colors.dark.textTertiary} />
+              ) : (
+                <Text style={styles.cancelLinkText}>Cancel my booking</Text>
+              )}
+            </Pressable>
+          )}
+
+          {!isUpcoming && !isCancelled && onWriteReview && (
+            <Pressable style={styles.reviewButton} onPress={() => onWriteReview(booking)}>
+              <Text style={styles.reviewButtonText}>Write a Review</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      {/* Help & Contact Section - Separate card below */}
+      {isUpcoming && !isCancelled && (
+        <View style={styles.helpCard}>
+          <Text style={styles.helpTitle}>Need Help?</Text>
+          
+          <Pressable 
+            style={styles.helpItem}
+            onPress={() => {
+              Linking.openURL('https://wa.me/351967407859');
+            }}
+          >
+            <Text style={styles.helpIcon}>📱</Text>
+            <View style={styles.helpTextContainer}>
+              <Text style={styles.helpLabel}>Contact via WhatsApp</Text>
+              <Text style={styles.helpValue}>+351 967 407 859</Text>
+            </View>
+          </Pressable>
+
+          <Pressable 
+            style={styles.helpItem}
+            onPress={() => {
+              const address = encodeURIComponent(booking.experience_location || 'Lisbon, Portugal');
+              Linking.openURL(`https://maps.google.com/?q=${address}`);
+            }}
+          >
+            <Text style={styles.helpIcon}>📍</Text>
+            <View style={styles.helpTextContainer}>
+              <Text style={styles.helpLabel}>Meeting Point</Text>
+              <Text style={styles.helpValue} numberOfLines={1}>{booking.experience_location}</Text>
+            </View>
+          </Pressable>
+
+          <Pressable 
+            style={styles.helpItem}
+            onPress={() => {
+              Linking.openURL('mailto:bookings@boredtourist.com');
+            }}
+          >
+            <Text style={styles.helpIcon}>✉️</Text>
+            <View style={styles.helpTextContainer}>
+              <Text style={styles.helpLabel}>Email Support</Text>
+              <Text style={styles.helpValue}>bookings@boredtourist.com</Text>
+            </View>
+          </Pressable>
         </View>
       )}
-      
-      <View style={styles.cardContent}>
-        <View style={styles.cardHeader}>
-          <View style={[
-            styles.statusBadge,
-            isCancelled && styles.statusBadgeCancelled
-          ]}>
-            <Text style={styles.statusText}>
-              {isCancelled ? `❌ ${t('booking.cancelled')}` : isUpcoming ? `⏱️ ${t('booking.upcoming')}` : t('booking.completed')}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.cardTitle}>{booking.experience_title}</Text>
-        <Text style={styles.cardProvider}>{booking.experience_location}</Text>
-
-        <View style={styles.detailsContainer}>
-          <View style={styles.detailRow}>
-            <Calendar size={16} color={colors.dark.textSecondary} />
-            <Text style={styles.detailText}>{formattedDate}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Clock size={16} color={colors.dark.textSecondary} />
-            <Text style={styles.detailText}>
-              {booking.slot_start_time || booking.booking_time || 'Time TBD'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <MapPin size={16} color={colors.dark.textSecondary} />
-            <Text style={styles.detailText}>{booking.experience_location}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailText}>
-              👥 {booking.participants} {booking.participants === 1 ? t('booking.person') : t('booking.people')}
-            </Text>
-          </View>
-        </View>
-
-        {/* Help & Contact Section */}
-        {isUpcoming && !isCancelled && (
-          <View style={styles.helpSection}>
-            <Text style={styles.helpTitle}>{t('booking.needHelp')}</Text>
-            
-            <Pressable 
-              style={styles.helpItem}
-              onPress={() => {
-                Linking.openURL('https://wa.me/351912345678');
-              }}
-            >
-              <Text style={styles.helpIcon}>📱</Text>
-              <View style={styles.helpTextContainer}>
-                <Text style={styles.helpLabel}>{t('booking.contactWhatsApp')}</Text>
-                <Text style={styles.helpValue}>+351 912 345 678</Text>
-              </View>
-            </Pressable>
-
-            <Pressable 
-              style={styles.helpItem}
-              onPress={() => {
-                const address = encodeURIComponent(booking.experience_location || 'Lisbon, Portugal');
-                Linking.openURL(`https://maps.google.com/?q=${address}`);
-              }}
-            >
-              <Text style={styles.helpIcon}>📍</Text>
-              <View style={styles.helpTextContainer}>
-                <Text style={styles.helpLabel}>{t('booking.meetingPoint')}</Text>
-                <Text style={styles.helpValue}>{booking.experience_location}</Text>
-              </View>
-            </Pressable>
-
-            <Pressable 
-              style={styles.helpItem}
-              onPress={() => {
-                Linking.openURL('mailto:support@boredtourist.com');
-              }}
-            >
-              <Text style={styles.helpIcon}>✉️</Text>
-              <View style={styles.helpTextContainer}>
-                <Text style={styles.helpLabel}>{t('booking.emailSupport')}</Text>
-                <Text style={styles.helpValue}>support@boredtourist.com</Text>
-              </View>
-            </Pressable>
-          </View>
-        )}
-
-        <View style={styles.cardFooter}>
-          <View>
-            <Text style={styles.referenceLabel}>{t('booking.bookingReference')}</Text>
-            <Text style={styles.referenceText}>{booking.booking_reference}</Text>
-          </View>
-          <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>{t('booking.total')}</Text>
-            <Text style={styles.price}>
-              {booking.currency}{booking.total_amount}
-            </Text>
-          </View>
-        </View>
-
-        {isUpcoming && !isCancelled && (
-          <Pressable 
-            style={styles.cancelLink}
-            onPress={() => onCancel(booking.id, booking.experience_title || 'this booking')}
-            disabled={isCancelling}
-          >
-            {isCancelling ? (
-              <ActivityIndicator size="small" color={colors.dark.textTertiary} />
-            ) : (
-              <Text style={styles.cancelLinkText}>{t('booking.cancelMyBooking')}</Text>
-            )}
-          </Pressable>
-        )}
-
-        {!isUpcoming && !isCancelled && onWriteReview && (
-          <Pressable style={styles.reviewButton} onPress={() => onWriteReview(booking)}>
-            <Text style={styles.reviewButtonText}>{t('booking.writeReview')}</Text>
-          </Pressable>
-        )}
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -906,33 +855,48 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
-  carouselContainer: {
+  bookingContainer: {
+    marginBottom: 8,
+  },
+  guestsText: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+  },
+  helpCard: {
+    backgroundColor: colors.dark.backgroundSecondary,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
+  },
+  helpTitle: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 16,
+  },
+  helpItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
+  },
+  helpIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  helpTextContainer: {
     flex: 1,
   },
-  pageIndicator: {
-    position: 'absolute',
-    top: 16,
-    right: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    zIndex: 10,
+  helpLabel: {
+    fontSize: 12,
+    color: colors.dark.textTertiary,
+    marginBottom: 2,
   },
-  pageIndicatorText: {
-    fontSize: 13,
+  helpValue: {
+    fontSize: 14,
     fontWeight: '600' as const,
-    color: '#FFFFFF',
-  },
-  carouselItem: {
-    width: CARD_WIDTH,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  singleBookingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
+    color: colors.dark.primary,
   },
   loginEmptyState: {
     flex: 1,
@@ -998,44 +962,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600' as const,
     color: colors.dark.text,
-  },
-  helpSection: {
-    marginTop: 16,
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: colors.dark.backgroundTertiary,
-    borderRadius: 12,
-    gap: 12,
-  },
-  helpTitle: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-    marginBottom: 4,
-  },
-  helpItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-  },
-  helpIcon: {
-    fontSize: 24,
-    width: 32,
-    textAlign: 'center',
-  },
-  helpTextContainer: {
-    flex: 1,
-  },
-  helpLabel: {
-    fontSize: 12,
-    color: colors.dark.textTertiary,
-    marginBottom: 2,
-  },
-  helpValue: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: colors.dark.primary,
   },
   // Review Modal Styles
   reviewModalOverlay: {

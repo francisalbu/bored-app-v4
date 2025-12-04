@@ -263,20 +263,22 @@ export default function FeedScreen() {
             </Text>
           </Pressable>
           
-          <Pressable 
-            style={[
-              styles.filterButton,
-              selectedFilter === 'availableToday' && styles.filterButtonActive
-            ]}
-            onPress={() => setSelectedFilter('availableToday')}
-          >
-            <Text style={[
-              styles.filterText,
-              selectedFilter === 'availableToday' && styles.filterTextActive
-            ]}>
-              {t('feed.availableToday')}
-            </Text>
-          </Pressable>
+          <View style={styles.filterButtonDisabledContainer}>
+            <View 
+              style={[
+                styles.filterButton,
+                styles.filterButtonDisabled
+              ]}
+            >
+              <Text style={[
+                styles.filterText,
+                styles.filterTextDisabled
+              ]}>
+                {t('feed.availableToday')}
+              </Text>
+              <Text style={styles.comingSoonText}>coming soon</Text>
+            </View>
+          </View>
         </BlurView>
       </View>
 
@@ -580,6 +582,22 @@ const styles = StyleSheet.create({
   },
   filterButtonActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  filterButtonDisabledContainer: {
+    position: 'relative' as const,
+  },
+  filterButtonDisabled: {
+    opacity: 0.8,
+    alignItems: 'center' as const,
+  },
+  filterTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  comingSoonText: {
+    color: '#FF8C00',
+    fontSize: 10,
+    fontWeight: '600' as const,
+    marginTop: 2,
   },
   filterText: {
     color: 'rgba(255, 255, 255, 0.7)',

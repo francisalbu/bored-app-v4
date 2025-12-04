@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Star } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -128,12 +128,6 @@ export default function ConfirmBookingScreen() {
               <Text style={styles.experienceTitle} numberOfLines={2}>
                 {experience.title}
               </Text>
-              <View style={styles.ratingRow}>
-                <Star size={14} color={colors.dark.primary} fill={colors.dark.primary} />
-                <Text style={styles.ratingText}>
-                  {experience.rating} ({experience.reviewCount})
-                </Text>
-              </View>
             </View>
           </View>
 

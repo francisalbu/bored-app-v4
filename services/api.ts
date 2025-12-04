@@ -40,6 +40,9 @@ class ApiService {
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
+      console.log('🔑 Auth token present:', this.token.substring(0, 20) + '...');
+    } else {
+      console.log('⚠️ No auth token set!');
     }
 
     const maxRetries = 2;
@@ -184,7 +187,7 @@ class ApiService {
   }
 
   async getMyBookings() {
-    return this.request('/bookings/my');
+    return this.request('/bookings');
   }
 
   async getBooking(id: string) {

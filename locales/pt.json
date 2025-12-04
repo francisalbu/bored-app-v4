@@ -223,7 +223,10 @@
     "noTimeSlotsAvailable": "Sem horários disponíveis nos próximos 5 dias a partir da data selecionada.",
     "selectDifferentDate": "Por favor selecione outra data",
     "bookingCancelled": "Reserva cancelada com sucesso",
-    "cancellationFailed": "Falha ao cancelar reserva"
+    "cancellationFailed": "Falha ao cancelar reserva",
+    "cancelMyBooking": "Cancelar a minha reserva",
+    "total": "Total",
+    "writeReview": "Escrever uma Avaliação"
   },
   "payment": {
     "title": "Confirmar e Pagar",
