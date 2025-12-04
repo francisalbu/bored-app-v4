@@ -20,6 +20,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { X } from 'lucide-react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import colors from '@/constants/colors';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -179,7 +180,75 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
   };
 
   const handleAppleSignIn = async () => {
-    Alert.alert('Coming Soon', 'Apple sign in will be available soon!');
+    try {
+      setLoadingProvider('apple');
+      setIsLoading(true);
+
+      console.log('=== STARTING APPLE SIGN-IN ===');
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      console.log('Apple credential received:', {
+        user: credential.user,
+        email: credential.email,
+        fullName: credential.fullName,
+      });
+
+      if (credential.identityToken) {
+        console.log('🔑 Signing in with Supabase using Apple token...');
+        
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: credential.identityToken,
+        });
+
+        if (error) {
+          console.error('❌ Supabase Apple sign-in error:', error);
+          throw error;
+        }
+
+        console.log('✅ Apple sign-in successful!', data.user?.email);
+        
+        // Update user name if provided (Apple only gives name on first sign-in)
+        if (credential.fullName?.givenName || credential.fullName?.familyName) {
+          const fullName = [credential.fullName.givenName, credential.fullName.familyName]
+            .filter(Boolean)
+            .join(' ');
+          
+          if (fullName) {
+            await supabase.auth.updateUser({
+              data: { name: fullName }
+            });
+          }
+        }
+
+        setShowSigningIn(true);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setShowSigningIn(false);
+        onClose();
+        if (onSuccess) onSuccess();
+      } else {
+        throw new Error('No identity token received from Apple');
+      }
+    } catch (error: any) {
+      console.error('=== APPLE SIGN-IN ERROR ===');
+      console.error(error);
+      
+      if (error.code === 'ERR_REQUEST_CANCELED') {
+        // User cancelled, don't show error
+        console.log('User cancelled Apple sign-in');
+      } else {
+        Alert.alert('Erro', error.message || 'Falha ao entrar com Apple');
+      }
+    } finally {
+      setIsLoading(false);
+      setLoadingProvider(null);
+    }
   };
 
   const handleFacebookSignIn = async () => {
@@ -328,14 +397,23 @@ export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBot
 
                 {/* Social Sign In Buttons */}
                 <View style={styles.socialButtons}>
-                  {/* Apple Sign In - TEMPORARILY DISABLED */}
-                  <Pressable
-                    style={[styles.socialButton, styles.appleButton, { opacity: 0.5 }]}
-                    disabled={true}
-                  >
-                    <Text style={styles.appleIcon}></Text>
-                    <Text style={styles.socialButtonText}>Continue with Apple (coming soon)</Text>
-                  </Pressable>
+                  {/* Apple Sign In - iOS only */}
+                  {Platform.OS === 'ios' && (
+                    <Pressable
+                      style={[styles.socialButton, styles.appleButton]}
+                      onPress={handleAppleSignIn}
+                      disabled={isLoading}
+                    >
+                      {loadingProvider === 'apple' ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Text style={styles.appleIcon}></Text>
+                          <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  )}
 
                   {/* Google Sign In */}
                   <Pressable

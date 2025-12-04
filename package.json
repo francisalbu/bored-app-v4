@@ -31,6 +31,7 @@
     "@xmldom/xmldom": "^0.8.11",
     "axios": "^1.13.2",
     "expo": "^54.0.25",
+    "expo-apple-authentication": "^8.0.7",
     "expo-auth-session": "^7.0.9",
     "expo-av": "^16.0.7",
     "expo-blur": "~15.0.7",
