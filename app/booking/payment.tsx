@@ -529,14 +529,8 @@ export default function PaymentScreen() {
       // Navigate to bookings tab to show the ticket
       const navigateToBookings = () => {
         console.log('🔵 [PAYMENT] Navigating to bookings tab...');
-        // Go back to root and then to bookings tab
-        while (router.canGoBack()) {
-          router.back();
-        }
-        // Small delay to ensure navigation stack is cleared
-        setTimeout(() => {
-          router.push('/(tabs)/bookings');
-        }, 100);
+        // Use replace to go directly to bookings, clearing navigation stack
+        router.replace('/(tabs)/bookings');
       };
 
       // Show success message
