@@ -502,7 +502,20 @@ export default function PaymentScreen() {
       // Payment and booking complete - stop processing
       setIsProcessing(false);
 
-      // Show success message with account creation prompt for guests
+      // Navigate to bookings tab to show the ticket
+      const navigateToBookings = () => {
+        console.log('🔵 [PAYMENT] Navigating to bookings tab...');
+        // Go back to root and then to bookings tab
+        while (router.canGoBack()) {
+          router.back();
+        }
+        // Small delay to ensure navigation stack is cleared
+        setTimeout(() => {
+          router.push('/(tabs)/bookings');
+        }, 100);
+      };
+
+      // Show success message
       if (isGuest) {
         Alert.alert(
           '✅ Booking Confirmed!',
@@ -511,12 +524,11 @@ export default function PaymentScreen() {
             { 
               text: 'Maybe Later', 
               style: 'cancel',
-              onPress: () => router.push('/(tabs)/index' as any)
+              onPress: navigateToBookings
             },
             { 
               text: 'Create Account', 
               onPress: () => {
-                // Open auth sheet with Google OAuth option
                 setShowAuthSheet(true);
               }
             }
@@ -527,8 +539,8 @@ export default function PaymentScreen() {
           'Payment Successful!',
           'Your booking is confirmed. Check your email for details.',
           [{ 
-            text: 'OK', 
-            onPress: () => router.push('/(tabs)/bookings' as any)
+            text: 'View Ticket', 
+            onPress: navigateToBookings
           }]
         );
       }
