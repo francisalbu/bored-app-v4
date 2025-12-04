@@ -195,7 +195,7 @@ export default function RootLayout() {
       <LanguageProvider>
         <StripeProvider
           publishableKey={STRIPE_PUBLISHABLE_KEY}
-          urlScheme="boredtravel"
+          urlScheme="boredtourist"
           merchantIdentifier="merchant.app.rork.bored-explorer"
         >
           <AuthProvider>
