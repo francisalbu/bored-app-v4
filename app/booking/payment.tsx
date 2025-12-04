@@ -1,6 +1,6 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Star, ChevronDown } from 'lucide-react-native';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -86,6 +86,16 @@ export default function PaymentScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  
+  // Reset processing state when screen comes into focus (in case user navigated back)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 [PAYMENT] Screen focused - resetting state');
+      setIsProcessing(false);
+      setClientSecret(null);
+      setBookingId(null);
+    }, [])
+  );
   
   // Early access confirmation modal
   const [showEarlyAccessModal, setShowEarlyAccessModal] = useState(false);
