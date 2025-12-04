@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const db = require('../db');
+const { from } = require('../config/database');
 const stripeService = require('../services/stripeService');
 const emailService = require('../services/emailService');
 
@@ -87,38 +87,47 @@ router.post('/confirm', async (req, res) => {
     const paymentStatus = await stripeService.getPaymentIntent(paymentIntentId);
 
     if (paymentStatus.status === 'succeeded') {
-      // Update booking as paid
-      await db.run(
-        `UPDATE bookings 
-         SET payment_status = 'paid',
-             status = 'confirmed',
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND payment_intent_id = ?`,
-        [bookingId, paymentIntentId]
-      );
+      // Update booking as paid using Supabase
+      const { error: updateError } = await from('bookings')
+        .update({
+          payment_status: 'paid',
+          status: 'confirmed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId)
+        .eq('payment_intent_id', paymentIntentId);
+
+      if (updateError) {
+        console.error('❌ Error updating booking:', updateError);
+      }
 
       // Fetch complete booking data for email
-      const booking = await db.get(
-        `SELECT b.*, 
-                e.title as experience_title,
-                e.location as experience_location,
-                e.duration as experience_duration,
-                e.image_url as experience_image,
-                s.slot_date,
-                s.start_time as slot_start_time,
-                s.end_time as slot_end_time
-         FROM bookings b
-         LEFT JOIN experiences e ON b.experience_id = e.id
-         LEFT JOIN slots s ON b.slot_id = s.id
-         WHERE b.id = ?`,
-        [bookingId]
-      );
+      const { data: booking, error: fetchError } = await from('bookings')
+        .select(`
+          *,
+          experiences(title, location, duration, image_url),
+          availability_slots(date, start_time, end_time)
+        `)
+        .eq('id', bookingId)
+        .single();
+
+      // Transform for email service
+      const bookingForEmail = booking ? {
+        ...booking,
+        experience_title: booking.experiences?.title,
+        experience_location: booking.experiences?.location,
+        experience_duration: booking.experiences?.duration,
+        experience_image: booking.experiences?.image_url,
+        slot_date: booking.availability_slots?.date,
+        slot_start_time: booking.availability_slots?.start_time,
+        slot_end_time: booking.availability_slots?.end_time,
+      } : null;
 
       // Send confirmation email
-      if (booking && booking.customer_email) {
+      if (bookingForEmail && bookingForEmail.customer_email) {
         try {
-          console.log('📧 Sending booking confirmation email to:', booking.customer_email);
-          await emailService.sendBookingConfirmation(booking);
+          console.log('📧 Sending booking confirmation email to:', bookingForEmail.customer_email);
+          await emailService.sendBookingConfirmation(bookingForEmail);
           console.log('✅ Booking confirmation email sent successfully');
         } catch (emailError) {
           // Don't fail the payment confirmation if email fails
@@ -168,36 +177,41 @@ router.post('/webhook', async (req, res) => {
         const bookingId = paymentIntent.metadata.booking_id;
         
         if (bookingId) {
-          await db.run(
-            `UPDATE bookings 
-             SET payment_status = 'paid',
-                 status = 'confirmed',
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = ? AND payment_intent_id = ?`,
-            [bookingId, paymentIntent.id]
-          );
+          // Update booking using Supabase
+          await from('bookings')
+            .update({
+              payment_status: 'paid',
+              status: 'confirmed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', bookingId)
+            .eq('payment_intent_id', paymentIntent.id);
+          
           console.log(`✅ Payment succeeded for booking ${bookingId}`);
 
           // Send confirmation email
           try {
-            const booking = await db.get(
-              `SELECT b.*, 
-                      e.title as experience_title,
-                      e.location as experience_location,
-                      e.duration as experience_duration,
-                      e.image_url as experience_image,
-                      s.slot_date,
-                      s.start_time as slot_start_time,
-                      s.end_time as slot_end_time
-               FROM bookings b
-               LEFT JOIN experiences e ON b.experience_id = e.id
-               LEFT JOIN slots s ON b.slot_id = s.id
-               WHERE b.id = ?`,
-              [bookingId]
-            );
+            const { data: booking } = await from('bookings')
+              .select(`
+                *,
+                experiences(title, location, duration, image_url),
+                availability_slots(date, start_time, end_time)
+              `)
+              .eq('id', bookingId)
+              .single();
             
             if (booking && booking.customer_email) {
-              await emailService.sendBookingConfirmation(booking);
+              const bookingForEmail = {
+                ...booking,
+                experience_title: booking.experiences?.title,
+                experience_location: booking.experiences?.location,
+                experience_duration: booking.experiences?.duration,
+                experience_image: booking.experiences?.image_url,
+                slot_date: booking.availability_slots?.date,
+                slot_start_time: booking.availability_slots?.start_time,
+                slot_end_time: booking.availability_slots?.end_time,
+              };
+              await emailService.sendBookingConfirmation(bookingForEmail);
               console.log(`📧 Confirmation email sent for booking ${bookingId}`);
             }
           } catch (emailError) {
@@ -211,13 +225,15 @@ router.post('/webhook', async (req, res) => {
         const failedBookingId = failedPayment.metadata.booking_id;
         
         if (failedBookingId) {
-          await db.run(
-            `UPDATE bookings 
-             SET payment_status = 'failed',
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = ? AND payment_intent_id = ?`,
-            [failedBookingId, failedPayment.id]
-          );
+          // Update booking using Supabase
+          await from('bookings')
+            .update({
+              payment_status: 'failed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', failedBookingId)
+            .eq('payment_intent_id', failedPayment.id);
+          
           console.log(`❌ Payment failed for booking ${failedBookingId}`);
         }
         break;
