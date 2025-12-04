@@ -27,7 +27,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 
-const API_URL = process.env.NODE_ENV === 'development' || __DEV__
+// Production API URL - always use production in builds
+const API_URL = __DEV__ 
   ? 'http://192.168.1.145:3000' 
   : 'https://bored-tourist-api.onrender.com';
 
@@ -238,7 +239,7 @@ export default function PaymentScreen() {
     try {
       console.log('📞 Updating user phone in database:', phone);
       
-      const backendURL = (process.env.NODE_ENV === 'development' || __DEV__) 
+      const backendURL = __DEV__ 
         ? 'http://192.168.1.145:3000/api' 
         : 'https://bored-tourist-api.onrender.com/api';
 

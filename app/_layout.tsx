@@ -14,10 +14,9 @@ import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 import { useShareIntent } from 'expo-share-intent';
 
-// Stripe publishable key - TEST MODE 🧪
-// ⚠️ IMPORTANT: This is a TEST key - no real money will be charged!
-// Use test cards: 4242 4242 4242 4242
-const STRIPE_PUBLISHABLE_KEY = 'pk_test_51Qe0OB2ZCSSBkVXw7lyC4hrAer9sx4A6kIfVLZlAwBaF6cNAgEiPLUUw5KlIO22txql7sG4tzUjwYY20eHoTizXn00Y2woBfvE';
+// Stripe publishable key - LIVE MODE 💰
+// ⚠️ IMPORTANT: This is a LIVE key - real money will be charged!
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_51Qe0O1JwIDoL5bobJjmXtc84YbeYprPx35DcRALLIlqumUqrUxGY86bsxdq8xTEf7hgzjVRDAOAnlHFQkC1YW2Sx00JRhjovcc';
 
 SplashScreen.preventAutoHideAsync();
 
