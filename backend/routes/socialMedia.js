@@ -19,12 +19,24 @@ const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN;
 // Google AI credentials for smart matching
 const GOOGLE_AI_KEY = process.env.GOOGLE_AI_KEY || process.env.EXPO_PUBLIC_GOOGLE_AI_KEY;
 
-// Supabase for fetching experiences
+// Supabase for fetching experiences - lazy initialization
 const { createClient } = require('@supabase/supabase-js');
-const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
-);
+let supabase = null;
+
+function getSupabase() {
+  if (!supabase) {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
+    
+    if (!url || !key) {
+      console.error('⚠️ Supabase credentials not configured');
+      return null;
+    }
+    
+    supabase = createClient(url, key);
+  }
+  return supabase;
+}
 
 /**
  * Extract metadata from TikTok URL
@@ -561,7 +573,19 @@ router.post('/smart-match', async (req, res) => {
     
     // Step 2: Fetch all experiences from database
     console.log('📦 Step 2: Fetching experiences...');
-    const { data: experiences, error: dbError } = await supabase
+    
+    const db = getSupabase();
+    if (!db) {
+      return res.json({
+        success: true,
+        metadata,
+        matchedExperiences: [],
+        matchMethod: 'none',
+        error: 'Database not configured',
+      });
+    }
+    
+    const { data: experiences, error: dbError } = await db
       .from('experiences')
       .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, operator_name')
       .eq('active', true)
