@@ -94,8 +94,8 @@ async function extractTikTokMetadata(url) {
 
 /**
  * Extract metadata from Instagram Reel URL
- * Uses Facebook Graph API oEmbed (official, requires App credentials)
- * Falls back to Apify if oEmbed fails
+ * Uses Apify instagram-scraper as primary method
+ * Falls back to Facebook Graph API oEmbed if available
  */
 async function extractInstagramMetadata(url) {
   try {
@@ -111,7 +111,17 @@ async function extractInstagramMetadata(url) {
     // Remove query parameters for cleaner URL
     cleanUrl = cleanUrl.split('?')[0];
     
-    // Use Facebook Graph API oEmbed (official API)
+    // PRIMARY: Use Apify Instagram Scraper
+    if (APIFY_API_TOKEN) {
+      console.log('🤖 Using Apify Instagram Scraper...');
+      const apifyResult = await extractWithApify(cleanUrl, 'instagram');
+      if (apifyResult.success) {
+        return apifyResult;
+      }
+      console.log('⚠️ Apify failed, trying fallback...');
+    }
+    
+    // FALLBACK: Use Facebook Graph API oEmbed (official API)
     if (FACEBOOK_APP_ID && FACEBOOK_APP_SECRET) {
       console.log('Using Facebook Graph API for Instagram oEmbed...');
       
@@ -154,13 +164,7 @@ async function extractInstagramMetadata(url) {
       }
     }
     
-    // Fallback: Try Apify for Instagram scraping
-    if (APIFY_API_TOKEN) {
-      console.log('🔄 Trying Apify for Instagram...');
-      return await extractWithApify(cleanUrl, 'instagram');
-    }
-    
-    // Fallback: Try legacy Instagram oEmbed API
+    // LAST FALLBACK: Try legacy Instagram oEmbed API
     console.log('Trying legacy Instagram oEmbed API...');
     const legacyOembedUrl = `https://api.instagram.com/oembed?url=${encodeURIComponent(cleanUrl)}`;
     const legacyResponse = await fetch(legacyOembedUrl);
@@ -221,7 +225,7 @@ async function extractWithApify(url, platform) {
     
     // Apify actor IDs for different platforms
     const actorIds = {
-      instagram: 'apify/instagram-post-scraper',
+      instagram: 'apify/instagram-scraper',
       tiktok: 'clockworks/tiktok-scraper',
     };
     
@@ -230,14 +234,32 @@ async function extractWithApify(url, platform) {
       throw new Error(`Unsupported platform for Apify: ${platform}`);
     }
     
+    // Build input based on platform
+    let input;
+    if (platform === 'instagram') {
+      // apify/instagram-scraper input format
+      input = {
+        directUrls: [url],
+        resultsType: 'posts',
+        resultsLimit: 1,
+        searchType: 'hashtag',
+        searchLimit: 1,
+      };
+    } else if (platform === 'tiktok') {
+      // clockworks/tiktok-scraper input format
+      input = {
+        postURLs: [url],
+        resultsPerPage: 1,
+        shouldDownloadVideos: false,
+        shouldDownloadCovers: false,
+      };
+    }
+    
     // Run the Apify actor
     const runResponse = await fetch(`https://api.apify.com/v2/acts/${actorId}/runs?token=${APIFY_API_TOKEN}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        directUrls: [url],
-        resultsLimit: 1,
-      }),
+      body: JSON.stringify(input),
     });
     
     if (!runResponse.ok) {
@@ -265,22 +287,37 @@ async function extractWithApify(url, platform) {
         
         if (results && results.length > 0) {
           const item = results[0];
+          console.log('📦 Apify raw result:', JSON.stringify(item, null, 2).substring(0, 500));
+          
+          // Extract data based on platform format
+          let caption, username, thumbnailUrl;
+          
+          if (platform === 'instagram') {
+            // apify/instagram-scraper output format
+            caption = item.caption || item.alt || item.text || '';
+            username = item.ownerUsername || item.owner?.username || null;
+            thumbnailUrl = item.displayUrl || item.thumbnailUrl || item.previewUrl || null;
+          } else if (platform === 'tiktok') {
+            // clockworks/tiktok-scraper output format
+            caption = item.text || item.desc || item.description || '';
+            username = item.authorMeta?.name || item.author?.uniqueId || item.authorName || null;
+            thumbnailUrl = item.videoMeta?.coverUrl || item.covers?.default || item.cover || null;
+          }
           
           // Extract hashtags
           const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
-          const caption = item.caption || item.text || item.description || '';
           const hashtags = caption.match(hashtagRegex) || [];
           const description = caption.replace(hashtagRegex, '').trim();
           
           return {
             platform,
             success: true,
-            username: item.ownerUsername || item.authorMeta?.name || null,
-            userUrl: item.ownerProfileUrl || null,
+            username: username,
+            userUrl: null,
             description: description,
             fullTitle: caption,
             hashtags: hashtags,
-            thumbnailUrl: item.displayUrl || item.thumbnailUrl || item.videoMeta?.coverUrl || null,
+            thumbnailUrl: thumbnailUrl,
             method: 'apify',
           };
         }
