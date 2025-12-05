@@ -6,6 +6,7 @@ import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Se
 import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Dimensions,
   FlatList,
@@ -37,6 +38,9 @@ import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { BoredAIModal } from '@/components/BoredAIModal';
 import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
 import { useLanguage } from '@/contexts/LanguageContext';
+import WelcomeOverlay from '@/components/WelcomeOverlay';
+
+const WELCOME_SHOWN_KEY = '@bored_tourist_welcome_shown';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -71,6 +75,7 @@ export default function FeedScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [showNoActivitiesMessage, setShowNoActivitiesMessage] = useState<boolean>(false);
+  const [showWelcome, setShowWelcome] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Wrapper for setFilters with logging
@@ -84,6 +89,33 @@ export default function FeedScreen() {
 
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading: loadingExperiences, error: experiencesError } = useExperiences();
+
+  // Check if welcome screen should be shown (first time user)
+  useEffect(() => {
+    const checkWelcomeShown = async () => {
+      try {
+        const hasSeenWelcome = await AsyncStorage.getItem(WELCOME_SHOWN_KEY);
+        if (!hasSeenWelcome) {
+          // Small delay to let the app load first
+          setTimeout(() => setShowWelcome(true), 500);
+        }
+      } catch (error) {
+        console.error('Error checking welcome status:', error);
+      }
+    };
+    checkWelcomeShown();
+  }, []);
+
+  // Dismiss welcome overlay and save preference
+  const handleDismissWelcome = async () => {
+    try {
+      await AsyncStorage.setItem(WELCOME_SHOWN_KEY, 'true');
+      setShowWelcome(false);
+    } catch (error) {
+      console.error('Error saving welcome status:', error);
+      setShowWelcome(false);
+    }
+  };
 
   // Request location permission and get user location
   useEffect(() => {
@@ -372,6 +404,12 @@ export default function FeedScreen() {
       <AuthBottomSheet
         visible={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+      />
+
+      {/* Welcome Overlay for first-time users */}
+      <WelcomeOverlay
+        visible={showWelcome}
+        onDismiss={handleDismissWelcome}
       />
     </View>
   );

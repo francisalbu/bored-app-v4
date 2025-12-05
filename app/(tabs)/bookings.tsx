@@ -55,6 +55,45 @@ export default function BookingsScreen() {
   const [expandedCardIndex, setExpandedCardIndex] = useState<number | null>(null);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
 
+  // Swipe gesture for switching between tabs
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+  // Use ref to track current filter for panResponder
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to horizontal swipes (not vertical scrolling)
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        swipeAnim.setValue(gestureState.dx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const SWIPE_THRESHOLD = 50;
+        const currentFilter = filterRef.current;
+        
+        if (gestureState.dx > SWIPE_THRESHOLD && currentFilter === 'past') {
+          // Swipe right - go to upcoming
+          setFilter('upcoming');
+          setExpandedCardIndex(null);
+        } else if (gestureState.dx < -SWIPE_THRESHOLD && currentFilter === 'upcoming') {
+          // Swipe left - go to past
+          setFilter('past');
+          setExpandedCardIndex(null);
+        }
+        
+        // Reset animation
+        Animated.spring(swipeAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
+
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return (
@@ -170,30 +209,35 @@ export default function BookingsScreen() {
         </View>
       </View>
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.dark.primary} />
-          <Text style={styles.loadingText}>{t('booking.loadingBookings')}</Text>
-        </View>
-      ) : filteredBookings.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Image 
-            source={{ uri: 'https://storage.googleapis.com/bored_tourist_media/images/icon_bookings.png' }}
-            style={styles.bookingsIcon}
-            contentFit="contain"
-          />
-          <Text style={styles.emptyTitle}>No {filter} bookings</Text>
-          <Text style={styles.emptyText}>
-            {filter === 'upcoming'
-              ? 'Start exploring and book your next adventure!'
-              : 'Your past experiences will appear here'}
-          </Text>
-          <Pressable 
-            style={styles.exploreButton}
-            onPress={() => router.push('/(tabs)/' as any)}
-          >
-            <Text style={styles.exploreButtonText}>Explore Experiences</Text>
-          </Pressable>
+      {/* Swipeable Content Area */}
+      <Animated.View 
+        style={[styles.swipeableContent, { transform: [{ translateX: Animated.multiply(swipeAnim, 0.1) }] }]}
+        {...panResponder.panHandlers}
+      >
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.dark.primary} />
+            <Text style={styles.loadingText}>{t('booking.loadingBookings')}</Text>
+          </View>
+        ) : filteredBookings.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Image 
+              source={{ uri: 'https://storage.googleapis.com/bored_tourist_media/images/icon_bookings.png' }}
+              style={styles.bookingsIcon}
+              contentFit="contain"
+            />
+            <Text style={styles.emptyTitle}>No {filter} bookings</Text>
+            <Text style={styles.emptyText}>
+              {filter === 'upcoming'
+                ? 'Start exploring and book your next adventure!'
+                : 'Your past experiences will appear here'}
+            </Text>
+            <Pressable 
+              style={styles.exploreButton}
+              onPress={() => router.push('/(tabs)/' as any)}
+            >
+              <Text style={styles.exploreButtonText}>Explore Experiences</Text>
+            </Pressable>
         </View>
       ) : (
         // Apple Wallet Style Stack
@@ -220,7 +264,8 @@ export default function BookingsScreen() {
             );
           })}
         </View>
-      )}
+        )}
+      </Animated.View>
 
       {/* Floating Help Button - hide when card is expanded */}
       {filteredBookings.length > 1 && expandedCardIndex === null && (
@@ -817,6 +862,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark.background,
+  },
+  swipeableContent: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: 16,

@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const TAB_BAR_WIDTH = 200;
+const TAB_BAR_WIDTH = 240;
 
 // Custom Tab Bar Component
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -28,7 +28,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         <BlurView
           intensity={80}
           tint="light"
-          style={[StyleSheet.absoluteFill, { borderRadius: 25, overflow: 'hidden' }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: 28, overflow: 'hidden' }]}
         />
         {visibleRoutes.map((route: any) => {
           const isFocused = state.index === state.routes.indexOf(route);
@@ -52,16 +52,16 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           let IconComponent;
           switch (route.name) {
             case 'index':
-              IconComponent = <Home size={22} color={color} fill={fill} strokeWidth={1.5} />;
+              IconComponent = <Home size={24} color={color} fill={fill} strokeWidth={1.5} />;
               break;
             case 'explore':
-              IconComponent = <Search size={22} color={color} strokeWidth={isFocused ? 2.5 : 1.5} />;
+              IconComponent = <Search size={24} color={color} strokeWidth={isFocused ? 2.5 : 1.5} />;
               break;
             case 'bookings':
-              IconComponent = <Ticket size={22} color={color} fill={fill} strokeWidth={1.5} />;
+              IconComponent = <Ticket size={24} color={color} fill={fill} strokeWidth={1.5} />;
               break;
             case 'profile':
-              IconComponent = <User size={22} color={color} fill={fill} strokeWidth={1.5} />;
+              IconComponent = <User size={24} color={color} fill={fill} strokeWidth={1.5} />;
               break;
             default:
               IconComponent = null;
@@ -93,9 +93,9 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     width: TAB_BAR_WIDTH,
-    height: 50,
+    height: 56,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 25,
+    borderRadius: 28,
     justifyContent: 'space-evenly',
     alignItems: 'center',
     shadowColor: '#000',
@@ -108,8 +108,8 @@ const styles = StyleSheet.create({
     paddingLeft: 32,
   },
   tabItem: {
-    width: 32,
-    height: 40,
+    width: 36,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
