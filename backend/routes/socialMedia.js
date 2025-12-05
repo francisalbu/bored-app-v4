@@ -561,6 +561,25 @@ router.get('/test', (req, res) => {
 });
 
 /**
+ * GET /api/social-media/debug
+ * Debug endpoint - check env vars
+ */
+router.get('/debug', (req, res) => {
+  res.json({
+    success: true,
+    env: {
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
+      hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
+      hasApifyToken: !!process.env.APIFY_API_TOKEN,
+      hasGoogleAiKey: !!process.env.GOOGLE_AI_KEY,
+      hasFacebookAppId: !!process.env.FACEBOOK_APP_ID,
+    },
+  });
+});
+
+/**
  * POST /api/social-media/smart-match
  * Extract metadata AND find matching experiences using AI
  * 
