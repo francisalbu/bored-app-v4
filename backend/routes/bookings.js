@@ -13,6 +13,8 @@ const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
+const emailService = require('../services/emailService');
+const { from } = require('../db/supabase');
 
 /**
  * POST /api/bookings
@@ -88,6 +90,46 @@ router.post('/',
       
       // Create booking with transaction safety (userId can be null for guest checkout)
       const booking = await Booking.createBooking(userId, bookingData);
+      
+      // 📧 Send confirmation email immediately after booking is created
+      if (booking && booking.customer_email) {
+        try {
+          // Fetch complete booking data with experience details for email
+          const { data: fullBooking, error: fetchError } = await from('bookings')
+            .select(`
+              *,
+              experiences(title, location, duration, image_url, images, meeting_point),
+              availability_slots(date, start_time, end_time)
+            `)
+            .eq('id', booking.id)
+            .single();
+
+          if (fullBooking && !fetchError) {
+            // Get first image from gallery if available
+            const experienceImages = fullBooking.experiences?.images || [];
+            const experienceImage = experienceImages.length > 0 ? experienceImages[0] : fullBooking.experiences?.image_url;
+            
+            const bookingForEmail = {
+              ...fullBooking,
+              experience_title: fullBooking.experiences?.title,
+              experience_location: fullBooking.experiences?.location,
+              experience_duration: fullBooking.experiences?.duration,
+              experience_image: experienceImage,
+              meeting_point: fullBooking.experiences?.meeting_point,
+              slot_date: fullBooking.availability_slots?.date,
+              slot_start_time: fullBooking.availability_slots?.start_time,
+              slot_end_time: fullBooking.availability_slots?.end_time,
+            };
+
+            console.log('📧 Sending booking confirmation email to:', bookingForEmail.customer_email);
+            await emailService.sendBookingConfirmation(bookingForEmail);
+            console.log('✅ Booking confirmation email sent successfully');
+          }
+        } catch (emailError) {
+          // Don't fail the booking if email fails - just log it
+          console.error('⚠️ Failed to send confirmation email:', emailError.message);
+        }
+      }
       
       res.status(201).json({
         success: true,
