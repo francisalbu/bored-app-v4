@@ -14,7 +14,6 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const emailService = require('../services/emailService');
-const { from } = require('../db/supabase');
 
 /**
  * POST /api/bookings

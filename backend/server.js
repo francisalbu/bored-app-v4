@@ -18,6 +18,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+
+// Force rebuild: 2025-12-05
 const passport = require('./config/passport');
 const { initDB, closeDB } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
