@@ -13,6 +13,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 import { useShareIntent } from 'expo-share-intent';
+import AnimatedSplash from '@/components/AnimatedSplash';
 
 // Stripe publishable key - LIVE MODE 💰
 // ⚠️ IMPORTANT: This is a LIVE key - real money will be charged!
@@ -47,6 +48,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [showSplash, setShowSplash] = useState(true);
   const [fontsLoaded] = useFonts({
     Inter_300Light,
     Inter_400Regular,
@@ -204,6 +206,9 @@ export default function RootLayout() {
               <FavoritesProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
                   <RootLayoutNav />
+                  {showSplash && (
+                    <AnimatedSplash onAnimationComplete={() => setShowSplash(false)} />
+                  )}
                 </GestureHandlerRootView>
               </FavoritesProvider>
             </BookingsProvider>
