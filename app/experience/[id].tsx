@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
-  MessageCircle,
+  Bot,
   Share2,
   Bookmark,
   Clock,
@@ -25,6 +25,7 @@ import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
+import AIChatModal from '@/components/AIChatModal';
 
 export default function ExperienceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -194,58 +195,25 @@ Book this amazing experience on BoredTourist!`;
 
   const handleAIChat = () => {
     setShowAIChat(true);
-    // TODO: Implement AI chat modal
-    Alert.alert('AI Chat', 'AI chat feature coming soon!');
   };
 
   const handleOpenMap = async () => {
     if (!experience) return;
     
-    // Always use experience coordinates (no user location needed)
-    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${experience.latitude},${experience.longitude}`;
+    // Open directly in Apple Maps
     const appleMapsUrl = `https://maps.apple.com/?ll=${experience.latitude},${experience.longitude}&q=${encodeURIComponent(experience.title)}`;
-
-    Alert.alert(
-      'Open Location',
-      'Choose your preferred maps app',
-      [
-        {
-          text: 'Google Maps',
-          onPress: async () => {
-            try {
-              const supported = await Linking.canOpenURL(googleMapsUrl);
-              if (supported) {
-                await Linking.openURL(googleMapsUrl);
-              } else {
-                Alert.alert('Error', 'Unable to open Google Maps');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to open Google Maps');
-            }
-          },
-        },
-        {
-          text: 'Apple Maps',
-          onPress: async () => {
-            try {
-              const supported = await Linking.canOpenURL(appleMapsUrl);
-              if (supported) {
-                await Linking.openURL(appleMapsUrl);
-              } else {
-                Alert.alert('Error', 'Unable to open Apple Maps');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to open Apple Maps');
-            }
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ],
-      { cancelable: true }
-    );
+    
+    try {
+      await Linking.openURL(appleMapsUrl);
+    } catch (error) {
+      // Fallback to Google Maps if Apple Maps fails
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${experience.latitude},${experience.longitude}`;
+      try {
+        await Linking.openURL(googleMapsUrl);
+      } catch (e) {
+        Alert.alert('Error', 'Unable to open maps');
+      }
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -336,7 +304,7 @@ Book this amazing experience on BoredTourist!`;
               </Pressable>
               <View style={styles.topRightActions}>
                 <Pressable style={styles.iconButton} onPress={handleAIChat}>
-                  <MessageCircle size={24} color={colors.dark.text} />
+                  <Bot size={24} color={colors.dark.text} />
                 </Pressable>
                 <Pressable style={styles.iconButton} onPress={handleShare}>
                   <Share2 size={24} color={colors.dark.text} />
@@ -433,10 +401,12 @@ Book this amazing experience on BoredTourist!`;
                 <Pressable style={styles.mapPreview} onPress={handleOpenMap}>
                   <Image
                     source={{ 
-                      uri: `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-l+FFD60A(${experience.longitude},${experience.latitude})/${experience.longitude},${experience.latitude},15,0/${Math.round(SCREEN_WIDTH - 48)}x180@2x?access_token=pk.eyJ1IjoiYm9yZWR0b3VyaXN0IiwiYSI6ImNtNWQ1ZWNpejAzOWoya3B1bmlxMnR2c2cifQ.Wt9HQPZ2GjWDjKvOlbMOzQ`
+                      uri: `https://maps.googleapis.com/maps/api/staticmap?center=${experience.latitude},${experience.longitude}&zoom=17&size=600x300&scale=2&style=element:geometry|color:0x212121&style=element:labels|visibility:off&style=feature:road|element:geometry|color:0x3a3a3a&style=feature:water|element:geometry|color:0x1a1a2e&markers=size:mid|color:0xFFD700|${experience.latitude},${experience.longitude}&key=AIzaSyBV_G5pAMs5luD4JADlUEq91nN1W6ka7OA`
                     }}
                     style={styles.mapImage}
                     contentFit="cover"
+                    cachePolicy="none"
+                    onError={(e) => console.log('Map image error:', e)}
                   />
                 </Pressable>
                 <Text style={styles.meetingPointText}>{experience.meetingPoint || experience.location}</Text>
@@ -563,6 +533,12 @@ Book this amazing experience on BoredTourist!`;
         visible={showAuthModal}
         onClose={() => setShowAuthModal(false)}
       />
+
+      <AIChatModal
+        visible={showAIChat}
+        experience={experience}
+        onClose={() => setShowAIChat(false)}
+      />
     </>
   );
 }
@@ -582,9 +558,9 @@ const styles = StyleSheet.create({
   },
   imageIndicatorContainer: {
     position: 'absolute' as const,
-    bottom: 70,
+    bottom: 24,
     left: 0,
-    right: 0,
+    right: 100,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -707,7 +683,52 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 24,
   },
-  // Map Preview
+  // Map Card
+  mapCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+  },
+  mapIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.dark.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  mapCardContent: {
+    flex: 1,
+  },
+  mapCardTitle: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
+    marginBottom: 4,
+  },
+  mapCardSubtitle: {
+    fontSize: 13,
+    color: colors.dark.primary,
+  },
+  mapCardArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.dark.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapCardArrowText: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: colors.dark.background,
+  },
+  // Legacy map styles (keep for reference)
   mapPreview: {
     height: 160,
     borderRadius: 20,
@@ -726,6 +747,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  mapOverlayButton: {
+    position: 'absolute' as const,
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.dark.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  mapOverlayText: {
+    color: colors.dark.background,
+    fontSize: 13,
+    fontWeight: '700' as const,
   },
   bottomBar: {
     position: 'absolute' as const,

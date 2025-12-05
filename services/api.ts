@@ -259,13 +259,9 @@ class ApiService {
     });
   }
 
-  // Social Media APIs
-  async extractSocialMediaMetadata(url: string) {
-    return this.post('/social-media/extract', { url });
-  }
-
-  async matchExperiencesFromSocialMedia(url: string, experiences: any[]) {
-    return this.post('/social-media/match-experiences', { url, experiences });
+  // User Stats
+  async getUserStats() {
+    return this.request('/users/stats');
   }
 }
 

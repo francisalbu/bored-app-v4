@@ -1,5 +1,5 @@
 import { ChevronLeft, MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -18,19 +18,56 @@ import colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
+import api from '@/services/api';
+import { EXPERIENCES } from '@/constants/experiences';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-  const { savedExperiences } = useFavorites();
+  const { savedExperiences: savedExperienceIds } = useFavorites();
   const [showAuthSheet, setShowAuthSheet] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   
-  // XP/Level system
-  const experiencesCompleted = 0; // Will come from backend
-  const citiesVisited = 0;
-  const reviewsWritten = 0;
+  // Get full experience data for saved experiences
+  const savedExperiences = EXPERIENCES.filter(exp => savedExperienceIds.includes(exp.id));
+  
+  // User stats from backend
+  const [userStats, setUserStats] = useState({
+    experiencesCompleted: 0,
+    citiesVisited: 0,
+    reviewsWritten: 0
+  });
+
+  // Fetch user stats when authenticated
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        const response = await api.getUserStats();
+        if (response.success && response.data) {
+          const data = response.data as {
+            experiencesCompleted?: number;
+            citiesVisited?: number;
+            reviewsWritten?: number;
+          };
+          setUserStats({
+            experiencesCompleted: data.experiencesCompleted || 0,
+            citiesVisited: data.citiesVisited || 0,
+            reviewsWritten: data.reviewsWritten || 0
+          });
+        }
+      } catch (error) {
+        console.log('Failed to fetch user stats:', error);
+      }
+    };
+
+    fetchStats();
+  }, [isAuthenticated]);
+  
+  // XP/Level system based on real stats
+  const { experiencesCompleted, citiesVisited, reviewsWritten } = userStats;
   
   // Level calculation: Each level requires more XP
   const level = Math.floor(experiencesCompleted / 5) + 1;
@@ -87,11 +124,11 @@ export default function ProfileScreen() {
   };
 
   const handleTextFounder = () => {
-    Linking.openURL('https://wa.me/351912345678?text=Hi%20Francis!');
+    Linking.openURL('https://wa.me/351967407859?text=Hi%20Francis!');
   };
 
   const handleEmailUs = () => {
-    Linking.openURL('mailto:hello@boredtourist.com');
+    Linking.openURL('mailto:francisco.albuquerque@boredtourist.com');
   };
 
   // Show login prompt when not authenticated
@@ -233,21 +270,43 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Saved Experiences Card */}
+          {/* Saved Experiences Card with Thumbnails */}
           <Pressable 
             style={styles.savedCard}
             onPress={() => router.push('/saved-experiences' as any)}
           >
-            <View style={styles.savedEmptyIcon}>
-              <Star size={32} color={savedExperiences.length > 0 ? colors.dark.primary : colors.dark.textTertiary} />
-            </View>
-            <View style={styles.savedInfo}>
-              <Text style={styles.savedTitle}>Saved Experiences</Text>
-              <Text style={styles.savedCount}>
-                {savedExperiences.length > 0 
-                  ? `${savedExperiences.length} saved`
-                  : 'No experiences saved yet'}
-              </Text>
+            <View style={styles.savedContent}>
+              {savedExperiences.length > 0 ? (
+                <View style={styles.savedThumbnails}>
+                  {savedExperiences.slice(0, 3).map((exp, index) => (
+                    <View 
+                      key={exp.id} 
+                      style={[
+                        styles.savedThumbnail,
+                        { marginLeft: index > 0 ? -15 : 0, zIndex: 3 - index }
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: exp.image }}
+                        style={styles.savedThumbnailImage}
+                        contentFit="cover"
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.savedEmptyIcon}>
+                  <Star size={32} color={colors.dark.textTertiary} />
+                </View>
+              )}
+              <View style={styles.savedInfo}>
+                <Text style={styles.savedTitle}>Saved Experiences</Text>
+                <Text style={styles.savedCount}>
+                  {savedExperiences.length > 0 
+                    ? `${savedExperiences.length} saved`
+                    : 'No experiences saved yet'}
+                </Text>
+              </View>
             </View>
             <ChevronRight size={24} color={colors.dark.textTertiary} />
           </Pressable>
@@ -487,6 +546,27 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+  },
+  savedContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  savedThumbnails: {
+    flexDirection: 'row',
+    marginRight: 12,
+  },
+  savedThumbnail: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: colors.dark.card,
+  },
+  savedThumbnailImage: {
+    width: '100%',
+    height: '100%',
   },
   savedImagesRow: {
     flexDirection: 'row',

@@ -2,8 +2,16 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '@/services/api';
 import { useAuth } from './AuthContext';
 
+interface SavedExperience {
+  id: string;
+  title?: string;
+  image_url?: string;
+  video_url?: string;
+}
+
 interface FavoritesContextType {
-  savedExperiences: string[];
+  savedExperiences: SavedExperience[];
+  savedExperienceIds: string[];
   isLoading: boolean;
   toggleSave: (experienceId: string) => Promise<void>;
   isSaved: (experienceId: string) => boolean;
@@ -13,9 +21,12 @@ interface FavoritesContextType {
 const FavoritesContext = createContext<FavoritesContextType | undefined>(undefined);
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
-  const [savedExperiences, setSavedExperiences] = useState<string[]>([]);
+  const [savedExperiences, setSavedExperiences] = useState<SavedExperience[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { isAuthenticated } = useAuth();
+
+  // Computed array of IDs for backward compatibility
+  const savedExperienceIds = savedExperiences.map(exp => exp.id);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -32,8 +43,13 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         const responseData: any = response.data;
         const experiences = Array.isArray(responseData) ? responseData : responseData.data || [];
-        const ids = experiences.map((exp: any) => exp.id?.toString());
-        setSavedExperiences(ids);
+        const formattedExperiences: SavedExperience[] = experiences.map((exp: any) => ({
+          id: exp.id?.toString(),
+          title: exp.title,
+          image_url: exp.image_url,
+          video_url: exp.video_url,
+        }));
+        setSavedExperiences(formattedExperiences);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -52,31 +68,29 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const isSavedNow = savedExperiences.includes(experienceId);
+    const isSavedNow = savedExperienceIds.includes(experienceId);
 
     try {
       if (isSavedNow) {
         // Optimistically remove
-        setSavedExperiences(prev => prev.filter(id => id !== experienceId));
+        setSavedExperiences(prev => prev.filter(exp => exp.id !== experienceId));
         await api.unsaveExperience(experienceId);
       } else {
-        // Optimistically add
-        setSavedExperiences(prev => [...prev, experienceId]);
+        // Optimistically add with minimal data
+        setSavedExperiences(prev => [...prev, { id: experienceId }]);
         await api.saveExperience(experienceId);
+        // Refresh to get full data
+        await loadSavedExperiences();
       }
     } catch (error) {
       // Revert on error
       console.error('Error toggling save:', error);
-      setSavedExperiences(prev => 
-        isSavedNow 
-          ? [...prev, experienceId]
-          : prev.filter(id => id !== experienceId)
-      );
+      await loadSavedExperiences();
     }
   };
 
   const isSaved = (experienceId: string) => {
-    return savedExperiences.includes(experienceId);
+    return savedExperienceIds.includes(experienceId);
   };
 
   const refreshSaved = async () => {
@@ -87,6 +101,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     <FavoritesContext.Provider
       value={{
         savedExperiences,
+        savedExperienceIds,
         isLoading,
         toggleSave,
         isSaved,

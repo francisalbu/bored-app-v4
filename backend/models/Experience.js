@@ -250,14 +250,14 @@ async function getExperienceReviews(experienceId) {
   const { data: reviews, error } = await from('reviews')
     .select(`
       *,
-      users(email, created_at)
+      users(name, email, created_at)
     `)
     .eq('experience_id', experienceId)
     .order('created_at', { ascending: false });
   
   if (error) throw error;
   
-  // Format reviews
+  // Format reviews - prioritize full name over username
   return reviews.map(review => ({
     id: review.id,
     rating: review.rating,
@@ -266,7 +266,7 @@ async function getExperienceReviews(experienceId) {
     source: review.source, // 'google' or 'app'
     verified_purchase: review.verified_purchase,
     author: {
-      name: review.author_name || review.users?.email?.split('@')[0] || 'Anonymous',
+      name: review.author_name || review.users?.name || review.users?.email?.split('@')[0] || 'Anonymous',
       email: review.users?.email,
       photo: review.author_photo
     }
@@ -306,13 +306,13 @@ async function createReview({ experience_id, user_id, booking_id, rating, commen
     })
     .select(`
       *,
-      users(email)
+      users(name, email)
     `)
     .single();
   
   if (error) throw error;
   
-  // Format review
+  // Format review - use full name if available
   return {
     id: data.id,
     rating: data.rating,
@@ -321,7 +321,7 @@ async function createReview({ experience_id, user_id, booking_id, rating, commen
     source: data.source,
     verified_purchase: data.verified_purchase,
     author: {
-      name: data.users?.email?.split('@')[0] || 'Anonymous',
+      name: data.users?.name || data.users?.email?.split('@')[0] || 'Anonymous',
       email: data.users?.email
     }
   };

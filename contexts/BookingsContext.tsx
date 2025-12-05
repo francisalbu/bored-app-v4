@@ -40,6 +40,8 @@ export interface Booking {
   slot_date?: string;
   slot_start_time?: string;
   slot_end_time?: string;
+  // Review status
+  has_review?: boolean;
 }
 
 export interface AvailabilitySlot {

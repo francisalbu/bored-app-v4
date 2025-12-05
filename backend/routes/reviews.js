@@ -86,22 +86,38 @@ router.get('/:experienceId', async (req, res) => {
     }
 
     // Format reviews
-    const formattedReviews = reviews.map(review => ({
-      id: review.id,
-      author: {
-        name: review.author_name || review.users?.name || 'Anonymous',
-        avatar: review.author_avatar || null,
-        email: review.users?.email || null
-      },
-      rating: review.rating,
-      comment: review.comment,
-      source: review.source,
-      verified_purchase: review.verified_purchase,
-      helpful_count: review.helpful_count,
-      operator_response: review.operator_response,
-      response_date: review.response_date,
-      created_at: review.created_at
-    }));
+    const formattedReviews = reviews.map(review => {
+      // Priority: 1) author_name from review, 2) user's name, 3) capitalize email username
+      let authorName = review.author_name;
+      if (!authorName && review.users?.name) {
+        authorName = review.users.name;
+      }
+      if (!authorName && review.users?.email) {
+        // Capitalize first letter of email username
+        const username = review.users.email.split('@')[0];
+        authorName = username.charAt(0).toUpperCase() + username.slice(1);
+      }
+      if (!authorName) {
+        authorName = 'Anonymous';
+      }
+      
+      return {
+        id: review.id,
+        author: {
+          name: authorName,
+          avatar: review.author_avatar || null,
+          email: review.users?.email || null
+        },
+        rating: review.rating,
+        comment: review.comment,
+        source: review.source,
+        verified_purchase: review.verified_purchase,
+        helpful_count: review.helpful_count,
+        operator_response: review.operator_response,
+        response_date: review.response_date,
+        created_at: review.created_at
+      };
+    });
 
     console.log(`✅ Found ${reviews.length} reviews`);
 

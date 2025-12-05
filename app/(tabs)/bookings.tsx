@@ -177,15 +177,11 @@ export default function BookingsScreen() {
         </View>
       ) : filteredBookings.length === 0 ? (
         <View style={styles.emptyState}>
-          <View style={styles.calendarContainer}>
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarMonth}>JUL</Text>
-              <Text style={styles.calendarYear}>2024</Text>
-            </View>
-            <View style={styles.calendarBody}>
-              <Text style={styles.calendarDay}>17</Text>
-            </View>
-          </View>
+          <Image 
+            source={{ uri: 'https://storage.googleapis.com/bored_tourist_media/images/icon_bookings.png' }}
+            style={styles.bookingsIcon}
+            contentFit="contain"
+          />
           <Text style={styles.emptyTitle}>No {filter} bookings</Text>
           <Text style={styles.emptyText}>
             {filter === 'upcoming'
@@ -226,8 +222,8 @@ export default function BookingsScreen() {
         </View>
       )}
 
-      {/* Floating Help Button */}
-      {filteredBookings.length > 0 && (
+      {/* Floating Help Button - hide when card is expanded */}
+      {filteredBookings.length > 1 && expandedCardIndex === null && (
         <Pressable 
           style={[styles.floatingHelpButton, { bottom: insets.bottom + 100 }]}
           onPress={() => setHelpModalVisible(true)}
@@ -408,7 +404,7 @@ function WalletCard({
             </Pressable>
           )}
 
-          {!isUpcoming && !isCancelled && onWriteReview && (
+          {!isUpcoming && !isCancelled && !booking.has_review && onWriteReview && (
             <Pressable style={styles.walletReviewButton} onPress={() => onWriteReview(booking)}>
               <Text style={styles.walletReviewText}>Write a Review</Text>
             </Pressable>
@@ -523,7 +519,7 @@ function BookingCard({ booking, onCancel, isCancelling, onWriteReview }: Booking
             </Pressable>
           )}
 
-          {!isUpcoming && !isCancelled && onWriteReview && (
+          {!isUpcoming && !isCancelled && !booking.has_review && onWriteReview && (
             <Pressable style={styles.reviewButton} onPress={() => onWriteReview(booking)}>
               <Text style={styles.reviewButtonText}>Write a Review</Text>
             </Pressable>
@@ -616,7 +612,7 @@ function HelpModal({ visible, onClose }: HelpModalProps) {
           <Pressable 
             style={styles.helpModalItem}
             onPress={() => {
-              Linking.openURL('https://wa.me/351912345678');
+              Linking.openURL('https://wa.me/351967407859');
               onClose();
             }}
           >
@@ -625,7 +621,7 @@ function HelpModal({ visible, onClose }: HelpModalProps) {
             </View>
             <View style={styles.helpModalItemContent}>
               <Text style={styles.helpModalItemTitle}>WhatsApp</Text>
-              <Text style={styles.helpModalItemValue}>+351 912 345 678</Text>
+              <Text style={styles.helpModalItemValue}>+351 967 407 859</Text>
             </View>
           </Pressable>
 
@@ -633,7 +629,7 @@ function HelpModal({ visible, onClose }: HelpModalProps) {
           <Pressable 
             style={styles.helpModalItem}
             onPress={() => {
-              Linking.openURL('mailto:support@boredtourist.com');
+              Linking.openURL('mailto:bookings@boredtourist.com');
               onClose();
             }}
           >
@@ -642,7 +638,7 @@ function HelpModal({ visible, onClose }: HelpModalProps) {
             </View>
             <View style={styles.helpModalItemContent}>
               <Text style={styles.helpModalItemTitle}>Email</Text>
-              <Text style={styles.helpModalItemValue}>support@boredtourist.com</Text>
+              <Text style={styles.helpModalItemValue}>bookings@boredtourist.com</Text>
             </View>
           </Pressable>
 
@@ -672,6 +668,8 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const textInputRef = useRef<TextInput>(null);
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -713,27 +711,31 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
     <Modal
       visible={visible}
       animationType="slide"
-      transparent
+      transparent={false}
       onRequestClose={onClose}
+      presentationStyle="pageSheet"
     >
-      <KeyboardAvoidingView 
-        style={styles.reviewModalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={styles.reviewModalBackdrop} onPress={onClose} />
-        <View style={[styles.reviewModalContent, { paddingBottom: Math.max(insets.bottom + 16, 32) }]}>
-          {/* Header */}
-          <View style={styles.reviewModalHeader}>
-            <Text style={styles.reviewModalTitle}>{t('reviews.writeReview')}</Text>
-            <Pressable onPress={onClose}>
-              <X size={24} color={colors.dark.textSecondary} />
-            </Pressable>
-          </View>
+      <View style={[styles.reviewModalContainer, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={styles.reviewModalHeader}>
+          <Text style={styles.reviewModalTitle}>{t('reviews.writeReview')}</Text>
+          <Pressable onPress={onClose} hitSlop={20}>
+            <X size={24} color={colors.dark.textSecondary} />
+          </Pressable>
+        </View>
 
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={insets.top + 60}
+        >
           <ScrollView 
+            ref={scrollViewRef}
             style={styles.reviewModalBody}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
             {/* Experience Info */}
             <View style={styles.reviewExperienceInfo}>
@@ -767,6 +769,7 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
             <View style={styles.reviewCommentSection}>
               <Text style={styles.reviewSectionLabel}>{t('reviews.yourReview')}</Text>
               <TextInput
+                ref={textInputRef}
                 style={styles.reviewCommentInput}
                 placeholder={t('reviews.shareExperience')}
                 placeholderTextColor={colors.dark.textTertiary}
@@ -776,6 +779,12 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
                 numberOfLines={6}
                 maxLength={1000}
                 textAlignVertical="top"
+                onFocus={() => {
+                  // Scroll to show the input when keyboard appears
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 300);
+                }}
               />
               <Text style={styles.reviewCharCount}>
                 {comment.length}/1000
@@ -798,8 +807,8 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
               )}
             </Pressable>
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -1223,45 +1232,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 100,
   },
-  calendarContainer: {
-    width: 140,
-    height: 140,
-    backgroundColor: colors.dark.backgroundTertiary,
-    borderRadius: 20,
-    overflow: 'hidden',
+  bookingsIcon: {
+    width: 300,
+    height: 300,
     marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  calendarHeader: {
-    backgroundColor: '#8B0000',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  calendarMonth: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  calendarYear: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    opacity: 0.8,
-  },
-  calendarBody: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarDay: {
-    fontSize: 56,
-    fontWeight: '700' as const,
-    color: '#1a1a1a',
   },
   emptyTitle: {
     fontSize: 24,
@@ -1590,19 +1564,9 @@ const styles = StyleSheet.create({
     color: colors.dark.text,
   },
   // Review Modal Styles
-  reviewModalOverlay: {
+  reviewModalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'flex-end',
-  },
-  reviewModalBackdrop: {
-    flex: 1,
-  },
-  reviewModalContent: {
-    backgroundColor: colors.dark.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
+    backgroundColor: colors.dark.background,
   },
   reviewModalHeader: {
     flexDirection: 'row',

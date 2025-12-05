@@ -2,7 +2,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Bot, Search, SlidersHorizontal, Sparkles } from 'lucide-react-native';
+import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Search, SlidersHorizontal, Sparkles } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
@@ -21,6 +21,8 @@ import {
   ViewToken,
   Share,
   Image,
+  TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,6 +34,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useExperiences } from '@/hooks/useExperiences';
 import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
+import { BoredAIModal } from '@/components/BoredAIModal';
+import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -58,14 +62,22 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [showAIChat, setShowAIChat] = useState<boolean>(false);
   const [showReviews, setShowReviews] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [showBoredAI, setShowBoredAI] = useState<boolean>(false);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [filters, setFiltersState] = useState<FilterOptions>({ categories: [], priceRange: null });
   const [selectedFilter, setSelectedFilter] = useState<'nearMe' | 'availableToday'>('nearMe');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [showNoActivitiesMessage, setShowNoActivitiesMessage] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // Wrapper for setFilters with logging
+  const setFilters = React.useCallback((newFilters: FilterOptions) => {
+    console.log('🎯 setFilters called with:', JSON.stringify(newFilters));
+    setFiltersState(newFilters);
+  }, []);
   
   // Check if we're on the home tab (feed screen is active)
   const isTabFocused = pathname === '/' || pathname === '/index';
@@ -99,14 +111,55 @@ export default function FeedScreen() {
     })();
   }, []);
 
-  // Filter experiences based on selected filter
+  // Filter experiences based on selected filter AND user filters
+  // Using the same logic as explore.tsx for category matching
   const filteredExperiences = React.useMemo(() => {
+    let result = [...EXPERIENCES];
+
+    // Apply category filters (same logic as explore.tsx)
+    if (filters.categories.length > 0) {
+      result = result.filter(exp => {
+        return filters.categories.some(selectedCategoryId => {
+          // Normalize category strings for comparison (e.g., "Mind & Body" -> "mind-body")
+          const expCategory = (exp.category || '').toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+          const selectedCat = selectedCategoryId.toLowerCase();
+          
+          // Check if experience category matches
+          const matchesCategory = expCategory === selectedCat || 
+                                 expCategory.includes(selectedCat) ||
+                                 (exp.category || '').toLowerCase().includes(selectedCategoryId.replace(/-/g, ' '));
+          
+          // Also check if any tag matches
+          const matchesTag = (exp.tags || []).some(tag => {
+            const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+            return normalizedTag === selectedCat || 
+                   normalizedTag.includes(selectedCat) ||
+                   tag.toLowerCase().includes(selectedCategoryId.replace(/-/g, ' '));
+          });
+          
+          return matchesCategory || matchesTag;
+        });
+      });
+    }
+
+    // Apply price range filter
+    if (filters.priceRange) {
+      const selectedRange = PRICE_RANGES.find(r => r.id === filters.priceRange);
+      if (selectedRange) {
+        result = result.filter(exp => {
+          const price = exp.price || 0;
+          if (selectedRange.id === 'free') {
+            return price === 0;
+          }
+          return price >= selectedRange.min && price <= selectedRange.max;
+        });
+      }
+    }
+
+    // Now apply location/availability filter
     if (selectedFilter === 'nearMe' && userLocation) {
       // Calculate real distances from user location
-      const experiencesWithDistance = EXPERIENCES.map(exp => {
-        // Parse coordinates from experience (assuming they have lat/lng)
-        // For now, we'll use Lisbon coordinates as default for all experiences
-        // TODO: Add actual coordinates to experiences in the database
+      const experiencesWithDistance = result.map(exp => {
         const expLat = exp.latitude || LISBON_CENTER.latitude;
         const expLng = exp.longitude || LISBON_CENTER.longitude;
         
@@ -121,25 +174,23 @@ export default function FeedScreen() {
       });
 
       // Sort by distance (closest first)
-      const sorted = experiencesWithDistance.sort((a, b) => a.calculatedDistance - b.calculatedDistance);
-
-      // Check if closest experience is more than 100km away
-      const hasNearbyActivities = sorted.length > 0 && sorted[0].calculatedDistance <= MAX_DISTANCE_KM;
-      setShowNoActivitiesMessage(!hasNearbyActivities);
-
-      // If no activities nearby and user is not in Lisbon area, return all Lisbon activities
-      if (!hasNearbyActivities) {
-        console.log('📍 No activities within 100km, showing all Lisbon experiences');
-        return sorted; // Still show Lisbon activities
-      }
-
-      // Filter only activities within 100km
-      return sorted.filter(exp => exp.calculatedDistance <= MAX_DISTANCE_KM);
+      return experiencesWithDistance.sort((a, b) => a.calculatedDistance - b.calculatedDistance);
     } else {
       // Filter only experiences available today
-      return EXPERIENCES.filter(exp => exp.availableToday);
+      return result.filter(exp => exp.availableToday);
     }
-  }, [selectedFilter, EXPERIENCES, userLocation]);
+  }, [selectedFilter, EXPERIENCES, userLocation, filters]);
+
+  // Update no activities message based on filtered results
+  React.useEffect(() => {
+    if (selectedFilter === 'nearMe' && filteredExperiences.length > 0) {
+      const firstExp = filteredExperiences[0] as any;
+      const hasNearby = firstExp.calculatedDistance ? firstExp.calculatedDistance <= MAX_DISTANCE_KM : true;
+      setShowNoActivitiesMessage(!hasNearby);
+    } else {
+      setShowNoActivitiesMessage(false);
+    }
+  }, [filteredExperiences, selectedFilter]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -154,11 +205,12 @@ export default function FeedScreen() {
 
   // Reset to first item when filter changes
   React.useEffect(() => {
+    console.log('🔄 Filters changed, resetting to first item');
     setCurrentIndex(0);
     if (flatListRef.current) {
       flatListRef.current.scrollToOffset({ offset: 0, animated: false });
     }
-  }, [selectedFilter]);
+  }, [selectedFilter, filters]);
 
   const { toggleSave, isSaved } = useFavorites();
   const { isAuthenticated } = useAuth();
@@ -179,7 +231,6 @@ export default function FeedScreen() {
           isActive={index === currentIndex}
           isSaved={isSaved(item.id)}
           isTabFocused={isTabFocused}
-          onAIChatPress={() => setShowAIChat(true)}
           onReviewsPress={() => setShowReviews(true)}
           onSavePress={() => handleSave(item.id)}
         />
@@ -208,8 +259,8 @@ export default function FeedScreen() {
     );
   }
 
-  // Show empty state
-  if (filteredExperiences.length === 0) {
+  // Show empty state (only if no experiences at all, not due to filters)
+  if (filteredExperiences.length === 0 && filters.categories.length === 0 && !filters.priceRange) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Text style={styles.emptyText}>{t('feed.emptyText')}</Text>
@@ -218,13 +269,17 @@ export default function FeedScreen() {
     );
   }
 
+  // If filters result in no experiences, just show first experience anyway
+  const displayExperiences = filteredExperiences.length > 0 ? filteredExperiences : EXPERIENCES;
+
   return (
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={filteredExperiences}
+        data={displayExperiences}
+        extraData={filters}
         renderItem={renderItem}
-        keyExtractor={(item) => `${selectedFilter}-${item.id}`}
+        keyExtractor={(item) => `${selectedFilter}-${filters.categories.join('-')}-${filters.priceRange || 'all'}-${item.id}`}
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={SCREEN_HEIGHT}
@@ -252,14 +307,18 @@ export default function FeedScreen() {
           <Text style={styles.headerTitle}>NEAR ME</Text>
           
           <View style={styles.headerRight}>
-            <Pressable 
-              style={styles.aiButton}
-              onPress={() => setShowAIChat(true)}
-            >
+            <Pressable style={styles.aiButton} onPress={() => setShowBoredAI(true)}>
               <Sparkles size={20} color={colors.dark.primary} />
             </Pressable>
-            <Pressable style={styles.filterIconButton}>
+            <Pressable style={styles.filterIconButton} onPress={() => setShowFilters(true)}>
               <SlidersHorizontal size={20} color={colors.dark.text} />
+              {(filters.categories.length > 0 || filters.priceRange) && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>
+                    {filters.categories.length + (filters.priceRange ? 1 : 0)}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           </View>
         </View>
@@ -289,16 +348,25 @@ export default function FeedScreen() {
         </View>
       )}
 
-      <AIChatModal
-        visible={showAIChat}
-        experience={experience}
-        onClose={() => setShowAIChat(false)}
+      {experience && (
+        <ReviewsModal
+          visible={showReviews}
+          experience={experience}
+          onClose={() => setShowReviews(false)}
+        />
+      )}
+
+      <BoredAIModal
+        visible={showBoredAI}
+        onClose={() => setShowBoredAI(false)}
       />
 
-      <ReviewsModal
-        visible={showReviews}
-        experience={experience}
-        onClose={() => setShowReviews(false)}
+      <FiltersModal
+        visible={showFilters}
+        onClose={() => setShowFilters(false)}
+        onApply={setFilters}
+        currentFilters={filters}
+        experiences={EXPERIENCES}
       />
 
       <AuthBottomSheet
@@ -314,12 +382,11 @@ interface ExperienceCardProps {
   isActive: boolean;
   isSaved: boolean;
   isTabFocused: boolean;
-  onAIChatPress: () => void;
   onReviewsPress: () => void;
   onSavePress: () => void;
 }
 
-function ExperienceCard({ experience, isActive, isSaved, isTabFocused, onAIChatPress, onReviewsPress, onSavePress }: ExperienceCardProps) {
+function ExperienceCard({ experience, isActive, isSaved, isTabFocused, onReviewsPress, onSavePress }: ExperienceCardProps) {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
@@ -372,7 +439,7 @@ Book this amazing experience on BoredTourist!`;
       
       {/* Main card container with video */}
       <Pressable 
-        style={[styles.mainCard, { marginTop: insets.top + 52, marginBottom: insets.bottom + 70 }]}
+        style={[styles.mainCard, { marginTop: 0, marginBottom: 0 }]}
         onPress={() => router.push(`/experience/${experience.id}`)}
       >
         {/* Video/Image content */}
@@ -415,9 +482,16 @@ Book this amazing experience on BoredTourist!`;
 
           {/* Gradient overlay on video - stronger vignette at bottom */}
           <LinearGradient
-            colors={['transparent', 'transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
-            locations={[0, 0.4, 0.7, 1]}
+            colors={['transparent', 'transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.9)']}
+            locations={[0, 0.35, 0.65, 1]}
             style={styles.videoGradient}
+          />
+
+          {/* Top vignette gradient */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.4)', 'transparent']}
+            locations={[0, 0.35, 0.7]}
+            style={styles.topVignette}
           />
 
           {/* Content overlay on video */}
@@ -434,10 +508,6 @@ Book this amazing experience on BoredTourist!`;
 
               {/* Right side - Actions */}
               <View style={styles.clyxSideActions}>
-                <Pressable style={styles.clyxSideActionButton} onPress={onAIChatPress}>
-                  <Bot size={24} color={colors.dark.text} />
-                  <Text style={styles.clyxSideActionLabel}>AI</Text>
-                </Pressable>
                 <Pressable style={styles.clyxSideActionButton} onPress={onReviewsPress}>
                   <MessageCircle size={24} color={colors.dark.text} />
                   <Text style={styles.clyxSideActionLabel}>{experience.rating}</Text>
@@ -476,6 +546,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
+  emptyStateContainer: {
+    flex: 1,
+    backgroundColor: colors.dark.background,
+  },
+  emptyStateContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
   loadingText: {
     color: colors.dark.text,
     fontSize: 18,
@@ -504,6 +584,21 @@ const styles = StyleSheet.create({
     color: colors.dark.textSecondary,
     fontSize: 14,
     textAlign: 'center' as const,
+  },
+  resetFiltersButton: {
+    marginTop: 24,
+    backgroundColor: colors.dark.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    minWidth: 180,
+    alignItems: 'center' as const,
+    zIndex: 100,
+  },
+  resetFiltersButtonText: {
+    color: colors.dark.background,
+    fontSize: 16,
+    fontWeight: '700' as const,
   },
   itemContainer: {
     height: SCREEN_HEIGHT,
@@ -561,6 +656,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+  },
+  filterBadge: {
+    position: 'absolute' as const,
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.dark.primary,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: colors.dark.background,
   },
   // Old filter styles (keeping for compatibility)
   filtersContainer: {
@@ -638,20 +750,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  // Main card in the center with rounded corners
+  // Main card in the center - FULL SCREEN
   mainCard: {
     flex: 1,
-    marginHorizontal: 6,
-    marginTop: 2,
-    marginBottom: -50,
-    borderRadius: 24,
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 0,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#000',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
   },
   // Wrapper for the video inside the card
   videoWrapper: {
@@ -670,6 +777,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: '60%',
   },
+  topVignette: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '35%',
+  },
   // Content overlay on top of video (provider, title, price, button, actions)
   cardContentOverlay: {
     position: 'absolute' as const,
@@ -677,7 +791,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   cardContentRow: {
     flexDirection: 'row' as const,
@@ -1347,6 +1461,7 @@ const styles = StyleSheet.create({
     gap: 20,
     alignItems: 'center' as const,
     paddingVertical: 8,
+    marginRight: -8,
   },
   clyxSideActionButton: {
     alignItems: 'center' as const,
@@ -1361,161 +1476,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
 });
-
-interface AIChatModalProps {
-  visible: boolean;
-  experience: Experience;
-  onClose: () => void;
-}
-
-function AIChatModal({ visible, experience, onClose }: AIChatModalProps) {
-  const { t } = useLanguage();
-  const [message, setMessage] = useState<string>('');
-  const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([]);
-  const insets = useSafeAreaInsets();
-
-  // Pre-fabricated questions based on experience type
-  const quickQuestions = [
-    t('feed.aiQuestion1'),
-    t('feed.aiQuestion2'),
-    t('feed.aiQuestion3'),
-    t('feed.aiQuestion4'),
-  ];
-
-  const handleQuickQuestion = (question: string) => {
-    setMessages([...messages, { text: question, isUser: true }]);
-    
-    // Simulate AI response based on question
-    setTimeout(() => {
-      let response = '';
-      if (question.includes('included')) {
-        response = `For "${experience.title}", the price includes all materials, expert instruction, and a complimentary drink. You'll also get to take home what you create! Transportation and additional food are not included.`;
-      } else if (question.includes('bring')) {
-        response = `Just bring yourself and your enthusiasm! We provide everything you need for "${experience.title}". Comfortable clothing is recommended. Don't forget your camera to capture the memories!`;
-      } else if (question.includes('children')) {
-        response = `"${experience.title}" is suitable for children aged 8 and above with adult supervision. Kids under 12 must be accompanied by a parent or guardian. We provide special equipment sized for children.`;
-      } else if (question.includes('cancel')) {
-        response = `You can cancel or reschedule up to 24 hours before "${experience.title}" starts for a full refund. Cancellations within 24 hours are non-refundable, but we're flexible in case of emergencies!`;
-      } else {
-        response = `Thanks for asking about "${experience.title}"! This is a demo response. In the full app, AI will provide detailed answers about availability, requirements, location details, and insider tips!`;
-      }
-      
-      setMessages((prev) => [...prev, { text: response, isUser: false }]);
-    }, 1000);
-  };
-
-  const handleSend = () => {
-    if (message.trim()) {
-      handleQuickQuestion(message);
-      setMessage('');
-    }
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-    >
-      <KeyboardAvoidingView 
-        style={styles.aiModalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
-        <Pressable style={styles.aiModalBackdrop} onPress={onClose} />
-        <View style={styles.aiModalContainer}>
-          <View style={styles.aiModalContent}>
-            {/* Header */}
-            <View style={styles.aiModalHeader}>
-              <View style={styles.aiHeaderLeft}>
-                <View style={styles.aiIcon}>
-                  <MessageCircle size={20} color={colors.dark.background} />
-                </View>
-                <Text style={styles.aiModalTitle}>{t('feed.aiModalTitle')}</Text>
-              </View>
-              <Pressable style={styles.aiCloseButton} onPress={onClose}>
-                <Text style={styles.aiCloseButtonText}>✕</Text>
-              </Pressable>
-            </View>
-
-            {/* Chat Messages */}
-            <ScrollView 
-              style={{ flex: 1 }}
-              contentContainerStyle={[styles.aiChatContainer, { paddingBottom: 20 }]} 
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {messages.length === 0 && (
-                <View style={styles.aiWelcomeContainer}>
-                  <Text style={styles.aiWelcomeText}>
-                    {t('feed.aiWelcome')}{' '}
-                    <Text style={styles.aiWelcomeTextBold}>"{experience.title}"</Text>
-                  </Text>
-                  
-                  {/* Quick Questions */}
-                  <Text style={styles.quickQuestionsTitle}>{t('feed.quickQuestions')}</Text>
-                  <View style={styles.quickQuestionsContainer}>
-                    {quickQuestions.map((question, idx) => (
-                      <Pressable
-                        key={idx}
-                        style={styles.quickQuestionButton}
-                        onPress={() => handleQuickQuestion(question)}
-                      >
-                        <Text style={styles.quickQuestionText}>{question}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-              
-              {messages.map((msg, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.aiChatBubble,
-                    msg.isUser ? styles.aiChatBubbleUser : styles.aiChatBubbleAI,
-                  ]}
-                >
-                  <Text style={[
-                    styles.aiChatText,
-                    msg.isUser ? styles.aiChatTextUser : styles.aiChatTextAI,
-                  ]}>
-                    {msg.text}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-
-            {/* Input */}
-            <View style={[styles.aiInputContainer, { paddingBottom: Math.max(insets.bottom + 8, 24) }]}>
-              <View style={styles.aiInputWrapper}>
-                <TextInput
-                  style={styles.aiInput}
-                  placeholder={t('feed.aiPlaceholder')}
-                  placeholderTextColor={colors.dark.textTertiary}
-                  value={message}
-                  onChangeText={setMessage}
-                  onSubmitEditing={handleSend}
-                  multiline
-                  maxLength={500}
-                />
-                <Pressable 
-                  style={[styles.aiSendButton, !message.trim() && styles.aiSendButtonDisabled]} 
-                  onPress={handleSend}
-                  disabled={!message.trim()}
-                >
-                  <Text style={styles.aiSendButtonText}>→</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
 
 interface ReviewsModalProps {
   visible: boolean;

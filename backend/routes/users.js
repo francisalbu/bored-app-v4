@@ -8,10 +8,76 @@ const express = require('express');
 const router = express.Router();
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const { createClient } = require('@supabase/supabase-js');
+const { from } = require('../config/database');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+/**
+ * GET /api/users/stats
+ * Get user statistics (experiences completed, cities visited, reviews written)
+ */
+router.get('/stats',
+  authenticateSupabase,
+  async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      console.log('📊 [USER-STATS] Fetching stats for user:', userId);
+
+      // Get completed bookings count (past bookings that are confirmed)
+      const { data: bookings, error: bookingsError } = await from('bookings')
+        .select(`
+          id,
+          experiences(location)
+        `)
+        .eq('user_id', userId)
+        .eq('status', 'confirmed')
+        .eq('payment_status', 'paid');
+
+      if (bookingsError) {
+        console.error('❌ [USER-STATS] Bookings error:', bookingsError);
+        throw bookingsError;
+      }
+
+      // Count unique cities from booking experiences
+      const uniqueCities = new Set();
+      bookings?.forEach(booking => {
+        if (booking.experiences?.location) {
+          // Extract city from location (e.g., "Lisbon, Portugal" -> "Lisbon")
+          const city = booking.experiences.location.split(',')[0].trim();
+          if (city) uniqueCities.add(city);
+        }
+      });
+
+      // Get reviews count
+      const { count: reviewsCount, error: reviewsError } = await from('reviews')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      if (reviewsError) {
+        console.error('❌ [USER-STATS] Reviews error:', reviewsError);
+        throw reviewsError;
+      }
+
+      const stats = {
+        experiencesCompleted: bookings?.length || 0,
+        citiesVisited: uniqueCities.size,
+        reviewsWritten: reviewsCount || 0
+      };
+
+      console.log('✅ [USER-STATS] Stats:', stats);
+
+      res.json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      console.error('❌ [USER-STATS] Error:', error);
+      next(error);
+    }
+  }
+);
 
 /**
  * PUT /api/users/update-phone

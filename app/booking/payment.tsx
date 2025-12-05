@@ -347,6 +347,10 @@ export default function PaymentScreen() {
     }
 
     setIsProcessing(true);
+    
+    // Reset previous payment state
+    setClientSecret(null);
+    setBookingId(null);
 
     try {
       // Wake up server first (cold start protection)
@@ -547,6 +551,8 @@ export default function PaymentScreen() {
     } catch (error) {
       console.error('❌ [PAYMENT] Error:', error);
       Alert.alert('Error', 'Failed to process payment');
+    } finally {
+      // Always reset processing state to prevent getting stuck
       setIsProcessing(false);
     }
   };
@@ -573,28 +579,26 @@ export default function PaymentScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Experience Card */}
-        <View style={styles.card}>
-          <View style={styles.experienceHeader}>
-            <Image
-              source={
-                experience.images && experience.images.length > 0
-                  ? experience.images[0]
-                  : { uri: experience.image }
-              }
-              style={styles.experienceImage}
-              contentFit="cover"
-            />
-            <View style={styles.experienceInfo}>
-              <Text style={styles.experienceTitle} numberOfLines={2}>
-                {experience.title}
+        {/* Big Experience Card with Image */}
+        <View style={styles.experienceCard}>
+          <Image
+            source={
+              experience.images && experience.images.length > 0
+                ? experience.images[0]
+                : { uri: experience.image }
+            }
+            style={styles.experienceCardImage}
+            contentFit="cover"
+          />
+          <View style={styles.experienceCardInfo}>
+            <Text style={styles.experienceCardTitle} numberOfLines={2}>
+              {experience.title}
+            </Text>
+            <View style={styles.experienceCardRating}>
+              <Star size={16} color={colors.dark.primary} fill={colors.dark.primary} />
+              <Text style={styles.experienceCardRatingText}>
+                {experience.rating} ({experience.reviewCount || 0})
               </Text>
-              <View style={styles.ratingRow}>
-                <Star size={14} color={colors.dark.primary} fill={colors.dark.primary} />
-                <Text style={styles.ratingText}>
-                  {experience.rating} ({experience.reviewCount})
-                </Text>
-              </View>
             </View>
           </View>
         </View>
@@ -915,6 +919,37 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  // Big Experience Card
+  experienceCard: {
+    margin: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: colors.dark.card,
+  },
+  experienceCardImage: {
+    width: '100%',
+    height: 180,
+  },
+  experienceCardInfo: {
+    padding: 16,
+  },
+  experienceCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.dark.text,
+    marginBottom: 8,
+  },
+  experienceCardRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  experienceCardRatingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.dark.text,
+  },
+  // Legacy styles (kept for reference)
   card: {
     backgroundColor: colors.dark.card,
     margin: 16,

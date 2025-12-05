@@ -13,7 +13,6 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 import { useShareIntent } from 'expo-share-intent';
-import AnimatedSplash from '@/components/AnimatedSplash';
 
 // Stripe publishable key - LIVE MODE 💰
 // ⚠️ IMPORTANT: This is a LIVE key - real money will be charged!
@@ -27,8 +26,11 @@ function RootLayoutNav() {
   return (
     <>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="experience" options={{ headerShown: false }} />
+        <Stack.Screen name="booking" options={{ headerShown: false }} />
+        <Stack.Screen name="reviews" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
         <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
         <Stack.Screen name="auth/verify-email" options={{ headerShown: false }} />
@@ -40,7 +42,6 @@ function RootLayoutNav() {
         <Stack.Screen name="info/terms" options={{ headerShown: false }} />
         <Stack.Screen name="info/privacy" options={{ headerShown: false }} />
         <Stack.Screen name="info/cancellation" options={{ headerShown: false }} />
-        <Stack.Screen name="experience" options={{ headerShown: false }} />
         <Stack.Screen name="shared-content" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
     </>
@@ -48,7 +49,6 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [showSplash, setShowSplash] = useState(true);
   const [fontsLoaded] = useFonts({
     Inter_300Light,
     Inter_400Regular,
@@ -206,9 +206,6 @@ export default function RootLayout() {
               <FavoritesProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
                   <RootLayoutNav />
-                  {showSplash && (
-                    <AnimatedSplash onAnimationComplete={() => setShowSplash(false)} />
-                  )}
                 </GestureHandlerRootView>
               </FavoritesProvider>
             </BookingsProvider>

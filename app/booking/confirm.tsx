@@ -10,14 +10,18 @@ import {
   Text,
   TextInput,
   View,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import colors from '@/constants/colors';
 import { useBookings } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExperience } from '@/hooks/useApi';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ConfirmBookingScreen() {
   const { experienceId, slotId, date, time, adults, price } = useLocalSearchParams<{
@@ -72,17 +76,6 @@ export default function ConfirmBookingScreen() {
     });
   };
 
-  const getCancellationDeadline = () => {
-    const deadline = new Date(bookingDate);
-    deadline.setHours(8, 30, 0, 0);
-    return deadline.toLocaleDateString('en-US', {
-      weekday: 'long',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
   const handleContinue = () => {
     // Navigate to payment screen with all the booking details
     router.push({
@@ -98,6 +91,31 @@ export default function ConfirmBookingScreen() {
     });
   };
 
+  // Format date for display
+  const formatDateDisplay = () => {
+    const d = new Date(date || '');
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const year = d.getFullYear();
+    return { day, month, year };
+  };
+
+  const { day, month, year } = formatDateDisplay();
+
+  // Parse time range
+  const getTimeRange = () => {
+    if (!time) return { start: '', end: '' };
+    const [startTime] = time.split(' - ');
+    // Calculate end time (add duration)
+    const durationHours = parseInt(experience.duration) || 2;
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const endHours = hours + durationHours;
+    const endTime = `${endHours.toString().padStart(2, '0')}:${(minutes || 0).toString().padStart(2, '0')}`;
+    return { start: startTime, end: endTime };
+  };
+
+  const timeRange = getTimeRange();
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -107,67 +125,66 @@ export default function ConfirmBookingScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color={colors.dark.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Booking details</Text>
+        <Text style={styles.headerTitle}>Confirm and pay</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Experience Card */}
-        <View style={styles.card}>
-          <View style={styles.experienceHeader}>
-            <Image
-              source={
-                experience.images && experience.images.length > 0
-                  ? experience.images[0]
-                  : { uri: experience.image }
-              }
-              style={styles.experienceImage}
-              contentFit="cover"
-            />
-            <View style={styles.experienceInfo}>
-              <Text style={styles.experienceTitle} numberOfLines={2}>
-                {experience.title}
-              </Text>
-              <View style={styles.ratingRow}>
-                <Star size={14} color={colors.dark.primary} fill={colors.dark.primary} />
-                <Text style={styles.ratingText}>
-                  {experience.rating} ({experience.reviewCount})
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Free Cancellation */}
-          <View style={styles.cancellationBox}>
-            <Text style={styles.cancellationTitle}>Free cancellation</Text>
-            <Text style={styles.cancellationText}>
-              Cancel before {getCancellationDeadline()} for full refund.
-            </Text>
+        {/* Big Confirmation Card with Image */}
+        <View style={styles.confirmationCard}>
+          <Image
+            source={
+              experience.images && experience.images.length > 0
+                ? experience.images[0]
+                : { uri: experience.image }
+            }
+            style={styles.cardImage}
+            contentFit="cover"
+          />
+          
+          {/* Info overlay at bottom of card */}
+          <View style={styles.cardInfoOverlay}>
+            <Text style={styles.cardDate}>{day} {month} {year}</Text>
+            <Text style={styles.cardTime}>{timeRange.start} – {timeRange.end}</Text>
+            <Text style={styles.cardGuests}>{adultsCount} Guest{adultsCount > 1 ? 's' : ''}</Text>
+            <Text style={styles.cardTitle} numberOfLines={2}>{experience.title}</Text>
+            <Text style={styles.cardPrice}>€{totalPrice.toFixed(2)}</Text>
           </View>
         </View>
 
-        {/* Booking Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Date</Text>
-          <Text style={styles.detailText}>{formatDate(date || '')}</Text>
-          <Text style={styles.detailText}>{time}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>Guests</Text>
-            <Pressable onPress={() => router.back()}>
-              <Text style={styles.changeLink}>Change</Text>
-            </Pressable>
+        {/* Booking Summary */}
+        <View style={styles.summarySection}>
+          <Text style={styles.sectionTitle}>Booking summary</Text>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Date</Text>
+            <Text style={styles.summaryValue}>{formatDate(date || '')}</Text>
           </View>
-          <Text style={styles.detailText}>
-            {adultsCount} adult{adultsCount > 1 ? 's' : ''}
-          </Text>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Time</Text>
+            <Text style={styles.summaryValue}>{timeRange.start} PM – {timeRange.end} PM</Text>
+          </View>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Guests</Text>
+            <Text style={styles.summaryValue}>{adultsCount} adult{adultsCount > 1 ? 's' : ''}</Text>
+          </View>
         </View>
 
-        {/* Total Price */}
+        {/* Price Details */}
+        <View style={styles.priceSection}>
+          <Text style={styles.sectionTitle}>Price details</Text>
+          
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>€{pricePerGuest.toFixed(0)} x {adultsCount} adult{adultsCount > 1 ? 's' : ''}</Text>
+            <Text style={styles.priceValue}>€{totalPrice.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Total */}
         <View style={styles.totalSection}>
-          <Text style={styles.totalLabel}>Total price</Text>
+          <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalValue}>€{totalPrice.toFixed(2)}</Text>
         </View>
       </ScrollView>
@@ -178,7 +195,7 @@ export default function ConfirmBookingScreen() {
           style={styles.continueButton} 
           onPress={handleContinue}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={styles.continueButtonText}>Continue to payment</Text>
         </Pressable>
       </View>
     </View>
@@ -196,8 +213,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
   },
   backButton: {
     width: 40,
@@ -213,90 +228,91 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  card: {
-    backgroundColor: colors.dark.card,
+  // Big Confirmation Card
+  confirmationCard: {
     margin: 16,
-    borderRadius: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: colors.dark.card,
+    height: 320,
+  },
+  cardImage: {
+    width: '100%',
+    height: '60%',
+  },
+  cardInfoOverlay: {
     padding: 16,
+    paddingTop: 12,
   },
-  experienceHeader: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  experienceImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    marginRight: 12,
-  },
-  experienceInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  experienceTitle: {
-    fontSize: 16,
-    fontWeight: '700' as const,
+  cardDate: {
+    fontSize: 22,
+    fontWeight: '800' as const,
     color: colors.dark.text,
-    marginBottom: 6,
+    marginBottom: 2,
   },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: colors.dark.text,
-  },
-  cancellationBox: {
-    backgroundColor: colors.dark.backgroundTertiary,
-    padding: 12,
-    borderRadius: 12,
-  },
-  cancellationTitle: {
+  cardTime: {
     fontSize: 14,
+    color: colors.dark.textSecondary,
+    marginBottom: 2,
+  },
+  cardGuests: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+    marginBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.dark.primary,
+    marginBottom: 8,
+  },
+  cardPrice: {
+    fontSize: 20,
     fontWeight: '700' as const,
     color: colors.dark.text,
-    marginBottom: 4,
+    position: 'absolute' as const,
+    right: 16,
+    bottom: 16,
   },
-  cancellationText: {
-    fontSize: 13,
-    color: colors.dark.textSecondary,
-    lineHeight: 18,
-  },
-  section: {
+  // Summary Section
+  summarySection: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.dark.border,
   },
-  sectionRow: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 16,
+  },
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-    marginBottom: 8,
-  },
-  detailText: {
+  summaryLabel: {
     fontSize: 15,
-    color: colors.dark.textSecondary,
-    marginTop: 4,
-  },
-  changeLink: {
-    fontSize: 14,
-    fontWeight: '600' as const,
     color: colors.dark.primary,
-    textDecorationLine: 'underline' as const,
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: '500' as const,
+    color: colors.dark.text,
+  },
+  // Price Section
+  priceSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'center',
   },
   priceLabel: {
     fontSize: 15,
@@ -304,19 +320,10 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     fontSize: 15,
-    fontWeight: '600' as const,
+    fontWeight: '500' as const,
     color: colors.dark.text,
   },
-  couponInput: {
-    marginTop: 8,
-  },
-  couponTextInput: {
-    fontSize: 14,
-    color: colors.dark.textTertiary,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
-  },
+  // Total Section
   totalSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -336,17 +343,7 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: colors.dark.primary,
   },
-  infoBox: {
-    margin: 16,
-    padding: 16,
-    backgroundColor: colors.dark.backgroundTertiary,
-    borderRadius: 12,
-  },
-  infoText: {
-    fontSize: 13,
-    color: colors.dark.textSecondary,
-    lineHeight: 18,
-  },
+  // Bottom Bar
   bottomBar: {
     padding: 16,
     borderTopWidth: 1,
@@ -356,7 +353,7 @@ const styles = StyleSheet.create({
   continueButton: {
     backgroundColor: colors.dark.primary,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 30,
     alignItems: 'center',
   },
   continueButtonText: {
