@@ -61,8 +61,20 @@ export default function BookingScreen() {
   const [selectedSlot, setSelectedSlot] = useState<{ schedule: DaySchedule; slot: TimeSlot } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  console.log('📅 Booking screen loaded with ID:', id, 'Type:', typeof id);
+
   // Always fetch from API
-  const { experience, loading: isLoadingExperience } = useExperience(id || '');
+  const { experience, loading: isLoadingExperience, error } = useExperience(id || '');
+
+  // Handle back navigation safely
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // If no history (came from share intent), go to home
+      router.replace('/(tabs)');
+    }
+  };
 
   // Show loading or error as full screen with same background
   if (isLoadingExperience || !experience) {
@@ -70,7 +82,7 @@ export default function BookingScreen() {
       <View style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Pressable style={styles.backButton} onPress={handleBack}>
             <ArrowLeft size={24} color={colors.dark.text} />
           </Pressable>
           <Text style={styles.headerTitle}>Select a time</Text>
@@ -80,7 +92,12 @@ export default function BookingScreen() {
           {isLoadingExperience ? (
             <ActivityIndicator size="large" color={colors.dark.primary} />
           ) : (
-            <Text style={styles.errorText}>Experience not found</Text>
+            <>
+              <Text style={styles.errorText}>Experience not found</Text>
+              <Text style={[styles.errorText, { fontSize: 14, marginTop: 8 }]}>
+                {error || `ID: ${id}`}
+              </Text>
+            </>
           )}
         </View>
       </View>

@@ -1,5 +1,5 @@
-import { Calendar, Clock, MapPin, RefreshCw, X, Star, Users } from 'lucide-react-native';
-import React, { useState, useRef } from 'react';
+import { Calendar, Clock, MapPin, RefreshCw, X, Star } from 'lucide-react-native';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,8 +13,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
-  FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -25,9 +23,6 @@ import { useBookings, type Booking } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 48;
 
 type BookingFilter = 'upcoming' | 'past';
 
@@ -41,8 +36,6 @@ export default function BookingsScreen() {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<Booking | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
@@ -190,65 +183,40 @@ export default function BookingsScreen() {
             <Text style={styles.exploreButtonText}>Explore Experiences</Text>
           </Pressable>
         </View>
+      ) : filter === 'upcoming' ? (
+        // Scroll view for upcoming bookings
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredBookings.map((booking) => (
+            <BookingCard 
+              key={booking.id} 
+              booking={booking}
+              onCancel={handleCancelBooking}
+              isCancelling={cancellingId === booking.id}
+              onWriteReview={handleOpenReviewModal}
+            />
+          ))}
+        </ScrollView>
       ) : (
-        <View style={styles.carouselContainer}>
-          {/* Carousel Counter */}
-          {filteredBookings.length > 1 && (
-            <View style={styles.carouselCounter}>
-              <Text style={styles.carouselCounterText}>
-                {currentIndex + 1}/{filteredBookings.length}
-              </Text>
-            </View>
-          )}
-          
-          {/* Tickets Carousel */}
-          <FlatList
-            ref={flatListRef}
-            data={filteredBookings}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_WIDTH + 16}
-            decelerationRate="fast"
-            contentContainerStyle={styles.carouselContent}
-            onMomentumScrollEnd={(e) => {
-              const index = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 16));
-              setCurrentIndex(index);
-            }}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item: booking }) => (
-              <TicketCard 
-                booking={booking}
-                onCancel={handleCancelBooking}
-                isCancelling={cancellingId === booking.id}
-                onWriteReview={handleOpenReviewModal}
-              />
-            )}
-          />
-          
-          {/* Fixed Help Section */}
-          {filter === 'upcoming' && (
-            <View style={styles.helpSection}>
-              <Text style={styles.helpSectionTitle}>Need Help?</Text>
-              <View style={styles.helpButtons}>
-                <Pressable 
-                  style={styles.helpButton}
-                  onPress={() => Linking.openURL('https://wa.me/351967407859')}
-                >
-                  <Text style={styles.helpButtonIcon}>📱</Text>
-                  <Text style={styles.helpButtonText}>WhatsApp</Text>
-                </Pressable>
-                <Pressable 
-                  style={styles.helpButton}
-                  onPress={() => Linking.openURL('mailto:bookings@boredtourist.com')}
-                >
-                  <Text style={styles.helpButtonIcon}>✉️</Text>
-                  <Text style={styles.helpButtonText}>Email</Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-        </View>
+        // Regular scroll view for past bookings
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredBookings.map((booking) => (
+            <BookingCard 
+              key={booking.id} 
+              booking={booking}
+              onCancel={handleCancelBooking}
+              isCancelling={cancellingId === booking.id}
+              onWriteReview={handleOpenReviewModal}
+            />
+          ))}
+        </ScrollView>
       )}
 
       {/* Review Modal */}
@@ -263,136 +231,6 @@ export default function BookingsScreen() {
           }}
         />
       )}
-    </View>
-  );
-}
-
-interface TicketCardProps {
-  booking: Booking;
-  onCancel: (id: number, title: string) => void;
-  isCancelling: boolean;
-  onWriteReview?: (booking: Booking) => void;
-}
-
-function TicketCard({ booking, onCancel, isCancelling, onWriteReview }: TicketCardProps) {
-  const { t } = useLanguage();
-  const bookingDate = new Date(booking.slot_date || booking.booking_date);
-  const formattedDate = bookingDate.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
-  const dateStr = booking.slot_date || booking.booking_date;
-  const endTime = booking.slot_end_time || '23:59:59';
-  const activityEndDateTime = new Date(`${dateStr}T${endTime}`);
-  
-  const isUpcoming = activityEndDateTime >= new Date() && booking.status !== 'cancelled';
-  const isCancelled = booking.status === 'cancelled';
-
-  // Format time display
-  const formatTime = (time: string | undefined) => {
-    if (!time) return 'TBD';
-    return time.substring(0, 5); // HH:MM
-  };
-
-  return (
-    <View style={styles.ticketCard}>
-      {/* Ticket Image Header */}
-      <View style={styles.ticketImageContainer}>
-        <Image
-          source={{ uri: booking.experience_image }}
-          style={styles.ticketImage}
-          contentFit="cover"
-        />
-        {/* Status Badge */}
-        <View style={[
-          styles.ticketStatusBadge,
-          isCancelled && styles.ticketStatusCancelled,
-          !isUpcoming && !isCancelled && styles.ticketStatusCompleted
-        ]}>
-          <Text style={styles.ticketStatusText}>
-            {isCancelled ? '❌ Cancelled' : isUpcoming ? '🎫 Upcoming' : '✅ Completed'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Ticket Content */}
-      <View style={styles.ticketContent}>
-        <Text style={styles.ticketTitle} numberOfLines={2}>{booking.experience_title}</Text>
-        
-        {/* Details Grid */}
-        <View style={styles.ticketDetails}>
-          <View style={styles.ticketDetailRow}>
-            <Calendar size={16} color={colors.dark.textSecondary} />
-            <Text style={styles.ticketDetailText}>{formattedDate}</Text>
-          </View>
-          <View style={styles.ticketDetailRow}>
-            <Clock size={16} color={colors.dark.textSecondary} />
-            <Text style={styles.ticketDetailText}>{formatTime(booking.slot_start_time || booking.booking_time)}</Text>
-          </View>
-          <View style={styles.ticketDetailRow}>
-            <Users size={16} color={colors.dark.textSecondary} />
-            <Text style={styles.ticketDetailText}>{booking.participants} {booking.participants === 1 ? 'person' : 'people'}</Text>
-          </View>
-        </View>
-
-        {/* Meeting Point */}
-        <Pressable 
-          style={styles.meetingPointBox}
-          onPress={() => {
-            const address = encodeURIComponent(booking.experience_location || 'Lisbon, Portugal');
-            Linking.openURL(`https://maps.google.com/?q=${address}`);
-          }}
-        >
-          <MapPin size={18} color={colors.dark.primary} />
-          <View style={styles.meetingPointContent}>
-            <Text style={styles.meetingPointLabel}>Meeting Point</Text>
-            <Text style={styles.meetingPointAddress} numberOfLines={1}>{booking.experience_location}</Text>
-          </View>
-        </Pressable>
-
-        {/* Dashed Separator */}
-        <View style={styles.ticketSeparator}>
-          <View style={styles.ticketNotchLeft} />
-          <View style={styles.ticketDashedLine} />
-          <View style={styles.ticketNotchRight} />
-        </View>
-
-        {/* Footer */}
-        <View style={styles.ticketFooter}>
-          <View>
-            <Text style={styles.ticketRefLabel}>Booking Reference</Text>
-            <Text style={styles.ticketRefValue}>{booking.booking_reference}</Text>
-          </View>
-          <View style={styles.ticketPriceBox}>
-            <Text style={styles.ticketPriceLabel}>Total</Text>
-            <Text style={styles.ticketPrice}>{booking.currency}{booking.total_amount}</Text>
-          </View>
-        </View>
-
-        {/* Action Button */}
-        {isUpcoming && !isCancelled && (
-          <Pressable 
-            style={styles.ticketCancelButton}
-            onPress={() => onCancel(booking.id, booking.experience_title || 'this booking')}
-            disabled={isCancelling}
-          >
-            {isCancelling ? (
-              <ActivityIndicator size="small" color={colors.dark.textTertiary} />
-            ) : (
-              <Text style={styles.ticketCancelText}>Cancel my booking</Text>
-            )}
-          </Pressable>
-        )}
-
-        {!isUpcoming && !isCancelled && onWriteReview && (
-          <Pressable style={styles.ticketReviewButton} onPress={() => onWriteReview(booking)}>
-            <Text style={styles.ticketReviewText}>Write a Review</Text>
-          </Pressable>
-        )}
-      </View>
     </View>
   );
 }
@@ -517,13 +355,13 @@ function BookingCard({ booking, onCancel, isCancelling, onWriteReview }: Booking
           <Pressable 
             style={styles.helpItem}
             onPress={() => {
-              Linking.openURL('https://wa.me/351967407859');
+              Linking.openURL('https://wa.me/351912345678');
             }}
           >
             <Text style={styles.helpIcon}>📱</Text>
             <View style={styles.helpTextContainer}>
               <Text style={styles.helpLabel}>Contact via WhatsApp</Text>
-              <Text style={styles.helpValue}>+351 967 407 859</Text>
+              <Text style={styles.helpValue}>+351 912 345 678</Text>
             </View>
           </Pressable>
 
@@ -544,13 +382,13 @@ function BookingCard({ booking, onCancel, isCancelling, onWriteReview }: Booking
           <Pressable 
             style={styles.helpItem}
             onPress={() => {
-              Linking.openURL('mailto:bookings@boredtourist.com');
+              Linking.openURL('mailto:support@boredtourist.com');
             }}
           >
             <Text style={styles.helpIcon}>✉️</Text>
             <View style={styles.helpTextContainer}>
               <Text style={styles.helpLabel}>Email Support</Text>
-              <Text style={styles.helpValue}>bookings@boredtourist.com</Text>
+              <Text style={styles.helpValue}>support@boredtourist.com</Text>
             </View>
           </Pressable>
         </View>
@@ -840,13 +678,33 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     position: 'relative',
   },
+  ticketNotchLeft: {
+    position: 'absolute',
+    left: -8,
+    top: '45%',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.dark.background,
+    zIndex: 10,
+  },
+  ticketNotchRight: {
+    position: 'absolute',
+    right: -8,
+    top: '45%',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.dark.background,
+    zIndex: 10,
+  },
   cardImage: {
     width: '100%',
     height: 180,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
-  oldProviderLogoContainer: {
+  providerLogoContainer: {
     position: 'absolute',
     top: 12,
     left: 12,
@@ -861,7 +719,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  oldProviderLogo: {
+  providerLogo: {
     width: '100%',
     height: '100%',
     borderRadius: 14,
@@ -1203,241 +1061,5 @@ const styles = StyleSheet.create({
     color: colors.dark.background,
     fontSize: 16,
     fontWeight: '900' as const,
-  },
-  // Carousel Styles
-  carouselContainer: {
-    flex: 1,
-  },
-  carouselCounter: {
-    position: 'absolute',
-    top: 16,
-    right: 24,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    zIndex: 10,
-  },
-  carouselCounterText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700' as const,
-  },
-  carouselContent: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-  },
-  // Ticket Card Styles
-  ticketCard: {
-    width: CARD_WIDTH,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginRight: 16,
-  },
-  ticketImageContainer: {
-    height: 180,
-    position: 'relative',
-  },
-  ticketImage: {
-    width: '100%',
-    height: '100%',
-  },
-  providerLogoContainer: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fff',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  providerLogo: {
-    width: '100%',
-    height: '100%',
-  },
-  ticketStatusBadge: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  ticketStatusCancelled: {
-    backgroundColor: 'rgba(220,38,38,0.8)',
-  },
-  ticketStatusCompleted: {
-    backgroundColor: 'rgba(34,197,94,0.8)',
-  },
-  ticketStatusText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600' as const,
-  },
-  ticketContent: {
-    padding: 16,
-  },
-  ticketTitle: {
-    fontSize: 20,
-    fontWeight: '800' as const,
-    color: colors.dark.text,
-    marginBottom: 12,
-  },
-  ticketDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 16,
-  },
-  ticketDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  ticketDetailText: {
-    fontSize: 14,
-    color: colors.dark.textSecondary,
-  },
-  meetingPointBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(0,255,140,0.1)',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0,255,140,0.3)',
-    marginBottom: 16,
-  },
-  meetingPointContent: {
-    flex: 1,
-  },
-  meetingPointLabel: {
-    fontSize: 12,
-    color: colors.dark.primary,
-    fontWeight: '600' as const,
-    marginBottom: 2,
-  },
-  meetingPointAddress: {
-    fontSize: 14,
-    color: colors.dark.text,
-  },
-  ticketSeparator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  ticketNotchLeft: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.dark.background,
-    marginLeft: -24,
-  },
-  ticketDashedLine: {
-    flex: 1,
-    height: 1,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-    marginHorizontal: 8,
-  },
-  ticketNotchRight: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.dark.background,
-    marginRight: -24,
-  },
-  ticketFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  ticketRefLabel: {
-    fontSize: 11,
-    color: colors.dark.textTertiary,
-    marginBottom: 2,
-  },
-  ticketRefValue: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-  },
-  ticketPriceBox: {
-    alignItems: 'flex-end',
-  },
-  ticketPriceLabel: {
-    fontSize: 11,
-    color: colors.dark.textTertiary,
-  },
-  ticketPrice: {
-    fontSize: 24,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
-  },
-  ticketCancelButton: {
-    marginTop: 16,
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  ticketCancelText: {
-    fontSize: 14,
-    color: colors.dark.textTertiary,
-    textDecorationLine: 'underline',
-  },
-  ticketReviewButton: {
-    marginTop: 16,
-    backgroundColor: colors.dark.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  ticketReviewText: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: colors.dark.background,
-  },
-  // Help Section Styles
-  helpSection: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
-  },
-  helpSectionTitle: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-    marginBottom: 12,
-  },
-  helpButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  helpButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.dark.backgroundTertiary,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  helpButtonIcon: {
-    fontSize: 18,
-  },
-  helpButtonText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: colors.dark.text,
   },
 });

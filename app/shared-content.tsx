@@ -182,6 +182,15 @@ interface SocialMediaMetadata {
   hashtags?: string[];
   thumbnailUrl?: string;
   error?: string;
+  matchMethod?: 'ai' | 'keywords' | 'suggested';
+}
+
+interface SmartMatchResponse {
+  success: boolean;
+  metadata: SocialMediaMetadata;
+  matchedExperiences: any[];
+  matchMethod: 'ai' | 'keywords' | 'suggested' | 'none';
+  error?: string;
 }
 
 export default function SharedContentScreen() {
@@ -197,6 +206,7 @@ export default function SharedContentScreen() {
   const [scanProgress] = useState(new Animated.Value(0));
   const [scanLineAnim] = useState(new Animated.Value(0));
   const [socialMetadata, setSocialMetadata] = useState<SocialMediaMetadata | null>(null);
+  const [matchMethod, setMatchMethod] = useState<string>('');
 
   // Scanning line animation
   useEffect(() => {
@@ -224,26 +234,111 @@ export default function SharedContentScreen() {
       // Animate progress bar
       Animated.timing(scanProgress, {
         toValue: 1,
-        duration: 4000,
+        duration: 6000, // Longer to account for AI processing
         easing: Easing.linear,
         useNativeDriver: false,
       }).start();
     }
   }, [analyzing]);
 
-  // Extract social media metadata when URL is available
-  const extractSocialMetadata = async (url: string): Promise<SocialMediaMetadata | null> => {
+  /**
+   * Use the new smart-match endpoint that handles:
+   * 1. Apify metadata extraction
+   * 2. Gemini AI matching
+   * 3. Keyword fallback
+   */
+  const smartMatchExperiences = async (url: string): Promise<SmartMatchResponse | null> => {
     try {
-      const response = await apiService.post('/social-media/extract', { url });
-      if (response.success !== false) {
-        console.log('📱 Social media metadata extracted:', response);
-        return response as SocialMediaMetadata;
+      console.log('🤖 Calling smart-match API for:', url);
+      const response = await apiService.post('/social-media/smart-match', { url });
+      
+      if (response.success) {
+        console.log('✅ Smart match response:', response);
+        return response as unknown as SmartMatchResponse;
       }
+      
+      console.log('❌ Smart match failed:', response.error);
       return null;
     } catch (error) {
-      console.error('Failed to extract social metadata:', error);
+      console.error('Failed to smart match:', error);
       return null;
     }
+  };
+
+  /**
+   * Fallback to local keyword matching if API fails
+   */
+  const localKeywordMatch = (url?: string, text?: string) => {
+    console.log('� Using local keyword matching...');
+    
+    let contentToAnalyze = `${url || ''} ${text || ''}`.toLowerCase();
+    
+    // Extract hashtags directly from the shared text
+    const hashtagRegex = /#[\w\u00C0-\u024F]+/gi;
+    const hashtagsFromText = (text || '').match(hashtagRegex) || [];
+    contentToAnalyze += ' ' + hashtagsFromText.join(' ').toLowerCase();
+    
+    console.log('� Content to analyze:', contentToAnalyze);
+    
+    // Find matching experiences based on keywords
+    const matches: MatchedExperience[] = [];
+    const matchedExperienceIds = new Set<string>();
+    const categoryScores: Record<string, number> = {};
+    
+    // Find which categories match the content
+    for (const [category, keywords] of Object.entries(EXPERIENCE_KEYWORDS)) {
+      for (const keyword of keywords) {
+        if (contentToAnalyze.includes(keyword)) {
+          categoryScores[category] = (categoryScores[category] || 0) + 10;
+        }
+      }
+    }
+    
+    // Find experiences that match the categories
+    const sortedCategories = Object.entries(categoryScores)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat]) => cat);
+    
+    for (const category of sortedCategories) {
+      const expIds = CATEGORY_TO_EXPERIENCE_IDS[category] || [];
+      
+      for (const expId of expIds) {
+        const exp = experiences.find(e => 
+          e.id === String(expId) || parseInt(e.id) === expId
+        );
+        
+        if (exp && !matchedExperienceIds.has(exp.id)) {
+          matchedExperienceIds.add(exp.id);
+          matches.push({
+            experience: exp,
+            score: categoryScores[category],
+            matchedKeywords: [category],
+          });
+        }
+      }
+      
+      // Also try matching by experience content
+      for (const exp of experiences) {
+        if (matchedExperienceIds.has(exp.id)) continue;
+        
+        const expContent = `${exp.title} ${exp.description || ''} ${exp.category} ${(exp.tags || []).join(' ')}`.toLowerCase();
+        const categoryKeywords = EXPERIENCE_KEYWORDS[category] || [];
+        
+        for (const keyword of categoryKeywords) {
+          if (expContent.includes(keyword)) {
+            matchedExperienceIds.add(exp.id);
+            matches.push({
+              experience: exp,
+              score: categoryScores[category],
+              matchedKeywords: [category],
+            });
+            break;
+          }
+        }
+      }
+    }
+    
+    return matches.sort((a, b) => b.score - a.score).slice(0, 5);
   };
 
   useEffect(() => {
@@ -258,189 +353,111 @@ export default function SharedContentScreen() {
     
     setLoading(false);
     
-    // Start extracting metadata and analyzing in parallel
+    // Main processing function
     const processSharedContent = async () => {
-      let metadata: SocialMediaMetadata | null = null;
-      
-      // Extract social media metadata while showing detecting animation
-      if (url && (url.includes('tiktok') || url.includes('instagram') || url.includes('instagr.am'))) {
-        metadata = await extractSocialMetadata(url);
-        if (metadata) {
-          setSocialMetadata(metadata);
+      try {
+        // Check if it's a social media URL
+        const isSocialMedia = url && (
+          url.includes('tiktok') || 
+          url.includes('instagram') || 
+          url.includes('instagr.am')
+        );
+        
+        if (isSocialMedia) {
+          // Try the smart-match API first (uses Apify + Gemini AI)
+          const smartMatchResult = await smartMatchExperiences(url);
+          
+          if (smartMatchResult?.success && smartMatchResult.matchedExperiences?.length > 0) {
+            // Transform API response to frontend format
+            const matches = smartMatchResult.matchedExperiences.map(exp => ({
+              experience: {
+                id: exp.id,
+                title: exp.title,
+                description: exp.description,
+                category: exp.category,
+                tags: exp.tags,
+                location: exp.location,
+                price: exp.price,
+                currency: exp.currency,
+                duration: exp.duration,
+                rating: exp.rating,
+                reviewCount: exp.reviewCount,
+                image: exp.image,
+                provider: exp.provider,
+              },
+              score: 100, // AI matched
+              matchedKeywords: smartMatchResult.matchMethod === 'suggested' ? ['suggested'] : ['ai-matched'],
+            }));
+            
+            setSocialMetadata(smartMatchResult.metadata);
+            setMatchedExperiences(matches);
+            setMatchMethod(smartMatchResult.matchMethod);
+            setAnalyzing(false);
+            return;
+          }
         }
-      }
-      
-      // Wait a bit more for the animation, then analyze
-      setTimeout(() => {
+        
+        // Fallback to local keyword matching
         if (experiences.length > 0) {
-          analyzeAndMatch(url, text, metadata);
-        } else {
-          setAnalyzing(false);
+          const localMatches = localKeywordMatch(url, text);
+          
+          if (localMatches.length > 0) {
+            setMatchedExperiences(localMatches);
+            setMatchMethod('keywords');
+          } else {
+            // Show top-rated experiences as suggestions
+            const topRated = experiences
+              .filter(e => e.rating >= 4.0)
+              .slice(0, 5)
+              .map(exp => ({ experience: exp, score: 0, matchedKeywords: ['suggested'] }));
+            setMatchedExperiences(topRated);
+            setMatchMethod('suggested');
+          }
         }
-      }, 2000);
+        
+      } catch (error) {
+        console.error('Error processing shared content:', error);
+        // Show suggestions on error
+        if (experiences.length > 0) {
+          const topRated = experiences
+            .filter(e => e.rating >= 4.0)
+            .slice(0, 3)
+            .map(exp => ({ experience: exp, score: 0, matchedKeywords: ['suggested'] }));
+          setMatchedExperiences(topRated);
+          setMatchMethod('suggested');
+        }
+      } finally {
+        setAnalyzing(false);
+      }
     };
     
     // Start after a short delay to show animation
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       processSharedContent();
     }, 1500);
+    
+    return () => clearTimeout(timer);
   }, [params, experiences]);
 
-  const analyzeAndMatch = async (url?: string, text?: string, metadata?: SocialMediaMetadata | null) => {
-    
-    try {
-      console.log('🔍 [analyzeAndMatch] Starting with:', { url, text, metadata });
-      
-      // Combine URL, text, AND social media metadata for analysis
-      let contentToAnalyze = `${url || sharedUrl || ''} ${text || sharedText || ''}`.toLowerCase();
-      
-      // Extract hashtags directly from the shared text (Instagram includes them!)
-      const hashtagRegex = /#[\w\u00C0-\u024F]+/gi;
-      const hashtagsFromText = (text || sharedText || '').match(hashtagRegex) || [];
-      
-      console.log('📱 Hashtags found in shared text:', hashtagsFromText);
-      
-      // Use passed metadata or fall back to state
-      const metadataToUse = metadata || socialMetadata;
-      
-      // If we have social media metadata, add it to the analysis
-      if (metadataToUse?.success) {
-        const metadataContent = [
-          metadataToUse.description || '',
-          metadataToUse.fullTitle || '',
-          metadataToUse.username || '',
-          ...(metadataToUse.hashtags || []),
-        ].join(' ').toLowerCase();
-        
-        contentToAnalyze += ' ' + metadataContent;
-        
-        console.log('📱 Analyzing with social metadata:', {
-          username: metadataToUse.username,
-          description: metadataToUse.description,
-          hashtags: metadataToUse.hashtags,
-        });
-      }
-      
-      // Add extracted hashtags to content (in case API failed but text has hashtags)
-      if (hashtagsFromText.length > 0) {
-        contentToAnalyze += ' ' + hashtagsFromText.join(' ').toLowerCase();
-        console.log('📱 Added hashtags from text to analysis');
-      }
-      
-      // Extract platform info
-      const isTikTok = contentToAnalyze.includes('tiktok');
-      const isInstagram = contentToAnalyze.includes('instagram') || contentToAnalyze.includes('instagr.am');
-      
-      // Find matching experiences based on keywords
-      const matches: MatchedExperience[] = [];
-      const matchedExperienceIds = new Set<string>();
-      const categoryScores: Record<string, number> = {};
-      
-      console.log('🔍 Content to analyze:', contentToAnalyze);
-      
-      // Step 1: Find which categories match the content
-      for (const [category, keywords] of Object.entries(EXPERIENCE_KEYWORDS)) {
-        for (const keyword of keywords) {
-          if (contentToAnalyze.includes(keyword)) {
-            categoryScores[category] = (categoryScores[category] || 0) + 10;
-            console.log(`✅ Matched keyword "${keyword}" -> category "${category}"`);
-          }
-        }
-      }
-      
-      console.log('📊 Category scores:', categoryScores);
-      
-      // Step 2: Find experiences that match the categories
-      const sortedCategories = Object.entries(categoryScores)
-        .sort((a, b) => b[1] - a[1])
-        .map(([cat]) => cat);
-      
-      console.log('🏆 Top categories:', sortedCategories);
-      
-      // Step 3: For each matched category, find relevant experiences by ID or content
-      for (const category of sortedCategories) {
-        const expIds = CATEGORY_TO_EXPERIENCE_IDS[category] || [];
-        
-        // Find experiences by ID mapping
-        for (const expId of expIds) {
-          const exp = experiences.find(e => 
-            e.id === String(expId) || 
-            e.id === expId.toString() ||
-            parseInt(e.id) === expId
-          );
-          
-          if (exp && !matchedExperienceIds.has(exp.id)) {
-            matchedExperienceIds.add(exp.id);
-            matches.push({
-              experience: exp,
-              score: categoryScores[category],
-              matchedKeywords: [category],
-            });
-            console.log(`🎯 Matched experience ${exp.id}: ${exp.title} via category "${category}"`);
-          }
-        }
-        
-        // Also try matching by experience content
-        for (const exp of experiences) {
-          if (matchedExperienceIds.has(exp.id)) continue;
-          
-          const expContent = `${exp.title} ${exp.description} ${exp.category} ${(exp.tags || []).join(' ')}`.toLowerCase();
-          const categoryKeywords = EXPERIENCE_KEYWORDS[category] || [];
-          
-          for (const keyword of categoryKeywords) {
-            if (expContent.includes(keyword)) {
-              matchedExperienceIds.add(exp.id);
-              matches.push({
-                experience: exp,
-                score: categoryScores[category],
-                matchedKeywords: [category],
-              });
-              console.log(`🎯 Matched experience ${exp.id}: ${exp.title} via content keyword "${keyword}"`);
-              break;
-            }
-          }
-        }
-      }
-      
-      // Sort by score and take top 5
-      matches.sort((a, b) => b.score - a.score);
-      const topMatches = matches.slice(0, 5);
-      
-      console.log('🏆 Final matches:', topMatches.map(m => `${m.experience.id}: ${m.experience.title}`));
-      
-      setMatchedExperiences(topMatches);
-      
-      // If no keyword matches, show top-rated experiences as suggestions
-      if (topMatches.length === 0) {
-        console.log('⚠️ No matches found, showing suggestions');
-        const topRated = experiences
-          .filter(e => e.rating >= 4.5)
-          .slice(0, 3)
-          .map(exp => ({ experience: exp, score: 0, matchedKeywords: ['suggested'] }));
-        setMatchedExperiences(topRated);
-      }
-      
-    } catch (error) {
-      console.error('Error analyzing content:', error);
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   const handleClose = () => {
-    // If we can go back (there's navigation history), go back
-    // Otherwise, the share extension will close and return to the source app
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      // If opened from share intent with no history, just dismiss
-      // This will close the share extension and return to Instagram/TikTok
-      router.replace('/');
-    }
+    // Always go to home - this ensures clean navigation state
+    router.replace('/(tabs)');
   };
 
   const handleExperiencePress = (experienceId: string) => {
-    router.push(`/experience/${experienceId}`);
+    // Close the modal first, then navigate to experience
+    // This avoids navigation stack issues when coming from a modal
+    console.log('🔗 Navigating to experience:', experienceId);
+    
+    // Dismiss the modal and navigate to the experience
+    // Using setTimeout to ensure modal is dismissed before navigation
+    router.dismiss();
+    setTimeout(() => {
+      router.push({
+        pathname: '/experience/[id]',
+        params: { id: experienceId }
+      });
+    }, 100);
   };
 
   const handleOpenOriginal = () => {
@@ -575,14 +592,18 @@ export default function SharedContentScreen() {
         {matchedExperiences.length > 0 && (
           <View style={styles.matchesSection}>
             <Text style={styles.sectionTitle}>
-              {matchedExperiences[0].matchedKeywords.includes('suggested') 
+              {matchMethod === 'suggested' || matchedExperiences[0]?.matchedKeywords?.includes('suggested') 
                 ? '✨ Suggested Experiences' 
-                : '🎯 Matching Experiences'}
+                : matchMethod === 'ai' 
+                  ? '🤖 AI-Matched Experiences'
+                  : '🎯 Matching Experiences'}
             </Text>
             <Text style={styles.sectionSubtitle}>
-              {matchedExperiences[0].matchedKeywords.includes('suggested')
+              {matchMethod === 'suggested' || matchedExperiences[0]?.matchedKeywords?.includes('suggested')
                 ? 'Check out these popular experiences'
-                : `Found ${matchedExperiences.length} related experience${matchedExperiences.length > 1 ? 's' : ''}`}
+                : matchMethod === 'ai'
+                  ? `Found ${matchedExperiences.length} experience${matchedExperiences.length > 1 ? 's' : ''} that match your content`
+                  : `Found ${matchedExperiences.length} related experience${matchedExperiences.length > 1 ? 's' : ''}`}
             </Text>
 
             {matchedExperiences.map(({ experience, matchedKeywords }) => (

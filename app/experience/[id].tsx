@@ -322,7 +322,14 @@ Book this amazing experience on BoredTourist!`;
             )}
 
             <View style={[styles.topActions, { paddingTop: insets.top + 16 }]}>
-              <Pressable style={styles.iconButton} onPress={() => router.back()}>
+              <Pressable style={styles.iconButton} onPress={() => {
+                // Safe back navigation - handle case where we came from share intent
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)');
+                }
+              }}>
                 <ArrowLeft size={24} color={colors.dark.text} />
               </Pressable>
               <View style={styles.topRightActions}>

@@ -258,6 +258,15 @@ class ApiService {
       body: JSON.stringify(userData),
     });
   }
+
+  // Social Media APIs
+  async extractSocialMediaMetadata(url: string) {
+    return this.post('/social-media/extract', { url });
+  }
+
+  async matchExperiencesFromSocialMedia(url: string, experiences: any[]) {
+    return this.post('/social-media/match-experiences', { url, experiences });
+  }
 }
 
 export const api = new ApiService();
