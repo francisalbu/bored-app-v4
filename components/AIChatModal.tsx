@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Modal,
   View,
@@ -9,17 +9,19 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { Bot } from 'lucide-react-native';
+import { Bot, Send } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import typography from '@/constants/typography';
-import { type Experience } from '@/constants/experiences';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getExperienceAnswer, type ExperienceInfo } from '@/services/boredAI';
 
+// Accept any experience-like object (from API or constants)
 interface AIChatModalProps {
   visible: boolean;
-  experience: Experience | null;
+  experience: any | null;
   onClose: () => void;
 }
 
@@ -27,42 +29,78 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
   const { t } = useLanguage();
   const [message, setMessage] = useState<string>('');
   const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  // Pre-fabricated questions based on experience type
+  // Pre-fabricated questions
   const quickQuestions = [
-    t('feed.aiQuestion1'),
-    t('feed.aiQuestion2'),
-    t('feed.aiQuestion3'),
-    t('feed.aiQuestion4'),
+    "What's included in the price?",
+    "What should I bring?",
+    "Is this suitable for children?",
+    "What's the cancellation policy?",
   ];
 
-  const handleQuickQuestion = (question: string) => {
-    if (!experience) return;
-    setMessages([...messages, { text: question, isUser: true }]);
+  // Convert experience to ExperienceInfo format
+  const getExperienceInfo = (): ExperienceInfo | null => {
+    if (!experience) return null;
     
-    // Simulate AI response based on question
+    return {
+      title: experience.title || '',
+      description: experience.description || '',
+      location: experience.location || experience.meeting_point || '',
+      duration: experience.duration || '',
+      price: experience.price || 0,
+      included: experience.included || experience.whats_included || [],
+      whatToBring: experience.whatToBring || experience.what_to_bring || [],
+      highlights: experience.highlights || [],
+      category: experience.category || '',
+      providerName: experience.provider || experience.operator_name || experience.providerName || '',
+    };
+  };
+
+  const handleQuestion = async (question: string) => {
+    if (!experience) return;
+    
+    // Add user message
+    setMessages(prev => [...prev, { text: question, isUser: true }]);
+    setIsLoading(true);
+    
+    // Scroll to bottom
     setTimeout(() => {
-      let response = '';
-      if (question.includes('included')) {
-        response = `For "${experience.title}", the price includes all materials, expert instruction, and a complimentary drink. You'll also get to take home what you create! Transportation and additional food are not included.`;
-      } else if (question.includes('bring')) {
-        response = `Just bring yourself and your enthusiasm! We provide everything you need for "${experience.title}". Comfortable clothing is recommended. Don't forget your camera to capture the memories!`;
-      } else if (question.includes('children')) {
-        response = `"${experience.title}" is suitable for children aged 8 and above with adult supervision. Kids under 12 must be accompanied by a parent or guardian. We provide special equipment sized for children.`;
-      } else if (question.includes('cancel')) {
-        response = `You can cancel or reschedule up to 24 hours before "${experience.title}" starts for a full refund. Cancellations within 24 hours are non-refundable, but we're flexible in case of emergencies!`;
-      } else {
-        response = `Thanks for asking about "${experience.title}"! This is a demo response. In the full app, AI will provide detailed answers about availability, requirements, location details, and insider tips!`;
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+
+    try {
+      const experienceInfo = getExperienceInfo();
+      if (!experienceInfo) {
+        setMessages(prev => [...prev, { 
+          text: "Sorry, I couldn't load the experience details. Please try again.", 
+          isUser: false 
+        }]);
+        return;
       }
+
+      const answer = await getExperienceAnswer(question, experienceInfo);
+      setMessages(prev => [...prev, { text: answer, isUser: false }]);
       
-      setMessages((prev) => [...prev, { text: response, isUser: false }]);
-    }, 1000);
+    } catch (error) {
+      console.error('AI Chat error:', error);
+      setMessages(prev => [...prev, { 
+        text: "Oops! Something went wrong. Please try again.", 
+        isUser: false 
+      }]);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
   };
 
   const handleSend = () => {
-    if (message.trim()) {
-      handleQuickQuestion(message);
+    if (message.trim() && !isLoading) {
+      handleQuestion(message.trim());
       setMessage('');
     }
   };
@@ -106,6 +144,7 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
 
             {/* Chat Messages */}
             <ScrollView 
+              ref={scrollViewRef}
               style={{ flex: 1 }}
               contentContainerStyle={[styles.aiChatContainer, { paddingBottom: 20 }]} 
               showsVerticalScrollIndicator={false}
@@ -114,18 +153,19 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
               {messages.length === 0 && (
                 <View style={styles.aiWelcomeContainer}>
                   <Text style={styles.aiWelcomeText}>
-                    {t('feed.aiWelcome')}{' '}
+                    👋 Hi! I'm here to answer any questions about{' '}
                     <Text style={styles.aiWelcomeTextBold}>"{experience.title}"</Text>
                   </Text>
                   
                   {/* Quick Questions */}
-                  <Text style={styles.quickQuestionsTitle}>{t('feed.quickQuestions')}</Text>
+                  <Text style={styles.quickQuestionsTitle}>Quick questions</Text>
                   <View style={styles.quickQuestionsContainer}>
                     {quickQuestions.map((question, idx) => (
                       <Pressable
                         key={idx}
-                        style={styles.quickQuestionButton}
-                        onPress={() => handleQuickQuestion(question)}
+                        style={[styles.quickQuestionButton, isLoading && styles.quickQuestionDisabled]}
+                        onPress={() => handleQuestion(question)}
+                        disabled={isLoading}
                       >
                         <Text style={styles.quickQuestionText}>{question}</Text>
                       </Pressable>
@@ -150,6 +190,14 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
                   </Text>
                 </View>
               ))}
+
+              {/* Loading indicator */}
+              {isLoading && (
+                <View style={styles.loadingBubble}>
+                  <ActivityIndicator size="small" color={colors.dark.primary} />
+                  <Text style={styles.loadingText}>Thinking...</Text>
+                </View>
+              )}
             </ScrollView>
 
             {/* Input */}
@@ -157,20 +205,25 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
               <View style={styles.aiInputWrapper}>
                 <TextInput
                   style={styles.aiInput}
-                  placeholder={t('feed.aiPlaceholder')}
+                  placeholder="Ask me anything about this experience..."
                   placeholderTextColor={colors.dark.textTertiary}
                   value={message}
                   onChangeText={setMessage}
                   onSubmitEditing={handleSend}
                   multiline
                   maxLength={500}
+                  editable={!isLoading}
                 />
                 <Pressable 
-                  style={[styles.aiSendButton, !message.trim() && styles.aiSendButtonDisabled]} 
+                  style={[styles.aiSendButton, (!message.trim() || isLoading) && styles.aiSendButtonDisabled]} 
                   onPress={handleSend}
-                  disabled={!message.trim()}
+                  disabled={!message.trim() || isLoading}
                 >
-                  <Text style={styles.aiSendButtonText}>→</Text>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={colors.dark.background} />
+                  ) : (
+                    <Send size={18} color={colors.dark.background} />
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -304,6 +357,23 @@ const styles = StyleSheet.create({
   aiChatTextAI: {
     color: colors.dark.text,
   },
+  loadingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.dark.background,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    gap: 8,
+  },
+  loadingText: {
+    ...typography.styles.body,
+    color: colors.dark.textSecondary,
+  },
+  quickQuestionDisabled: {
+    opacity: 0.5,
+  },
   aiInputContainer: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -336,10 +406,5 @@ const styles = StyleSheet.create({
   },
   aiSendButtonDisabled: {
     backgroundColor: colors.dark.textTertiary,
-  },
-  aiSendButtonText: {
-    color: colors.dark.background,
-    fontSize: 18,
-    fontWeight: '600',
   },
 });

@@ -144,7 +144,7 @@ async function getBookingById(bookingId, userId = null) {
   let query = from('bookings')
     .select(`
       *,
-      experiences(title, image_url, video_url, location, duration, price),
+      experiences(title, image_url, images, video_url, location, duration, price),
       availability_slots(date, start_time, end_time, max_participants, booked_participants)
     `)
     .eq('id', bookingId);
@@ -158,11 +158,15 @@ async function getBookingById(bookingId, userId = null) {
   if (error && error.code !== 'PGRST116') throw error;
   if (!data) return null;
   
+  // Use first image from images array if available, otherwise fallback to image_url
+  const images = data.experiences?.images || [];
+  const experienceImage = images.length > 0 ? images[0] : data.experiences?.image_url;
+  
   // Flatten the response to match expected format
   return {
     ...data,
     experience_title: data.experiences?.title,
-    experience_image: data.experiences?.image_url,
+    experience_image: experienceImage,
     experience_video: data.experiences?.video_url,
     experience_location: data.experiences?.location,
     experience_duration: data.experiences?.duration,
@@ -184,7 +188,7 @@ async function getUserBookings(userId, filters = {}) {
   let query = from('bookings')
     .select(`
       *,
-      experiences(title, image_url, video_url, location, duration, price),
+      experiences(title, image_url, images, video_url, location, duration, price),
       availability_slots(date, start_time, end_time),
       reviews!left(id)
     `)
@@ -211,19 +215,25 @@ async function getUserBookings(userId, filters = {}) {
   console.log(`✅ Query returned ${results.length} bookings`);
   
   // Flatten the response to match expected format
-  return results.map(booking => ({
-    ...booking,
-    experience_title: booking.experiences?.title,
-    experience_image: booking.experiences?.image_url,
-    experience_video: booking.experiences?.video_url,
-    experience_location: booking.experiences?.location,
-    experience_duration: booking.experiences?.duration,
-    experience_price: booking.experiences?.price,
-    slot_date: booking.availability_slots?.date,
-    slot_start_time: booking.availability_slots?.start_time,
-    slot_end_time: booking.availability_slots?.end_time,
-    has_review: booking.reviews && booking.reviews.length > 0
-  }));
+  // Use first image from images array if available, otherwise fallback to image_url
+  return results.map(booking => {
+    const images = booking.experiences?.images || [];
+    const experienceImage = images.length > 0 ? images[0] : booking.experiences?.image_url;
+    
+    return {
+      ...booking,
+      experience_title: booking.experiences?.title,
+      experience_image: experienceImage,
+      experience_video: booking.experiences?.video_url,
+      experience_location: booking.experiences?.location,
+      experience_duration: booking.experiences?.duration,
+      experience_price: booking.experiences?.price,
+      slot_date: booking.availability_slots?.date,
+      slot_start_time: booking.availability_slots?.start_time,
+      slot_end_time: booking.availability_slots?.end_time,
+      has_review: booking.reviews && booking.reviews.length > 0
+    };
+  });
 }/**
  * Update booking (limited fields, user must own booking)
  */

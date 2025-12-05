@@ -25,20 +25,23 @@ router.get('/stats',
       const userId = req.user.id;
       console.log('📊 [USER-STATS] Fetching stats for user:', userId);
 
-      // Get completed bookings count (past bookings that are confirmed)
+      // Get all confirmed/completed bookings for this user
       const { data: bookings, error: bookingsError } = await from('bookings')
         .select(`
           id,
+          status,
+          payment_status,
           experiences(location)
         `)
         .eq('user_id', userId)
-        .eq('status', 'confirmed')
-        .eq('payment_status', 'paid');
+        .in('status', ['confirmed', 'completed']);
 
       if (bookingsError) {
         console.error('❌ [USER-STATS] Bookings error:', bookingsError);
         throw bookingsError;
       }
+
+      console.log('📊 [USER-STATS] Found bookings:', bookings?.length, bookings);
 
       // Count unique cities from booking experiences
       const uniqueCities = new Set();

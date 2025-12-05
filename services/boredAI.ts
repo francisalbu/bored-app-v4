@@ -7,6 +7,11 @@ export interface VibeCheckResponse {
   mapsUrl?: string;
 }
 
+// Get API key helper
+const getApiKey = () => {
+  return process.env.EXPO_PUBLIC_GOOGLE_AI_KEY || Constants.expoConfig?.extra?.googleAiKey;
+};
+
 export const getVibeCheckRecommendation = async (userVibe: string): Promise<VibeCheckResponse> => {
   try {
     // Initialize the client only when needed (Lazy Initialization)
@@ -75,5 +80,96 @@ export const getVibeCheckRecommendation = async (userVibe: string): Promise<Vibe
   } catch (error) {
     console.error("Gemini API Error:", error);
     return { text: "The AI is on a coffee break. Try again later." };
+  }
+};
+
+/**
+ * Experience-specific AI assistant
+ * Answers questions about a specific experience
+ */
+export interface ExperienceInfo {
+  title: string;
+  description?: string;
+  location?: string;
+  duration?: string;
+  price?: number;
+  included?: string[];
+  whatToBring?: string[];
+  highlights?: string[];
+  category?: string;
+  providerName?: string;
+}
+
+export const getExperienceAnswer = async (
+  question: string, 
+  experience: ExperienceInfo
+): Promise<string> => {
+  try {
+    const apiKey = getApiKey();
+    
+    if (!apiKey) {
+      console.error("API Key is missing");
+      return "I'm having trouble connecting right now. Please try again later!";
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+    // Build context from experience data
+    const experienceContext = `
+Experience: ${experience.title}
+${experience.description ? `Description: ${experience.description}` : ''}
+${experience.location ? `Location: ${experience.location}` : ''}
+${experience.duration ? `Duration: ${experience.duration}` : ''}
+${experience.price ? `Price: €${experience.price} per person` : ''}
+${experience.included?.length ? `What's included: ${experience.included.join(', ')}` : ''}
+${experience.whatToBring?.length ? `What to bring: ${experience.whatToBring.join(', ')}` : ''}
+${experience.highlights?.length ? `Highlights: ${experience.highlights.join(', ')}` : ''}
+${experience.category ? `Category: ${experience.category}` : ''}
+${experience.providerName ? `Provider: ${experience.providerName}` : ''}
+    `.trim();
+
+    const systemPrompt = `
+You are a friendly and helpful assistant for a travel experiences booking app called "Bored Tourist".
+You're answering questions about a specific experience that a user is considering booking.
+
+${experienceContext}
+
+Rules:
+1. Be helpful, warm, and conversational - like a knowledgeable friend.
+2. Keep answers concise (max 80 words) but informative.
+3. If you don't have specific information, give a reasonable general answer based on similar experiences.
+4. Always be encouraging about the experience.
+5. For cancellation questions: "You can cancel up to 24 hours before for a full refund."
+6. For age/children questions: Be inclusive but mention adult supervision for younger kids.
+7. Never make up specific prices, times, or requirements not in the context.
+8. Use emojis sparingly (1-2 max) to be friendly.
+
+User question: ${question}
+    `.trim();
+
+    console.log('🤖 Experience AI: Generating answer...');
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 150,
+      },
+    });
+
+    const response = await result.response;
+    const text = response.text();
+
+    if (!text) {
+      return "I'm having trouble thinking right now. Could you try asking again?";
+    }
+
+    console.log('✅ Experience AI: Answer generated');
+    return text.trim();
+
+  } catch (error) {
+    console.error("Experience AI Error:", error);
+    return "Oops! I couldn't process your question. Please try again in a moment.";
   }
 };

@@ -1461,7 +1461,6 @@ const styles = StyleSheet.create({
     gap: 20,
     alignItems: 'center' as const,
     paddingVertical: 8,
-    marginRight: -8,
   },
   clyxSideActionButton: {
     alignItems: 'center' as const,

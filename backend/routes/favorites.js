@@ -1,14 +1,13 @@
 /**
  * Favorites Routes
  * 
- * Handles user favorites/saved experiences
+ * Handles user favorites/saved experiences using Supabase
  */
 
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { from } = require('../config/database');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
-const { query, run, get } = require('../config/database');
 
 /**
  * GET /api/favorites
@@ -17,27 +16,110 @@ const { query, run, get } = require('../config/database');
 router.get('/', authenticateSupabase, async (req, res, next) => {
   try {
     const userId = req.user.id;
+    console.log('📚 [FAVORITES] Getting favorites for user:', userId);
     
-    const favorites = await query(`
-      SELECT 
-        e.id, e.title, e.description, e.location, e.address,
-        e.price, e.currency, e.duration, e.max_group_size,
-        e.category, e.video_url, e.image_url, e.images,
-        e.rating, e.review_count, e.distance,
-        e.instant_booking, e.available_today, e.verified,
-        o.company_name as operator_name, o.logo_url as operator_logo
-      FROM favorites f
-      INNER JOIN experiences e ON f.experience_id = e.id
-      LEFT JOIN operators o ON e.operator_id = o.id
-      WHERE f.user_id = ? AND e.is_active = 1
-      ORDER BY f.created_at DESC
-    `, [userId]);
+    // Get favorites first
+    const { data: favorites, error } = await from('favorites')
+      .select('id, experience_id, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('❌ [FAVORITES] Error getting favorites:', error);
+      throw error;
+    }
+    
+    console.log('📚 [FAVORITES] Raw favorites:', favorites);
+    
+    if (!favorites || favorites.length === 0) {
+      console.log('ℹ️ [FAVORITES] No favorites found for user');
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // Get experience IDs
+    const experienceIds = favorites.map(f => f.experience_id);
+    console.log('📚 [FAVORITES] Experience IDs:', experienceIds);
+    
+    // Get experiences details separately
+    const { data: experiences, error: expError } = await from('experiences')
+      .select(`
+        id, title, description, location,
+        price, currency, duration,
+        category, video_url, image_url, images,
+        rating, review_count,
+        instant_booking, available_today,
+        operator_id
+      `)
+      .in('id', experienceIds);
+    
+    if (expError) {
+      console.error('❌ [FAVORITES] Error getting experiences:', expError);
+      throw expError;
+    }
+    
+    console.log('📚 [FAVORITES] Experiences found:', experiences?.length);
+    
+    // Get operator details
+    const operatorIds = [...new Set(experiences?.map(e => e.operator_id).filter(Boolean))];
+    let operators = [];
+    if (operatorIds.length > 0) {
+      const { data: opData } = await from('operators')
+        .select('id, company_name, logo_url')
+        .in('id', operatorIds);
+      operators = opData || [];
+    }
+    
+    // Create operator map
+    const operatorMap = {};
+    operators.forEach(op => {
+      operatorMap[op.id] = op;
+    });
+    
+    // Create experience map
+    const experienceMap = {};
+    experiences?.forEach(exp => {
+      experienceMap[exp.id] = {
+        ...exp,
+        operator_name: operatorMap[exp.operator_id]?.company_name,
+        operator_logo: operatorMap[exp.operator_id]?.logo_url
+      };
+    });
+    
+    // Combine favorites with experience details
+    const formattedFavorites = favorites.map(fav => {
+      const exp = experienceMap[fav.experience_id] || {};
+      return {
+        id: exp.id || fav.experience_id,
+        title: exp.title,
+        description: exp.description,
+        location: exp.location,
+        price: exp.price,
+        currency: exp.currency,
+        duration: exp.duration,
+        category: exp.category,
+        video_url: exp.video_url,
+        image_url: exp.image_url,
+        images: exp.images,
+        rating: exp.rating,
+        review_count: exp.review_count,
+        instant_booking: exp.instant_booking,
+        available_today: exp.available_today,
+        operator_name: exp.operator_name,
+        operator_logo: exp.operator_logo,
+      };
+    });
+    
+    console.log('✅ [FAVORITES] Returning:', formattedFavorites.length, 'favorites');
     
     res.json({
       success: true,
-      data: favorites
+      data: formattedFavorites
     });
   } catch (error) {
+    console.error('❌ [FAVORITES] Error:', error);
     next(error);
   }
 });
@@ -51,6 +133,8 @@ router.post('/', authenticateSupabase, async (req, res, next) => {
     const userId = req.user.id;
     const { experienceId } = req.body;
     
+    console.log('➕ [FAVORITES] Adding favorite for user:', userId, 'experience:', experienceId);
+    
     if (!experienceId) {
       return res.status(400).json({
         success: false,
@@ -59,12 +143,14 @@ router.post('/', authenticateSupabase, async (req, res, next) => {
     }
     
     // Check if already favorited
-    const existing = await get(
-      'SELECT id FROM favorites WHERE user_id = ? AND experience_id = ?',
-      [userId, experienceId]
-    );
+    const { data: existing } = await from('favorites')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('experience_id', experienceId)
+      .maybeSingle();
     
     if (existing) {
+      console.log('ℹ️ [FAVORITES] Already in favorites');
       return res.status(200).json({
         success: true,
         message: 'Already in favorites'
@@ -72,16 +158,29 @@ router.post('/', authenticateSupabase, async (req, res, next) => {
     }
     
     // Add to favorites
-    await run(
-      'INSERT INTO favorites (user_id, experience_id, created_at) VALUES (?, ?, datetime("now"))',
-      [userId, experienceId]
-    );
+    const { data, error } = await from('favorites')
+      .insert({
+        user_id: userId,
+        experience_id: experienceId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ [FAVORITES] Insert error:', error);
+      throw error;
+    }
+    
+    console.log('✅ [FAVORITES] Added to favorites');
     
     res.status(201).json({
       success: true,
-      message: 'Added to favorites'
+      message: 'Added to favorites',
+      data
     });
   } catch (error) {
+    console.error('❌ [FAVORITES] Error:', error);
     next(error);
   }
 });
@@ -95,16 +194,26 @@ router.delete('/:experienceId', authenticateSupabase, async (req, res, next) => 
     const userId = req.user.id;
     const { experienceId } = req.params;
     
-    await run(
-      'DELETE FROM favorites WHERE user_id = ? AND experience_id = ?',
-      [userId, experienceId]
-    );
+    console.log('➖ [FAVORITES] Removing favorite for user:', userId, 'experience:', experienceId);
+    
+    const { error } = await from('favorites')
+      .delete()
+      .eq('user_id', userId)
+      .eq('experience_id', experienceId);
+    
+    if (error) {
+      console.error('❌ [FAVORITES] Delete error:', error);
+      throw error;
+    }
+    
+    console.log('✅ [FAVORITES] Removed from favorites');
     
     res.json({
       success: true,
       message: 'Removed from favorites'
     });
   } catch (error) {
+    console.error('❌ [FAVORITES] Error:', error);
     next(error);
   }
 });
@@ -118,19 +227,25 @@ router.get('/check/:experienceId', authenticateSupabase, async (req, res, next) 
     const userId = req.user.id;
     const { experienceId } = req.params;
     
-    const favorite = await get(
-      'SELECT id FROM favorites WHERE user_id = ? AND experience_id = ?',
-      [userId, experienceId]
-    );
+    const { data: existing } = await from('favorites')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('experience_id', experienceId)
+      .maybeSingle();
     
     res.json({
       success: true,
       data: {
-        isFavorite: !!favorite
+        isFavorite: !!existing
       }
     });
   } catch (error) {
-    next(error);
+    res.json({
+      success: true,
+      data: {
+        isFavorite: false
+      }
+    });
   }
 });
 
