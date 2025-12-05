@@ -24,15 +24,26 @@ export default function SavedExperiencesScreen() {
   const { experiences, loading: expLoading } = useExperiences();
 
   useEffect(() => {
+    console.log('🔄 [SAVED] Refreshing saved experiences...');
     refreshSaved();
   }, []);
+
+  // Debug logs
+  useEffect(() => {
+    console.log('📚 [SAVED] savedExperiences IDs:', savedExperiences);
+    console.log('📚 [SAVED] experiences IDs:', experiences.map(e => e.id));
+    console.log('📚 [SAVED] ID types - saved:', typeof savedExperiences[0], 'exp:', typeof experiences[0]?.id);
+  }, [savedExperiences, experiences]);
 
   const isLoading = favLoading || expLoading;
 
   // Get full experience details for saved IDs from API data
+  // Ensure both are strings for comparison
   const savedExperienceDetails = experiences.filter(exp => 
-    savedExperiences.includes(exp.id)
+    savedExperiences.includes(String(exp.id))
   );
+  
+  console.log('📚 [SAVED] Filtered results:', savedExperienceDetails.length);
 
   const handleRemoveFavorite = async (experienceId: string, event: any) => {
     // Prevent navigation to experience detail

@@ -19,18 +19,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import api from '@/services/api';
-import { EXPERIENCES } from '@/constants/experiences';
+import { useExperiences } from '@/hooks/useExperiences';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
   const { savedExperiences: savedExperienceIds } = useFavorites();
+  const { experiences } = useExperiences();
   const [showAuthSheet, setShowAuthSheet] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   
-  // Get full experience data for saved experiences
-  const savedExperiences = EXPERIENCES.filter(exp => savedExperienceIds.includes(exp.id));
+  // Get full experience data for saved experiences from API
+  const savedExperiences = experiences.filter(exp => savedExperienceIds.includes(exp.id));
   
   // User stats from backend
   const [userStats, setUserStats] = useState({
@@ -287,7 +288,7 @@ export default function ProfileScreen() {
                       ]}
                     >
                       <Image
-                        source={{ uri: exp.image }}
+                        source={{ uri: exp.images && exp.images.length > 0 ? exp.images[0] : exp.image }}
                         style={styles.savedThumbnailImage}
                         contentFit="cover"
                       />

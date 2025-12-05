@@ -228,9 +228,9 @@ export default function FeedScreen() {
       <View style={styles.itemContainer}>
         <ExperienceCard
           experience={item}
-          isActive={index === currentIndex}
+          isActive={index === currentIndex && !showNoActivitiesMessage}
           isSaved={isSaved(item.id)}
-          isTabFocused={isTabFocused}
+          isTabFocused={isTabFocused && !showNoActivitiesMessage}
           onReviewsPress={() => setShowReviews(true)}
           onSavePress={() => handleSave(item.id)}
         />

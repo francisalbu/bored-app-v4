@@ -35,19 +35,10 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return;
       }
 
-      // 2. If no saved preference, use device locale
-      const deviceLocale = Localization.getLocales()[0];
-      const deviceLanguage = deviceLocale?.languageCode || 'en';
-      
-      console.log('📱 Device language code:', deviceLanguage);
-      
-      // Map device language to supported locales
-      const appLocale: Locale = deviceLanguage.startsWith('pt') ? 'pt' : 'en';
-      
-      console.log('🌍 Auto-detected app locale:', appLocale);
-      
-      i18n.locale = appLocale;
-      setLocaleState(appLocale);
+      // 2. Default to English (app is English-first)
+      console.log('🌍 Defaulting to English');
+      i18n.locale = 'en';
+      setLocaleState('en');
     } catch (error) {
       console.error('Error initializing language:', error);
       // Fallback to English
