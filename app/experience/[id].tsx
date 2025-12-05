@@ -9,12 +9,14 @@ import {
   Users,
   MapPin,
   Star,
+  Globe,
+  Footprints,
 } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, Dimensions, FlatList, Linking, Alert, Share, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 import colors from '@/constants/colors';
 import typography from '@/constants/typography';
@@ -354,24 +356,18 @@ Book this amazing experience on BoredTourist!`;
           </View>
 
           <View style={styles.content}>
-            <Text style={styles.title}>{experience?.title || 'Loading...'}</Text>
+            {/* Title - Big and Bold */}
+            <Text style={styles.title}>{experience?.title?.toUpperCase() || 'Loading...'}</Text>
 
+            {/* Host Info */}
             {experience && (
               <View style={styles.hostInfo}>
                 {experience.providerLogo ? (
-                  <>
-                    <Image
-                      source={{ uri: experience.providerLogo }}
-                      style={styles.hostLogo}
-                      resizeMode="contain"
-                      onError={(e) => {
-                        console.log('❌ Logo failed to load:', experience.providerLogo, e);
-                      }}
-                      onLoad={() => {
-                        console.log('✅ Logo loaded successfully:', experience.providerLogo);
-                      }}
-                    />
-                  </>
+                  <Image
+                    source={{ uri: experience.providerLogo }}
+                    style={styles.hostLogo}
+                    contentFit="contain"
+                  />
                 ) : (
                   <View style={styles.hostAvatar}>
                     <Text style={styles.hostInitial}>{experience.provider[0]}</Text>
@@ -381,52 +377,31 @@ Book this amazing experience on BoredTourist!`;
               </View>
             )}
 
+            {/* Info Chips Row */}
             {experience && (
-              <View style={styles.locationRow}>
-                <MapPin size={16} color={colors.dark.textSecondary} />
-                <Text style={styles.locationText}>
-                  {experience.location} • {experience.distance}
-                </Text>
-              </View>
-            )}
-
-            {experience && (
-              <View style={styles.ratingRow}>
-                <Star size={16} color="#FFB800" fill="#FFB800" />
-                <Text style={styles.ratingText}>
-                  {experience.rating} ({experience.reviewCount} reviews)
-                </Text>
-              </View>
-            )}
-
-            {experience && (
-              <View style={styles.statsContainer}>
-                <View style={styles.statCard}>
-                  <Clock size={24} color={colors.dark.primary} />
-                  <Text style={styles.statLabel}>Duration</Text>
-                  <Text style={styles.statValue}>{experience.duration}</Text>
+              <View style={styles.infoChipsRow}>
+                <View style={styles.infoChip}>
+                  <Clock size={16} color={colors.dark.text} />
+                  <Text style={styles.infoChipText}>{experience.duration}</Text>
                 </View>
-                <View style={styles.statCard}>
-                  <Users size={24} color={colors.dark.primary} />
-                  <Text style={styles.statLabel}>Group size</Text>
-                  <Text style={styles.statValue}>Max {experience.maxGroupSize || 12}</Text>
+                <View style={styles.infoChip}>
+                  <Footprints size={16} color={colors.dark.text} />
+                  <Text style={styles.infoChipText}>Walking</Text>
                 </View>
-                <Pressable style={styles.statCard} onPress={handleOpenMap}>
-                  <MapPin size={24} color={colors.dark.primary} />
-                  <Text style={styles.statLabel}>View on Map</Text>
-                  <Text style={styles.statValue}>{experience.location}</Text>
-                </Pressable>
+                <View style={styles.infoChip}>
+                  <Globe size={16} color={colors.dark.text} />
+                  <Text style={styles.infoChipText}>{experience.languages?.[0] || 'English'}</Text>
+                </View>
               </View>
             )}
 
+            {/* Description */}
             {experience && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About this experience</Text>
-                <Text style={styles.descriptionText}>{experience.description}</Text>
-              </View>
+              <Text style={styles.descriptionText}>{experience.description}</Text>
             )}
 
-            {experience && experience.highlights.length > 0 && (
+            {/* Highlights */}
+            {experience && experience.highlights && experience.highlights.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Highlights</Text>
                 {experience.highlights.map((highlight, index) => (
@@ -438,9 +413,10 @@ Book this amazing experience on BoredTourist!`;
               </View>
             )}
 
-            {experience && experience.included.length > 0 && (
+            {/* What's Included */}
+            {experience && experience.included && experience.included.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>What&apos;s included</Text>
+                <Text style={styles.sectionTitle}>What's included</Text>
                 {experience.included.map((item, index) => (
                   <View key={index} style={styles.listItem}>
                     <View style={styles.bullet} />
@@ -450,6 +426,24 @@ Book this amazing experience on BoredTourist!`;
               </View>
             )}
 
+            {/* Map Preview */}
+            {experience && experience.latitude && experience.longitude && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Meeting Point</Text>
+                <Pressable style={styles.mapPreview} onPress={handleOpenMap}>
+                  <Image
+                    source={{ 
+                      uri: `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-l+FFD60A(${experience.longitude},${experience.latitude})/${experience.longitude},${experience.latitude},15,0/${Math.round(SCREEN_WIDTH - 48)}x180@2x?access_token=pk.eyJ1IjoiYm9yZWR0b3VyaXN0IiwiYSI6ImNtNWQ1ZWNpejAzOWoya3B1bmlxMnR2c2cifQ.Wt9HQPZ2GjWDjKvOlbMOzQ`
+                    }}
+                    style={styles.mapImage}
+                    contentFit="cover"
+                  />
+                </Pressable>
+                <Text style={styles.meetingPointText}>{experience.meetingPoint || experience.location}</Text>
+              </View>
+            )}
+
+            {/* Reviews */}
             {experience && (
               <View style={styles.section}>
                 <View style={styles.reviewsHeader}>
@@ -462,64 +456,64 @@ Book this amazing experience on BoredTourist!`;
                   </View>
                 </View>
 
-              {reviewsLoading ? (
-                <Text style={styles.loadingText}>Loading reviews...</Text>
-              ) : reviews.length === 0 ? (
-                <Text style={styles.noReviewsText}>No reviews yet</Text>
-              ) : (
-                (showAllReviews ? reviews : reviews.slice(0, 3)).map((review) => (
-                  <View key={review.id} style={styles.reviewCard}>
-                    <View style={styles.reviewContent}>
-                      <View style={styles.reviewHeader}>
-                        <View style={styles.reviewAvatar}>
-                          <Text style={styles.reviewAvatarText}>
-                            {review.author.name[0].toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={styles.reviewAuthor}>
-                          <View style={styles.reviewAuthorRow}>
-                            <Text style={styles.reviewName}>{review.author.name}</Text>
-                            {review.source === 'google' && (
-                              <View style={styles.googleBadge}>
-                                <Text style={styles.googleBadgeText}>Google</Text>
-                              </View>
-                            )}
+                {reviewsLoading ? (
+                  <Text style={styles.loadingText}>Loading reviews...</Text>
+                ) : reviews.length === 0 ? (
+                  <Text style={styles.noReviewsText}>No reviews yet</Text>
+                ) : (
+                  (showAllReviews ? reviews : reviews.slice(0, 3)).map((review) => (
+                    <View key={review.id} style={styles.reviewCard}>
+                      <View style={styles.reviewContent}>
+                        <View style={styles.reviewHeader}>
+                          <View style={styles.reviewAvatar}>
+                            <Text style={styles.reviewAvatarText}>
+                              {review.author.name[0].toUpperCase()}
+                            </Text>
                           </View>
-                          <Text style={styles.reviewDate}>{formatDate(review.created_at)}</Text>
+                          <View style={styles.reviewAuthor}>
+                            <View style={styles.reviewAuthorRow}>
+                              <Text style={styles.reviewName}>{review.author.name}</Text>
+                              {review.source === 'google' && (
+                                <View style={styles.googleBadge}>
+                                  <Text style={styles.googleBadgeText}>Google</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.reviewDate}>{formatDate(review.created_at)}</Text>
+                          </View>
+                          <View style={styles.reviewRating}>
+                            <Star size={14} color="#FFB800" fill="#FFB800" />
+                            <Text style={styles.reviewRatingText}>{review.rating}</Text>
+                          </View>
                         </View>
-                        <View style={styles.reviewRating}>
-                          <Star size={14} color="#FFB800" fill="#FFB800" />
-                          <Text style={styles.reviewRatingText}>{review.rating}</Text>
-                        </View>
+                        <Text style={styles.reviewText}>{review.comment}</Text>
+                        {review.verified_purchase && (
+                          <View style={styles.verifiedBadge}>
+                            <Text style={styles.verifiedText}>✓ Verified Purchase</Text>
+                          </View>
+                        )}
                       </View>
-                      <Text style={styles.reviewText}>{review.comment}</Text>
-                      {review.verified_purchase && (
-                        <View style={styles.verifiedBadge}>
-                          <Text style={styles.verifiedText}>✓ Verified Purchase</Text>
-                        </View>
-                      )}
                     </View>
-                  </View>
-                ))
-              )}
+                  ))
+                )}
 
-              {reviews.length > 3 && !showAllReviews && (
-                <Pressable 
-                  style={styles.viewAllReviews}
-                  onPress={() => setShowAllReviews(true)}
-                >
-                  <Text style={styles.viewAllReviewsText}>View All {reviews.length} Reviews</Text>
-                </Pressable>
-              )}
+                {reviews.length > 3 && !showAllReviews && (
+                  <Pressable 
+                    style={styles.viewAllReviews}
+                    onPress={() => setShowAllReviews(true)}
+                  >
+                    <Text style={styles.viewAllReviewsText}>View All {reviews.length} Reviews</Text>
+                  </Pressable>
+                )}
 
-              {showAllReviews && reviews.length > 3 && (
-                <Pressable 
-                  style={styles.viewAllReviews}
-                  onPress={() => setShowAllReviews(false)}
-                >
-                  <Text style={styles.viewAllReviewsText}>Show Less</Text>
-                </Pressable>
-              )}
+                {showAllReviews && reviews.length > 3 && (
+                  <Pressable 
+                    style={styles.viewAllReviews}
+                    onPress={() => setShowAllReviews(false)}
+                  >
+                    <Text style={styles.viewAllReviewsText}>Show Less</Text>
+                  </Pressable>
+                )}
               </View>
             )}
 
@@ -533,13 +527,12 @@ Book this amazing experience on BoredTourist!`;
           return null;
         })()}
         {experience && (
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.priceSection}>
               <Text style={styles.price}>
-                {experience.currency}
-                {experience.price}
+                €{experience.price}
               </Text>
-              <Text style={styles.priceLabel}>per person</Text>
+              <Text style={styles.priceLabel}>/ person</Text>
             </View>
             <Pressable 
               style={[
@@ -559,7 +552,7 @@ Book this amazing experience on BoredTourist!`;
               }}
             >
               <Text style={styles.bookButtonText}>
-                {['12', '19', '33', '38', '40'].includes(experience.id) ? "I'M INTERESTED!" : "BOOK NOW"}
+                {['12', '19', '33', '38', '40'].includes(experience.id) ? "I'M INTERESTED!" : "BOOK"}
               </Text>
             </Pressable>
           </View>
@@ -580,12 +573,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.background,
   },
   imageContainer: {
-    height: 400,
+    height: SCREEN_HEIGHT * 0.45,
     position: 'relative' as const,
   },
   heroImage: {
     width: SCREEN_WIDTH,
-    height: 400,
+    height: SCREEN_HEIGHT * 0.45,
   },
   imageIndicatorContainer: {
     position: 'absolute' as const,
@@ -649,112 +642,145 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    padding: 20,
+    padding: 24,
+    paddingTop: 28,
   },
   title: {
     fontFamily: typography.fonts.extrabold,
-    fontSize: 32,
+    fontSize: 28,
     color: colors.dark.text,
-    marginBottom: 16,
-    lineHeight: 38,
-    letterSpacing: -0.5,
+    marginBottom: 20,
+    lineHeight: 34,
+    letterSpacing: 0.5,
   },
   hostInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   hostAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.dark.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.dark.textSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   hostLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: colors.dark.border,
   },
   hostInitial: {
     color: colors.dark.background,
-    fontSize: 20,
+    fontSize: 14,
     fontFamily: typography.fonts.extrabold,
   },
   hostName: {
     color: colors.dark.text,
-    fontSize: 16,
-    fontFamily: typography.fonts.semibold,
+    fontSize: 15,
+    fontFamily: typography.fonts.regular,
   },
-  locationRow: {
+  // Info Chips Row
+  infoChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  locationText: {
-    color: colors.dark.textSecondary,
-    fontSize: 14,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    gap: 16,
     marginBottom: 24,
   },
-  ratingText: {
+  infoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoChipText: {
     color: colors.dark.text,
     fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-  },
-  statLabel: {
-    color: colors.dark.textSecondary,
-    fontSize: 11,
     fontFamily: typography.fonts.regular,
-    marginTop: 8,
-    textAlign: 'center' as const,
-  },
-  statValue: {
-    color: colors.dark.text,
-    fontSize: 13,
-    fontFamily: typography.fonts.semibold,
-    marginTop: 4,
-    textAlign: 'center' as const,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontFamily: typography.fonts.extrabold,
-    color: colors.dark.text,
-    marginBottom: 16,
-    letterSpacing: -0.3,
   },
   descriptionText: {
     color: colors.dark.textSecondary,
     fontSize: 15,
     fontFamily: typography.fonts.regular,
     lineHeight: 24,
+    marginBottom: 24,
+  },
+  // Map Preview
+  mapPreview: {
+    height: 160,
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative' as const,
+  },
+  mapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mapOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomBar: {
+    position: 'absolute' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    backgroundColor: colors.dark.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  priceSection: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  price: {
+    fontSize: 32,
+    fontFamily: typography.fonts.extrabold,
+    color: colors.dark.primary,
+  },
+  priceLabel: {
+    fontSize: 14,
+    fontFamily: typography.fonts.regular,
+    color: colors.dark.textSecondary,
+  },
+  bookButton: {
+    backgroundColor: colors.dark.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 24,
+  },
+  interestButton: {
+    backgroundColor: colors.dark.primary,
+  },
+  bookButtonText: {
+    color: colors.dark.background,
+    fontSize: 15,
+    fontFamily: typography.fonts.extrabold,
+    letterSpacing: 0.5,
+  },
+  // Sections
+  section: {
+    marginBottom: 28,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontFamily: typography.fonts.extrabold,
+    color: colors.dark.text,
+    marginBottom: 16,
+    letterSpacing: -0.3,
   },
   listItem: {
     flexDirection: 'row',
@@ -776,6 +802,13 @@ const styles = StyleSheet.create({
     fontFamily: typography.fonts.regular,
     lineHeight: 22,
   },
+  meetingPointText: {
+    color: colors.dark.textSecondary,
+    fontSize: 14,
+    fontFamily: typography.fonts.regular,
+    marginTop: 12,
+  },
+  // Reviews
   reviewsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -794,12 +827,6 @@ const styles = StyleSheet.create({
   },
   reviewCard: {
     marginBottom: 20,
-  },
-  reviewImage: {
-    width: '100%',
-    height: 220,
-    borderRadius: 16,
-    marginBottom: 12,
   },
   reviewContent: {
     gap: 8,
@@ -825,6 +852,11 @@ const styles = StyleSheet.create({
   reviewAuthor: {
     flex: 1,
   },
+  reviewAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   reviewName: {
     color: colors.dark.text,
     fontSize: 15,
@@ -848,23 +880,6 @@ const styles = StyleSheet.create({
     color: colors.dark.textSecondary,
     fontSize: 14,
     lineHeight: 20,
-  },
-  loadingText: {
-    color: colors.dark.textSecondary,
-    fontSize: 14,
-    textAlign: 'center' as const,
-    padding: 20,
-  },
-  noReviewsText: {
-    color: colors.dark.textSecondary,
-    fontSize: 14,
-    textAlign: 'center' as const,
-    padding: 20,
-  },
-  reviewAuthorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   googleBadge: {
     backgroundColor: '#4285F4',
@@ -900,47 +915,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600' as const,
   },
-  bottomBar: {
-    position: 'absolute' as const,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    backgroundColor: colors.dark.card,
-    borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
-  },
-  priceSection: {
-    flex: 1,
-  },
-  price: {
-    fontSize: 28,
-    fontFamily: typography.fonts.extrabold,
-    color: colors.dark.primary,
-  },
-  priceLabel: {
-    fontSize: 13,
-    fontFamily: typography.fonts.regular,
+  loadingText: {
     color: colors.dark.textSecondary,
+    fontSize: 14,
+    textAlign: 'center' as const,
+    padding: 20,
   },
-  bookButton: {
-    backgroundColor: colors.dark.primary,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
-    borderRadius: 28,
-  },
-  interestButton: {
-    backgroundColor: colors.dark.primary, // Lime color for interest
-  },
-  bookButtonText: {
-    color: colors.dark.background,
-    fontSize: 17,
-    fontFamily: typography.fonts.extrabold,
-    letterSpacing: 0.5,
+  noReviewsText: {
+    color: colors.dark.textSecondary,
+    fontSize: 14,
+    textAlign: 'center' as const,
+    padding: 20,
   },
   errorText: {
     color: colors.dark.textSecondary,

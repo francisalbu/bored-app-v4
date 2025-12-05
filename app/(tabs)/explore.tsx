@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import colors from '@/constants/colors';
 import { CATEGORIES, type Experience } from '@/constants/experiences';
@@ -19,6 +20,9 @@ import { useExperiences } from '@/hooks/useExperiences';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
+// Poster-style vertical cards (3:4 aspect ratio)
+const TRENDING_CARD_WIDTH = (SCREEN_WIDTH - 56) / 2.3;
+const TRENDING_CARD_HEIGHT = TRENDING_CARD_WIDTH * 1.4; // 3:4 aspect ratio
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -112,60 +116,59 @@ export default function ExploreScreen() {
         <ScrollView 
         style={styles.content}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContainer}
-          >
-            {categoriesWithExperiences.map((category) => (
-              <Pressable
-                key={category.id}
-                style={[
-                  styles.categoryCard,
-                  selectedCategory === category.id && styles.categoryCardActive,
-                ]}
-                onPress={() => setSelectedCategory(category.id)}
-              >
-                <Text style={styles.categoryIcon}>{category.icon}</Text>
-                <Text style={[
-                  styles.categoryName,
-                  selectedCategory === category.id && styles.categoryNameActive,
-                ]}>
-                  {category.name}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+        {/* Categories - Pill Style */}
+        <Text style={styles.sectionTitle}>CATEGORIES</Text>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContainer}
+        >
+          {categoriesWithExperiences.map((category) => (
+            <Pressable
+              key={category.id}
+              style={[
+                styles.categoryPill,
+                selectedCategory === category.id && styles.categoryPillActive,
+              ]}
+              onPress={() => setSelectedCategory(category.id)}
+            >
+              <Text style={styles.categoryIcon}>{category.icon}</Text>
+              <Text style={[
+                styles.categoryName,
+                selectedCategory === category.id && styles.categoryNameActive,
+              ]}>
+                {category.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
-        {/* Trending section only shows when "All" category is selected */}
-        {selectedCategory === 'all' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🔥 Trending Now</Text>
+        {/* Trending Now - Only when "All" is selected */}
+        {selectedCategory === 'all' && trendingExperiences.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>TRENDING NOW</Text>
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.trendingContainer}
             >
-              {trendingExperiences.map((experience) => (
+              {trendingExperiences.slice(0, 4).map((experience) => (
                 <TrendingCard key={experience.id} experience={experience} />
               ))}
             </ScrollView>
-          </View>
+          </>
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {selectedCategory === 'all' ? 'All Experiences' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
-          </Text>
-          <View style={styles.grid}>
-            {filteredExperiences.map((experience) => (
-              <ExperienceCard key={experience.id} experience={experience} />
-            ))}
-          </View>
+        {/* All Experiences Grid */}
+        <Text style={styles.sectionTitle}>
+          {selectedCategory === 'all' ? 'ALL EXPERIENCES' : CATEGORIES.find(c => c.id === selectedCategory)?.name.toUpperCase()}
+        </Text>
+        <View style={styles.grid}>
+          {filteredExperiences.map((experience) => (
+            <ExperienceCard key={experience.id} experience={experience} />
+          ))}
         </View>
       </ScrollView>
       )}
@@ -193,19 +196,20 @@ function ExperienceCard({ experience }: ExperienceCardProps) {
         style={styles.cardImage}
         contentFit="cover"
       />
+      {/* Gradient overlay - smooth fade for text readability */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)']}
+        locations={[0, 0.5, 1]}
+        style={styles.cardGradient}
+      />
+      {/* Content inside the image */}
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={2}>
-          {experience.title}
+          {experience.title.toUpperCase()}
         </Text>
-        <Text style={styles.cardLocation} numberOfLines={1}>
-          📍 {experience.location}
+        <Text style={styles.cardPrice}>
+          {experience.currency}{experience.price}
         </Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardRating}>⭐ {experience.rating}</Text>
-          <Text style={styles.cardPrice}>
-            {experience.currency}{experience.price}
-          </Text>
-        </View>
       </View>
     </Pressable>
   );
@@ -227,20 +231,20 @@ function TrendingCard({ experience }: ExperienceCardProps) {
         style={styles.trendingImage}
         contentFit="cover"
       />
-      <View style={styles.trendingBadge}>
-        <Text style={styles.trendingBadgeText}>TRENDING</Text>
-      </View>
+      {/* Gradient overlay - starts higher for better text readability */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)']}
+        locations={[0, 0.5, 1]}
+        style={styles.trendingGradient}
+      />
+      {/* Content inside the image */}
       <View style={styles.trendingContent}>
         <Text style={styles.trendingTitle} numberOfLines={2}>
-          {experience.title}
+          {experience.title.toUpperCase()}
         </Text>
-        <Text style={styles.trendingLocation}>📍 {experience.location}</Text>
-        <View style={styles.trendingFooter}>
-          <Text style={styles.trendingRating}>⭐ {experience.rating}</Text>
-          <Text style={styles.trendingPrice}>
-            {experience.currency}{experience.price}
-          </Text>
-        </View>
+        <Text style={styles.trendingPrice}>
+          {experience.currency}{experience.price}
+        </Text>
       </View>
     </Pressable>
   );
@@ -254,7 +258,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   searchBar: {
     flexDirection: 'row',
@@ -273,149 +277,137 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  section: {
-    marginBottom: 24,
-  },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '900' as const,
     color: colors.dark.text,
-    marginBottom: 16,
+    marginTop: 20,
+    marginBottom: 14,
     paddingHorizontal: 16,
+    letterSpacing: 1,
   },
+  // Categories - Pill Style
   categoriesContainer: {
     paddingHorizontal: 16,
-    gap: 12,
+    gap: 10,
   },
-  categoryCard: {
+  categoryPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: colors.dark.backgroundTertiary,
-    borderWidth: 2,
-    borderColor: colors.dark.border,
-    minWidth: 100,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    gap: 6,
   },
-  categoryCardActive: {
-    backgroundColor: colors.dark.primary,
-    borderColor: colors.dark.primary,
+  categoryPillActive: {
+    backgroundColor: colors.dark.text,
+    borderColor: colors.dark.text,
   },
   categoryIcon: {
-    fontSize: 28,
-    marginBottom: 4,
+    fontSize: 16,
   },
   categoryName: {
-    fontSize: 13,
-    fontWeight: '900' as const,
-    color: colors.dark.textSecondary,
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
   },
   categoryNameActive: {
     color: colors.dark.background,
   },
+  // Trending Cards - Poster Style (Vertical)
   trendingContainer: {
     paddingHorizontal: 16,
-    gap: 16,
+    gap: 14,
   },
   trendingCard: {
-    width: 280,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 16,
+    width: TRENDING_CARD_WIDTH,
+    height: TRENDING_CARD_HEIGHT,
+    borderRadius: 20,
     overflow: 'hidden',
+    position: 'relative' as const,
   },
   trendingImage: {
     width: '100%',
-    height: 180,
-  },
-  trendingBadge: {
+    height: '100%',
     position: 'absolute' as const,
-    top: 12,
-    right: 12,
-    backgroundColor: colors.dark.accent,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
   },
-  trendingBadgeText: {
-    fontSize: 10,
-    fontWeight: '900' as const,
-    color: colors.dark.background,
+  trendingGradient: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '55%',
   },
   trendingContent: {
-    padding: 12,
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    paddingBottom: 14,
   },
   trendingTitle: {
-    fontSize: 16,
-    fontWeight: '900' as const,
+    fontSize: 14,
+    fontWeight: '800' as const,
     color: colors.dark.text,
     marginBottom: 6,
-  },
-  trendingLocation: {
-    fontSize: 13,
-    color: colors.dark.textSecondary,
-    marginBottom: 8,
-  },
-  trendingFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  trendingRating: {
-    fontSize: 13,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
+    letterSpacing: 0.3,
+    lineHeight: 18,
   },
   trendingPrice: {
-    fontSize: 16,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.75)',
   },
+  // Grid Cards - Poster Style (Vertical)
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
-    gap: 16,
+    gap: 14,
   },
   card: {
     width: CARD_WIDTH,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
+    height: CARD_WIDTH * 1.35, // Vertical aspect ratio
+    borderRadius: 20,
     overflow: 'hidden',
+    position: 'relative' as const,
   },
   cardImage: {
     width: '100%',
-    height: 140,
+    height: '100%',
+    position: 'absolute' as const,
+  },
+  cardGradient: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '55%',
   },
   cardContent: {
-    padding: 10,
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 14,
+    paddingBottom: 12,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '900' as const,
+    fontSize: 13,
+    fontWeight: '800' as const,
     color: colors.dark.text,
     marginBottom: 4,
-    height: 36,
-  },
-  cardLocation: {
-    fontSize: 12,
-    color: colors.dark.textSecondary,
-    marginBottom: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardRating: {
-    fontSize: 12,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
+    letterSpacing: 0.3,
+    lineHeight: 17,
   },
   cardPrice: {
-    fontSize: 14,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.75)',
   },
   centerContainer: {
     flex: 1,
@@ -430,6 +422,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#FF4444',
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: 'center' as const,
   },
 });

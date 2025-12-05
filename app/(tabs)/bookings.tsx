@@ -1,5 +1,5 @@
-import { Calendar, Clock, MapPin, RefreshCw, X, Star } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Calendar, Clock, MapPin, RefreshCw, X, Star, QrCode, ChevronDown } from 'lucide-react-native';
+import React, { useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,9 +13,13 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import apiService from '@/services/api';
 
 import colors from '@/constants/colors';
@@ -23,6 +27,18 @@ import { useBookings, type Booking } from '@/contexts/BookingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CARD_HEIGHT = SCREEN_HEIGHT * 0.65;
+
+// Dynamic collapsed height based on number of cards
+const getCollapsedHeight = (totalCards: number): number => {
+  if (totalCards <= 1) return 0;
+  if (totalCards === 2) return 110; // Bigger cards for 2
+  if (totalCards === 3) return 90;
+  if (totalCards === 4) return 75;
+  return 65; // 5 or more cards
+};
 
 type BookingFilter = 'upcoming' | 'past';
 
@@ -36,6 +52,8 @@ export default function BookingsScreen() {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<Booking | null>(null);
+  const [expandedCardIndex, setExpandedCardIndex] = useState<number | null>(null);
+  const [helpModalVisible, setHelpModalVisible] = useState(false);
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
@@ -106,50 +124,48 @@ export default function BookingsScreen() {
     setSelectedBookingForReview(null);
   };
 
+  const handleCardPress = (index: number) => {
+    if (filteredBookings.length === 1) {
+      // Single card - always expanded
+      return;
+    }
+    setExpandedCardIndex(expandedCardIndex === index ? null : index);
+  };
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{t('booking.myBookings')}</Text>
-          <Pressable onPress={refreshBookings} disabled={isLoading}>
-            <RefreshCw 
-              size={20} 
-              color={isLoading ? colors.dark.textTertiary : colors.dark.primary} 
-            />
-          </Pressable>
-        </View>
+        <Text style={styles.headerTitle}>MY BOOKINGS</Text>
         <View style={styles.filterContainer}>
           <Pressable
-            style={[
-              styles.filterButton,
-              filter === 'upcoming' && styles.filterButtonActive,
-            ]}
-            onPress={() => setFilter('upcoming')}
+            style={styles.filterTab}
+            onPress={() => {
+              setFilter('upcoming');
+              setExpandedCardIndex(null);
+            }}
           >
-            <Text
-              style={[
-                styles.filterText,
-                filter === 'upcoming' && styles.filterTextActive,
-              ]}
-            >
-              {t('booking.upcoming')} ({upcomingBookings.length})
+            <Text style={[
+              styles.filterText,
+              filter === 'upcoming' && styles.filterTextActive,
+            ]}>
+              Upcoming
             </Text>
+            {filter === 'upcoming' && <View style={styles.filterDot} />}
           </Pressable>
           <Pressable
-            style={[
-              styles.filterButton,
-              filter === 'past' && styles.filterButtonActive,
-            ]}
-            onPress={() => setFilter('past')}
+            style={styles.filterTab}
+            onPress={() => {
+              setFilter('past');
+              setExpandedCardIndex(null);
+            }}
           >
-            <Text
-              style={[
-                styles.filterText,
-                filter === 'past' && styles.filterTextActive,
-              ]}
-            >
-              {t('booking.past')} ({pastBookings.length})
+            <Text style={[
+              styles.filterText,
+              filter === 'past' && styles.filterTextActive,
+            ]}>
+              Past
             </Text>
+            {filter === 'past' && <View style={styles.filterDot} />}
           </Pressable>
         </View>
       </View>
@@ -183,41 +199,48 @@ export default function BookingsScreen() {
             <Text style={styles.exploreButtonText}>Explore Experiences</Text>
           </Pressable>
         </View>
-      ) : filter === 'upcoming' ? (
-        // Scroll view for upcoming bookings
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {filteredBookings.map((booking) => (
-            <BookingCard 
-              key={booking.id} 
-              booking={booking}
-              onCancel={handleCancelBooking}
-              isCancelling={cancellingId === booking.id}
-              onWriteReview={handleOpenReviewModal}
-            />
-          ))}
-        </ScrollView>
       ) : (
-        // Regular scroll view for past bookings
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {filteredBookings.map((booking) => (
-            <BookingCard 
-              key={booking.id} 
-              booking={booking}
-              onCancel={handleCancelBooking}
-              isCancelling={cancellingId === booking.id}
-              onWriteReview={handleOpenReviewModal}
-            />
-          ))}
-        </ScrollView>
+        // Apple Wallet Style Stack
+        <View style={styles.walletContainer}>
+          {filteredBookings.map((booking, index) => {
+            const isExpanded = expandedCardIndex === index || filteredBookings.length === 1;
+            const isTopCard = expandedCardIndex === null ? index === 0 : expandedCardIndex === index;
+            
+            return (
+              <WalletCard
+                key={booking.id}
+                booking={booking}
+                index={index}
+                totalCards={filteredBookings.length}
+                isExpanded={isExpanded}
+                isTopCard={isTopCard}
+                expandedIndex={expandedCardIndex}
+                onPress={() => handleCardPress(index)}
+                onCancel={handleCancelBooking}
+                isCancelling={cancellingId === booking.id}
+                onWriteReview={handleOpenReviewModal}
+                insets={insets}
+              />
+            );
+          })}
+        </View>
       )}
+
+      {/* Floating Help Button */}
+      {filteredBookings.length > 0 && (
+        <Pressable 
+          style={[styles.floatingHelpButton, { bottom: insets.bottom + 100 }]}
+          onPress={() => setHelpModalVisible(true)}
+        >
+          <Text style={styles.floatingHelpIcon}>?</Text>
+        </Pressable>
+      )}
+
+      {/* Help Modal */}
+      <HelpModal 
+        visible={helpModalVisible} 
+        onClose={() => setHelpModalVisible(false)} 
+      />
 
       {/* Review Modal */}
       {selectedBookingForReview && (
@@ -232,6 +255,167 @@ export default function BookingsScreen() {
         />
       )}
     </View>
+  );
+}
+
+interface WalletCardProps {
+  booking: Booking;
+  index: number;
+  totalCards: number;
+  isExpanded: boolean;
+  isTopCard: boolean;
+  expandedIndex: number | null;
+  onPress: () => void;
+  onCancel: (id: number, title: string) => void;
+  isCancelling: boolean;
+  onWriteReview?: (booking: Booking) => void;
+  insets: { bottom: number };
+}
+
+function WalletCard({ 
+  booking, 
+  index, 
+  totalCards, 
+  isExpanded, 
+  isTopCard,
+  expandedIndex,
+  onPress, 
+  onCancel, 
+  isCancelling, 
+  onWriteReview,
+  insets 
+}: WalletCardProps) {
+  const { t } = useLanguage();
+  const bookingDate = new Date(booking.slot_date || booking.booking_date);
+  const day = bookingDate.getDate().toString().padStart(2, '0');
+  const month = bookingDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  
+  const dateStr = booking.slot_date || booking.booking_date;
+  const endTime = booking.slot_end_time || '23:59:59';
+  const activityEndDateTime = new Date(`${dateStr}T${endTime}`);
+  
+  const isUpcoming = activityEndDateTime >= new Date() && booking.status !== 'cancelled';
+  const isCancelled = booking.status === 'cancelled';
+
+  // Get dynamic collapsed height based on total cards
+  const collapsedHeight = getCollapsedHeight(totalCards);
+
+  // Calculate position based on state
+  let topOffset = 0;
+  if (totalCards === 1) {
+    topOffset = 0;
+  } else if (expandedIndex !== null) {
+    if (index < expandedIndex) {
+      topOffset = index * collapsedHeight;
+    } else if (index === expandedIndex) {
+      topOffset = index * collapsedHeight;
+    } else {
+      // Cards below expanded card
+      topOffset = expandedIndex * collapsedHeight + CARD_HEIGHT + (index - expandedIndex - 1) * collapsedHeight + 16;
+    }
+  } else {
+    // No card expanded - stack from top
+    topOffset = index * collapsedHeight;
+  }
+
+  // When only 1 card, make it fullscreen; otherwise use CARD_HEIGHT
+  const cardHeight = isExpanded 
+    ? (totalCards === 1 ? SCREEN_HEIGHT - 180 : CARD_HEIGHT) 
+    : collapsedHeight;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.walletCard,
+        {
+          top: topOffset,
+          height: cardHeight,
+          zIndex: isExpanded ? 100 : totalCards - index,
+        },
+      ]}
+    >
+      {/* Card Image Background */}
+      <Image
+        source={{ uri: booking.experience_image }}
+        style={styles.walletCardImage}
+        contentFit="cover"
+      />
+      
+      {/* Gradient Overlay */}
+      <LinearGradient
+        colors={isExpanded ? ['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.95)'] : ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)']}
+        locations={isExpanded ? [0, 0.4, 1] : [0, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Collapsed View - Just title preview */}
+      {!isExpanded && (
+        <View style={styles.walletCardCollapsed}>
+          <View style={styles.walletCardCollapsedLeft}>
+            <Text style={styles.walletCardCollapsedDay}>{day}</Text>
+            <Text style={styles.walletCardCollapsedMonth}>{month}</Text>
+          </View>
+          <View style={styles.walletCardCollapsedRight}>
+            <Text style={styles.walletCardCollapsedTitle} numberOfLines={1}>
+              {booking.experience_title}
+            </Text>
+            <Text style={styles.walletCardCollapsedTime}>
+              {booking.slot_start_time || 'Time TBD'}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Expanded View - All info at bottom with vignette */}
+      {isExpanded && (
+        <View style={[styles.walletCardExpanded, { paddingBottom: totalCards === 1 ? insets.bottom + 16 : 20 }]}>
+          {/* Date */}
+          <View style={styles.walletDateRow}>
+            <Text style={styles.walletDay}>{day}</Text>
+            <Text style={styles.walletMonth}>{month}</Text>
+          </View>
+
+          {/* Title */}
+          <Text style={styles.walletTitle}>{booking.experience_title}</Text>
+          
+          {/* Details Row */}
+          <Text style={styles.walletDetails}>
+            {booking.slot_start_time || 'Time TBD'} • {booking.experience_location}
+          </Text>
+          
+          {/* Info Row */}
+          <View style={styles.walletInfoRow}>
+            <Text style={styles.walletInfoItem}>👥 {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}</Text>
+            <Text style={styles.walletInfoItem}>💰 {booking.currency}{booking.total_amount}</Text>
+          </View>
+
+          {/* Reference */}
+          <Text style={styles.walletReference}>Ref: {booking.booking_reference}</Text>
+
+          {/* Actions */}
+          {isUpcoming && !isCancelled && (
+            <Pressable 
+              style={styles.walletCancelLink}
+              onPress={() => onCancel(booking.id, booking.experience_title || 'this booking')}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <ActivityIndicator size="small" color={colors.dark.textTertiary} />
+              ) : (
+                <Text style={styles.walletCancelText}>Cancel booking</Text>
+              )}
+            </Pressable>
+          )}
+
+          {!isUpcoming && !isCancelled && onWriteReview && (
+            <Pressable style={styles.walletReviewButton} onPress={() => onWriteReview(booking)}>
+              <Text style={styles.walletReviewText}>Write a Review</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -394,6 +578,83 @@ function BookingCard({ booking, onCancel, isCancelling, onWriteReview }: Booking
         </View>
       )}
     </View>
+  );
+}
+
+// Help Modal Component
+interface HelpModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+function HelpModal({ visible, onClose }: HelpModalProps) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.helpModalOverlay}>
+        <Pressable style={styles.helpModalBackdrop} onPress={onClose} />
+        <View style={[styles.helpModalContent, { paddingBottom: Math.max(insets.bottom + 16, 32) }]}>
+          {/* Header */}
+          <View style={styles.helpModalHeader}>
+            <Text style={styles.helpModalTitle}>Need Help?</Text>
+            <Pressable onPress={onClose} style={styles.helpModalClose}>
+              <X size={24} color={colors.dark.textSecondary} />
+            </Pressable>
+          </View>
+
+          <Text style={styles.helpModalSubtitle}>
+            We're here to help! Contact us through any of these channels:
+          </Text>
+
+          {/* WhatsApp */}
+          <Pressable 
+            style={styles.helpModalItem}
+            onPress={() => {
+              Linking.openURL('https://wa.me/351912345678');
+              onClose();
+            }}
+          >
+            <View style={styles.helpModalIconContainer}>
+              <Text style={styles.helpModalIcon}>💬</Text>
+            </View>
+            <View style={styles.helpModalItemContent}>
+              <Text style={styles.helpModalItemTitle}>WhatsApp</Text>
+              <Text style={styles.helpModalItemValue}>+351 912 345 678</Text>
+            </View>
+          </Pressable>
+
+          {/* Email */}
+          <Pressable 
+            style={styles.helpModalItem}
+            onPress={() => {
+              Linking.openURL('mailto:support@boredtourist.com');
+              onClose();
+            }}
+          >
+            <View style={styles.helpModalIconContainer}>
+              <Text style={styles.helpModalIcon}>✉️</Text>
+            </View>
+            <View style={styles.helpModalItemContent}>
+              <Text style={styles.helpModalItemTitle}>Email</Text>
+              <Text style={styles.helpModalItemValue}>support@boredtourist.com</Text>
+            </View>
+          </Pressable>
+
+          {/* Response Time */}
+          <View style={styles.helpModalNote}>
+            <Text style={styles.helpModalNoteText}>
+              We typically respond within 1-2 hours during business hours (9AM - 6PM GMT)
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -560,29 +821,394 @@ const styles = StyleSheet.create({
   },
   filterContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 24,
   },
-  filterButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.dark.backgroundTertiary,
+  filterTab: {
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.dark.border,
-  },
-  filterButtonActive: {
-    backgroundColor: colors.dark.primary,
-    borderColor: colors.dark.primary,
   },
   filterText: {
-    fontSize: 15,
-    fontWeight: '900' as const,
+    fontSize: 16,
+    fontWeight: '600' as const,
     color: colors.dark.textSecondary,
   },
   filterTextActive: {
+    color: colors.dark.text,
+    fontWeight: '700' as const,
+  },
+  filterDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: colors.dark.text,
+    marginTop: 6,
+  },
+  // Apple Wallet Style
+  walletContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    position: 'relative' as const,
+  },
+  walletCard: {
+    position: 'absolute' as const,
+    left: 16,
+    right: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  walletCardImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  // Collapsed state
+  walletCardCollapsed: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  walletCardCollapsedLeft: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  walletCardCollapsedDay: {
+    fontSize: 32,
+    fontWeight: '800' as const,
+    color: colors.dark.text,
+    lineHeight: 36,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  walletCardCollapsedMonth: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  walletCardCollapsedRight: {
+    flex: 1,
+  },
+  walletCardCollapsedTitle: {
+    fontSize: 18,
+    fontWeight: '800' as const,
+    color: colors.dark.text,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  walletCardCollapsedTime: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
+    marginTop: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  // Expanded state
+  walletCardExpanded: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 20,
+  },
+  walletDateSection: {
+    marginBottom: 8,
+  },
+  walletDay: {
+    fontSize: 56,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    lineHeight: 60,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  walletMonth: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+    color: colors.dark.primary,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  walletInfoSection: {
+    marginBottom: 20,
+  },
+  walletTitle: {
+    fontSize: 24,
+    fontWeight: '800' as const,
+    color: colors.dark.text,
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  walletSubtitle: {
+    fontSize: 15,
+    fontWeight: '500' as const,
+    color: colors.dark.text,
+    opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  walletDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  walletNotchLeft: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.dark.background,
+    marginLeft: -28,
+  },
+  walletDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: 8,
+    borderStyle: 'dashed' as const,
+  },
+  walletNotchRight: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.dark.background,
+    marginRight: -28,
+  },
+  walletViewTicket: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+  },
+  walletViewTicketText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: colors.dark.textSecondary,
+    letterSpacing: 1,
+  },
+  walletExtraInfo: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  walletExtraRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  walletExtraLabel: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+  },
+  walletExtraValue: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
+  },
+  walletExtraPrice: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: colors.dark.primary,
+  },
+  walletCancelLink: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  walletCancelText: {
+    fontSize: 13,
+    color: colors.dark.textTertiary,
+    textDecorationLine: 'underline' as const,
+  },
+  walletReviewButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.dark.primary,
+    marginTop: 8,
+  },
+  walletReviewText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: colors.dark.primary,
+  },
+  walletReference: {
+    fontSize: 14,
+    color: colors.dark.primary,
+    marginTop: 8,
+    fontWeight: '700' as const,
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  walletDateRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginBottom: 4,
+  },
+  walletDetails: {
+    fontSize: 14,
+    color: colors.dark.text,
+    opacity: 0.9,
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  walletInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 4,
+  },
+  walletInfoItem: {
+    fontSize: 14,
+    color: colors.dark.text,
+    opacity: 0.85,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  floatingHelpButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.dark.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 100,
+  },
+  floatingHelpIcon: {
+    fontSize: 24,
+    fontWeight: '700' as const,
     color: colors.dark.background,
   },
+  walletHelpButton: {
+    backgroundColor: colors.dark.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  walletHelpText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: colors.dark.background,
+  },
+  // Help Modal Styles
+  helpModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'flex-end',
+  },
+  helpModalBackdrop: {
+    flex: 1,
+  },
+  helpModalContent: {
+    backgroundColor: colors.dark.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  helpModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  helpModalTitle: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+  },
+  helpModalClose: {
+    padding: 4,
+  },
+  helpModalSubtitle: {
+    fontSize: 15,
+    color: colors.dark.textSecondary,
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  helpModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.backgroundTertiary,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  helpModalIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.dark.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  helpModalIcon: {
+    fontSize: 24,
+  },
+  helpModalItemContent: {
+    flex: 1,
+  },
+  helpModalItemTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
+    marginBottom: 2,
+  },
+  helpModalItemValue: {
+    fontSize: 14,
+    color: colors.dark.primary,
+    fontWeight: '500' as const,
+  },
+  helpModalNote: {
+    marginTop: 12,
+    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+  },
+  helpModalNoteText: {
+    fontSize: 13,
+    color: colors.dark.textTertiary,
+    textAlign: 'center' as const,
+    lineHeight: 18,
+  },
+  // Keep old styles for backwards compatibility
   content: {
     flex: 1,
   },

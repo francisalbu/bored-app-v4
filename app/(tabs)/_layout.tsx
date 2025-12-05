@@ -1,46 +1,140 @@
 import { Tabs } from 'expo-router';
-import { Home, Compass, Sparkles, Calendar, User } from 'lucide-react-native';
+import { Home, Search, Ticket, User } from 'lucide-react-native';
 import React from 'react';
-import { Platform } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
 
+const TAB_BAR_WIDTH = 200;
+
+// Custom Tab Bar Component
+function CustomTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
+  
+  // Define the visible tabs in order
+  const visibleTabNames = ['index', 'explore', 'bookings', 'profile'];
+  
+  // Filter and sort routes to match our order
+  const visibleRoutes = visibleTabNames
+    .map(name => state.routes.find((route: any) => route.name === name))
+    .filter(Boolean);
+
+  return (
+    <View style={[styles.floatingContainer, { bottom: insets.bottom > 0 ? insets.bottom + 4 : 20 }]}>
+      <View style={styles.tabBar}>
+        <BlurView
+          intensity={80}
+          tint="light"
+          style={[StyleSheet.absoluteFill, { borderRadius: 25, overflow: 'hidden' }]}
+        />
+        {visibleRoutes.map((route: any) => {
+          const isFocused = state.index === state.routes.indexOf(route);
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          // Cor cinzenta escura para ativo, cinzenta clara para inativo
+          const color = isFocused ? '#1a1a1a' : '#999999';
+          const fill = isFocused ? '#1a1a1a' : 'none';
+
+          let IconComponent;
+          switch (route.name) {
+            case 'index':
+              IconComponent = <Home size={22} color={color} fill={fill} strokeWidth={1.5} />;
+              break;
+            case 'explore':
+              IconComponent = <Search size={22} color={color} strokeWidth={isFocused ? 2.5 : 1.5} />;
+              break;
+            case 'bookings':
+              IconComponent = <Ticket size={22} color={color} fill={fill} strokeWidth={1.5} />;
+              break;
+            case 'profile':
+              IconComponent = <User size={22} color={color} fill={fill} strokeWidth={1.5} />;
+              break;
+            default:
+              IconComponent = null;
+          }
+
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              style={styles.tabItem}
+            >
+              {IconComponent}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  floatingContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    width: TAB_BAR_WIDTH,
+    height: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 25,
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+    overflow: 'hidden',
+    paddingHorizontal: 20,
+    paddingLeft: 32,
+  },
+  tabItem: {
+    width: 32,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+
 export default function TabLayout() {
   const { t } = useLanguage();
+  
   return (
     <Tabs
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: colors.dark.primary,
-        tabBarInactiveTintColor: colors.dark.textSecondary,
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#1a1a1a',
-          borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 85 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-          paddingTop: 8,
-          elevation: 0,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '900' as const,
-          marginTop: 4,
-        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: t('tabs.feed'),
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color, size }) => <Compass size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -52,22 +146,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="saved"
         options={{
-          title: 'Bored AI',
-          tabBarIcon: ({ color, size }) => <Sparkles size={size} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
           title: t('tabs.bookings'),
-          tabBarIcon: ({ color, size }) => <Calendar size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: t('tabs.settings'),
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
       />
     </Tabs>

@@ -1,4 +1,4 @@
-import { Settings, Award, TrendingUp, MapPin, Star, LogOut, LogIn } from 'lucide-react-native';
+import { ChevronLeft, MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   Pressable,
@@ -7,13 +7,14 @@ import {
   Text,
   View,
   Alert,
+  Modal,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
 import colors from '@/constants/colors';
-import { USER_PROFILE, type Badge } from '@/constants/profile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
@@ -24,24 +25,57 @@ export default function ProfileScreen() {
   const { user, isAuthenticated, logout } = useAuth();
   const { savedExperiences } = useFavorites();
   const [showAuthSheet, setShowAuthSheet] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   
-  // For new users, all stats start at 0
-  const currentXP = 0;
-  const nextLevelXP = 3500;
-  const level = 1;
-  const progressPercentage = (currentXP / nextLevelXP) * 100;
+  // XP/Level system
+  const experiencesCompleted = 0; // Will come from backend
+  const citiesVisited = 0;
+  const reviewsWritten = 0;
+  
+  // Level calculation: Each level requires more XP
+  const level = Math.floor(experiencesCompleted / 5) + 1;
+  const currentLevelXP = experiencesCompleted % 5;
+  const xpForNextLevel = 5;
+  const progressPercentage = (currentLevelXP / xpForNextLevel) * 100;
+  
+  const getLevelTitle = (lvl: number) => {
+    if (lvl <= 1) return 'Explorer';
+    if (lvl <= 3) return 'Adventurer';
+    if (lvl <= 5) return 'Traveler';
+    if (lvl <= 10) return 'Globetrotter';
+    return 'Legend';
+  };
   
   const handleLogout = () => {
+    setShowMenu(false);
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      'Sign Out',
+      'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Logout',
+          text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
             await logout();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    setShowMenu(false);
+    Alert.alert(
+      'Delete Account',
+      'This action is permanent and cannot be undone. All your data will be deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Contact Support', 'Please email support@boredtourist.com to delete your account.');
           },
         },
       ]
@@ -52,86 +86,76 @@ export default function ProfileScreen() {
     setShowAuthSheet(true);
   };
 
+  const handleTextFounder = () => {
+    Linking.openURL('https://wa.me/351912345678?text=Hi%20Francis!');
+  };
+
+  const handleEmailUs = () => {
+    Linking.openURL('mailto:hello@boredtourist.com');
+  };
+
   // Show login prompt when not authenticated
   if (!isAuthenticated) {
     return (
       <>
         <View style={styles.container}>
           <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <ChevronLeft size={28} color={colors.dark.text} />
+            </Pressable>
             <Text style={styles.headerTitle}>Profile</Text>
+            <View style={styles.headerRight} />
           </View>
           
           <ScrollView 
-            style={styles.guestScrollView}
-            contentContainerStyle={styles.guestContainer}
+            style={styles.scrollView}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.guestContent}>
-              <Text style={styles.guestTitle}>Access your bookings from anywhere</Text>
-              <Text style={styles.guestDescription}>
-                Sign up to sync your bookings, add activities to your favorites list, and make payments faster with saved data.
+            {/* Login Card */}
+            <View style={styles.loginCard}>
+              <View style={styles.loginIconContainer}>
+                <Text style={styles.loginIcon}>👋</Text>
+              </View>
+              <Text style={styles.loginTitle}>Welcome to Bored Tourist</Text>
+              <Text style={styles.loginDescription}>
+                Sign in to sync your bookings, save your favorite experiences, and track your adventures.
               </Text>
-              <Pressable style={styles.guestButton} onPress={handleLogin}>
-                <Text style={styles.guestButtonText}>Sign in or create account</Text>
+              <Pressable style={styles.loginButton} onPress={handleLogin}>
+                <Text style={styles.loginButtonText}>Sign in or create account</Text>
               </Pressable>
             </View>
 
-          <View style={styles.guestSettingsSection}>
-            <Text style={styles.guestSectionTitle}>General</Text>
-            
-            <Pressable style={styles.guestSettingCard}>
-              <View style={styles.guestSettingInfo}>
-                <Text style={styles.guestSettingLabel}>Currency</Text>
-                <Text style={styles.guestSettingValue}>(€) Euro</Text>
-              </View>
-            </Pressable>
-            
-            <Pressable style={styles.guestSettingCard}>
-              <View style={styles.guestSettingInfo}>
-                <Text style={styles.guestSettingLabel}>Language</Text>
-                <Text style={styles.guestSettingValue}>English</Text>
-              </View>
-            </Pressable>
-            
-            <Pressable style={styles.guestSettingCard}>
-              <View style={styles.guestSettingInfo}>
-                <Text style={styles.guestSettingLabel}>Appearance</Text>
-                <Text style={styles.guestSettingValue}>System default</Text>
-              </View>
-            </Pressable>
-            
-            <Pressable style={styles.guestSettingCard}>
-              <Text style={styles.guestSettingLabel}>Notifications</Text>
-            </Pressable>
-          </View>
+            {/* Contact Section */}
+            <View style={styles.sectionCard}>
+              <Pressable style={styles.menuItem} onPress={handleTextFounder}>
+                <MessageCircle size={22} color={colors.dark.textSecondary} />
+                <Text style={styles.menuItemText}>Text the Founder</Text>
+              </Pressable>
+              <View style={styles.menuDivider} />
+              <Pressable style={styles.menuItem} onPress={handleEmailUs}>
+                <Mail size={22} color={colors.dark.textSecondary} />
+                <Text style={styles.menuItemText}>Email Us</Text>
+              </Pressable>
+            </View>
 
-          <View style={styles.guestSettingsSection}>
-            <Text style={styles.guestSectionTitle}>Support</Text>
-            
-            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/about' as any)}>
-              <Text style={styles.guestSettingLabel}>About Bored Tourist</Text>
-            </Pressable>
-            
-            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/help' as any)}>
-              <Text style={styles.guestSettingLabel}>Help Center</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.guestSettingsSection}>
-            <Text style={styles.guestSectionTitle}>Legal</Text>
-            
-            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/terms' as any)}>
-              <Text style={styles.guestSettingLabel}>Terms and Conditions</Text>
-            </Pressable>
-            
-            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/privacy' as any)}>
-              <Text style={styles.guestSettingLabel}>Privacy</Text>
-            </Pressable>
-            
-            <Pressable style={styles.guestSettingCard} onPress={() => router.push('/info/cancellation' as any)}>
-              <Text style={styles.guestSettingLabel}>Cancellation & Refund Policy</Text>
-            </Pressable>
-          </View>
+            {/* Legal Section */}
+            <View style={styles.sectionCard}>
+              <Pressable style={styles.menuItem} onPress={() => router.push('/info/about' as any)}>
+                <Info size={22} color={colors.dark.textSecondary} />
+                <Text style={styles.menuItemText}>About Bored Tourist</Text>
+              </Pressable>
+              <View style={styles.menuDivider} />
+              <Pressable style={styles.menuItem} onPress={() => router.push('/info/privacy' as any)}>
+                <Shield size={22} color={colors.dark.textSecondary} />
+                <Text style={styles.menuItemText}>Privacy Policy</Text>
+              </Pressable>
+              <View style={styles.menuDivider} />
+              <Pressable style={styles.menuItem} onPress={() => router.push('/info/terms' as any)}>
+                <BookOpen size={22} color={colors.dark.textSecondary} />
+                <Text style={styles.menuItemText}>Terms of Use</Text>
+              </Pressable>
+            </View>
           </ScrollView>
         </View>
 
@@ -139,9 +163,7 @@ export default function ProfileScreen() {
           visible={showAuthSheet}
           onClose={() => setShowAuthSheet(false)}
           onSuccess={() => {
-            console.log('🎉 Auth success - refreshing profile');
             setShowAuthSheet(false);
-            // The auth context will auto-update and trigger a re-render
           }}
         />
       </>
@@ -149,204 +171,177 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.headerButtons}>
-          <Pressable style={styles.settingsButton} onPress={() => router.push('/settings' as any)}>
-            <Settings size={24} color={colors.dark.text} />
+    <>
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ChevronLeft size={28} color={colors.dark.text} />
           </Pressable>
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
-            <LogOut size={20} color={colors.dark.error} />
-            <Text style={styles.logoutText}>Logout</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.profileSection}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{user?.name.charAt(0).toUpperCase()}</Text>
+          <View style={styles.headerRight}>
+            <Pressable style={styles.menuButton} onPress={() => setShowMenu(true)}>
+              <MoreVertical size={24} color={colors.dark.text} />
+            </Pressable>
           </View>
-          <Text style={styles.name}>{user?.name}</Text>
-          <Text style={styles.username}>@{user?.email.split('@')[0]}</Text>
+        </View>
 
-          <View style={styles.levelContainer}>
-            <View style={styles.levelBadge}>
-              <Award size={16} color={colors.dark.primary} />
-              <Text style={styles.levelText}>Level {level}</Text>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Profile Header */}
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarEmoji}>🧑‍🚀</Text>
+              </View>
             </View>
-            <Text style={styles.title}>Beginner Explorer</Text>
-          </View>
-
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${progressPercentage}%` },
-                ]}
-              />
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{user?.name || 'Explorer'}</Text>
+              <Text style={styles.profileUsername}>@{user?.email?.split('@')[0] || 'username'}</Text>
             </View>
-            <Text style={styles.progressText}>
-              {currentXP} / {nextLevelXP} XP
-            </Text>
           </View>
-        </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Completed</Text>
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{experiencesCompleted}</Text>
+              <Text style={styles.statLabel}>Experiences</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{citiesVisited}</Text>
+              <Text style={styles.statLabel}>Cities</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{reviewsWritten}</Text>
+              <Text style={styles.statLabel}>Reviews</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Cities</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Badges</Text>
-          </View>
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Star size={20} color={colors.dark.accent} />
-            <Text style={styles.sectionTitle}>Saved Experiences</Text>
-            {savedExperiences.length > 0 && (
-              <Text style={styles.sectionCount}>({savedExperiences.length})</Text>
-            )}
+          {/* Level Progress */}
+          <View style={styles.levelSection}>
+            <View style={styles.levelProgressBar}>
+              <View style={[styles.levelProgressFill, { width: `${Math.max(progressPercentage, 5)}%` }]} />
+            </View>
+            <View style={styles.levelLabels}>
+              <Text style={styles.levelCurrent}>
+                <Text style={styles.levelBold}>Level {level}</Text> {getLevelTitle(level)}
+              </Text>
+              <Text style={styles.levelNext}>Level {level + 1}</Text>
+            </View>
           </View>
-          <Pressable
-            style={styles.savedButton}
+
+          {/* Saved Experiences Card */}
+          <Pressable 
+            style={styles.savedCard}
             onPress={() => router.push('/saved-experiences' as any)}
           >
-            <View style={styles.savedButtonContent}>
-              <View style={styles.savedButtonLeft}>
-                <View style={styles.savedIconContainer}>
-                  <Star size={24} color={colors.dark.accent} fill={colors.dark.accent} />
-                </View>
-                <View>
-                  <Text style={styles.savedButtonTitle}>
-                    {savedExperiences.length > 0 
-                      ? `${savedExperiences.length} Saved Experience${savedExperiences.length !== 1 ? 's' : ''}`
-                      : 'No Saved Experiences'}
-                  </Text>
-                  <Text style={styles.savedButtonSubtitle}>
-                    {savedExperiences.length > 0 
-                      ? 'Tap to view all your favorites'
-                      : 'Start saving experiences you love'}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.savedButtonArrow}>›</Text>
+            <View style={styles.savedEmptyIcon}>
+              <Star size={32} color={savedExperiences.length > 0 ? colors.dark.primary : colors.dark.textTertiary} />
             </View>
+            <View style={styles.savedInfo}>
+              <Text style={styles.savedTitle}>Saved Experiences</Text>
+              <Text style={styles.savedCount}>
+                {savedExperiences.length > 0 
+                  ? `${savedExperiences.length} saved`
+                  : 'No experiences saved yet'}
+              </Text>
+            </View>
+            <ChevronRight size={24} color={colors.dark.textTertiary} />
           </Pressable>
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Award size={20} color={colors.dark.primary} />
-            <Text style={styles.sectionTitle}>Badges</Text>
+          {/* Contact Section */}
+          <View style={styles.sectionCard}>
+            <Pressable style={styles.menuItem} onPress={handleTextFounder}>
+              <MessageCircle size={22} color={colors.dark.textSecondary} />
+              <Text style={styles.menuItemText}>Text the Founder</Text>
+            </Pressable>
+            <View style={styles.menuDivider} />
+            <Pressable style={styles.menuItem} onPress={handleEmailUs}>
+              <Mail size={22} color={colors.dark.textSecondary} />
+              <Text style={styles.menuItemText}>Email Us</Text>
+            </Pressable>
           </View>
-          <View style={styles.badgesGrid}>
-            {USER_PROFILE.badges.map((badge) => (
-              <BadgeCard key={badge.id} badge={{ ...badge, earned: false }} earned={false} />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Star size={20} color={colors.dark.accent} />
-            <Text style={styles.sectionTitle}>Adventure Stats</Text>
-          </View>
-          <View style={styles.statsListContainer}>
-            <StatRow
-              icon={<MapPin size={18} color={colors.dark.primary} />}
-              label="Total Experiences Booked"
-              value="0"
-            />
-            <StatRow
-              icon={<TrendingUp size={18} color={colors.dark.primary} />}
-              label="Experiences Completed"
-              value="0"
-            />
-            <StatRow
-              icon={<Award size={18} color={colors.dark.primary} />}
-              label="Current Level"
-              value={level.toString()}
-            />
-          </View>
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
-interface BadgeCardProps {
-  badge: Badge;
-  earned: boolean;
-}
-
-function BadgeCard({ badge, earned }: BadgeCardProps) {
-  const isEarned = badge.earned; // Use badge's earned status instead of prop
-  
-  return (
-    <View style={[
-      styles.badgeCard, 
-      !isEarned && styles.badgeCardLocked,
-      isEarned && { borderColor: colors.dark.primary, borderWidth: 2 }
-    ]}>
-      <Text style={[styles.badgeIcon, !isEarned && styles.badgeIconLocked]}>
-        {badge.icon}
-      </Text>
-      <Text style={[styles.badgeName, !isEarned && styles.badgeNameLocked]}>
-        {badge.name}
-      </Text>
-      <Text
-        style={[styles.badgeDescription, !isEarned && styles.badgeDescriptionLocked]}
-        numberOfLines={2}
-      >
-        {badge.description}
-      </Text>
-      {isEarned && badge.earnedDate && (
-        <Text style={styles.badgeDate}>
-          {new Date(badge.earnedDate).toLocaleDateString('en-US', {
-            month: 'short',
-            year: 'numeric',
-          })}
-        </Text>
-      )}
-      {!isEarned && (
-        <Text style={styles.lockedText}>🔒 Locked</Text>
-      )}
-    </View>
-  );
-}
-
-interface StatRowProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}
-
-function StatRow({ icon, label, value }: StatRowProps) {
-  return (
-    <View style={styles.statRow}>
-      <View style={styles.statRowLeft}>
-        <View>{icon}</View>
-        <Text style={styles.statRowLabel}>{label}</Text>
+        </ScrollView>
       </View>
-      <Text style={styles.statRowValue}>{value}</Text>
-    </View>
+
+      {/* Dropdown Menu Modal */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setShowMenu(false)}>
+          <View style={[styles.menuDropdown, { top: insets.top + 60 }]}>
+            <Pressable 
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setShowMenu(false);
+                router.push('/info/about' as any);
+              }}
+            >
+              <Info size={20} color={colors.dark.text} />
+              <Text style={styles.menuDropdownText}>About Bored Tourist</Text>
+            </Pressable>
+            
+            <View style={styles.menuDropdownDivider} />
+            
+            <Pressable 
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setShowMenu(false);
+                router.push('/info/privacy' as any);
+              }}
+            >
+              <Shield size={20} color={colors.dark.text} />
+              <Text style={styles.menuDropdownText}>Privacy Policy</Text>
+            </Pressable>
+            
+            <View style={styles.menuDropdownDivider} />
+            
+            <Pressable 
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setShowMenu(false);
+                router.push('/info/terms' as any);
+              }}
+            >
+              <BookOpen size={20} color={colors.dark.text} />
+              <Text style={styles.menuDropdownText}>Terms of Use</Text>
+            </Pressable>
+            
+            <View style={styles.menuDropdownDivider} />
+            
+            <Pressable 
+              style={styles.menuDropdownItem}
+              onPress={handleLogout}
+            >
+              <LogOut size={20} color={colors.dark.text} />
+              <Text style={styles.menuDropdownText}>Sign Out</Text>
+            </Pressable>
+            
+            <View style={styles.menuDropdownDivider} />
+            
+            <Pressable 
+              style={styles.menuDropdownItem}
+              onPress={handleDeleteAccount}
+            >
+              <Trash2 size={20} color={colors.dark.error} />
+              <Text style={[styles.menuDropdownText, { color: colors.dark.error }]}>Delete Account</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <AuthBottomSheet
+        visible={showAuthSheet}
+        onClose={() => setShowAuthSheet(false)}
+        onSuccess={() => setShowAuthSheet(false)}
+      />
+    </>
   );
 }
 
@@ -356,425 +351,278 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.background,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.dark.backgroundTertiary,
+  backButton: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loginButton: {
-    flexDirection: 'row',
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: colors.dark.text,
+  },
+  headerRight: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: colors.dark.card,
-    borderWidth: 1,
-    borderColor: colors.dark.primary,
+    justifyContent: 'center',
   },
-  loginButtonText: {
-    fontSize: 14,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
-  },
-  logoutButton: {
-    flexDirection: 'row',
+  menuButton: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: colors.dark.card,
-    borderWidth: 1,
-    borderColor: colors.dark.error,
+    justifyContent: 'center',
   },
-  logoutText: {
-    fontSize: 14,
-    fontWeight: '900' as const,
-    color: colors.dark.error,
-  },
-  content: {
+  scrollView: {
     flex: 1,
   },
-  contentContainer: {
-    paddingBottom: 100,
-  },
-  profileSection: {
-    alignItems: 'center',
-    paddingVertical: 24,
+  scrollContent: {
     paddingHorizontal: 16,
+  },
+  // Profile Header
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  avatarContainer: {
+    marginRight: 16,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: colors.dark.primary,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: colors.dark.primary,
     backgroundColor: colors.dark.card,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.dark.border,
   },
-  avatarInitial: {
-    fontSize: 40,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
+  avatarEmoji: {
+    fontSize: 48,
   },
-  name: {
-    fontSize: 24,
-    fontWeight: '900' as const,
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 28,
+    fontWeight: '800' as const,
     color: colors.dark.text,
     marginBottom: 4,
   },
-  username: {
+  profileUsername: {
+    fontSize: 16,
+    color: colors.dark.textSecondary,
+  },
+  // Stats Row
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 28,
+    fontWeight: '800' as const,
+    color: colors.dark.text,
+    marginBottom: 4,
+  },
+  statLabel: {
     fontSize: 14,
     color: colors.dark.textSecondary,
-    marginBottom: 16,
   },
-  levelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.dark.border,
   },
-  levelBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 255, 140, 0.15)',
-    borderWidth: 1,
-    borderColor: colors.dark.primary,
+  // Level Progress
+  levelSection: {
+    marginBottom: 24,
   },
-  levelText: {
-    fontSize: 14,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '900' as const,
-    color: colors.dark.accent,
-  },
-  progressContainer: {
-    width: '100%',
-    gap: 8,
-  },
-  progressBar: {
+  levelProgressBar: {
     height: 8,
     backgroundColor: colors.dark.backgroundTertiary,
     borderRadius: 4,
     overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.dark.primary,
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    color: colors.dark.textSecondary,
-    textAlign: 'center' as const,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.dark.card,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.dark.textSecondary,
-  },
-  section: {
-    marginBottom: 24,
-    paddingHorizontal: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
-  },
-  sectionCount: {
-    fontSize: 16,
-    color: colors.dark.textSecondary,
-    marginLeft: 8,
-  },
-  savedInfo: {
-    fontSize: 14,
-    color: colors.dark.textSecondary,
-    textAlign: 'center' as const,
-    padding: 16,
-  },
-  savedButton: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-  },
-  savedButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  savedButtonLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    flex: 1,
-  },
-  savedIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 204, 0, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  savedButtonTitle: {
-    fontSize: 16,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
-    marginBottom: 4,
-  },
-  savedButtonSubtitle: {
-    fontSize: 13,
-    color: colors.dark.textSecondary,
-  },
-  savedButtonArrow: {
-    fontSize: 32,
-    color: colors.dark.textSecondary,
-    fontWeight: '300' as const,
-  },
-  badgesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  badgeCard: {
-    width: '48%',
-    backgroundColor: colors.dark.card,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-  },
-  badgeCardLocked: {
-    backgroundColor: colors.dark.backgroundTertiary,
-    borderColor: colors.dark.border,
-    opacity: 0.6,
-  },
-  badgeIcon: {
-    fontSize: 36,
     marginBottom: 8,
   },
-  badgeIconLocked: {
-    opacity: 0.5,
+  levelProgressFill: {
+    height: '100%',
+    backgroundColor: colors.dark.text,
+    borderRadius: 4,
   },
-  badgeName: {
-    fontSize: 13,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
-    marginBottom: 4,
-    textAlign: 'center' as const,
-  },
-  badgeNameLocked: {
-    color: colors.dark.textSecondary,
-  },
-  badgeDescription: {
-    fontSize: 11,
-    color: colors.dark.textSecondary,
-    textAlign: 'center' as const,
-    lineHeight: 14,
-  },
-  badgeDescriptionLocked: {
-    color: colors.dark.textTertiary,
-  },
-  badgeDate: {
-    fontSize: 10,
-    color: colors.dark.primary,
-    marginTop: 4,
-    fontWeight: '900' as const,
-  },
-  lockedText: {
-    fontSize: 10,
-    color: colors.dark.textTertiary,
-    marginTop: 4,
-  },
-  statsListContainer: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  statRow: {
+  levelLabels: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
   },
-  statRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statRowLabel: {
+  levelCurrent: {
     fontSize: 14,
+    color: colors.dark.textSecondary,
+  },
+  levelBold: {
+    fontWeight: '800' as const,
     color: colors.dark.text,
   },
-  statRowValue: {
-    fontSize: 16,
-    fontWeight: '900' as const,
-    color: colors.dark.primary,
+  levelNext: {
+    fontSize: 14,
+    color: colors.dark.textTertiary,
   },
-  emptyState: {
-    padding: 32,
+  // Saved Card
+  savedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  savedImagesRow: {
+    flexDirection: 'row',
+    marginRight: 12,
+  },
+  savedImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.dark.card,
+  },
+  savedEmptyIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    backgroundColor: colors.dark.backgroundTertiary,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
-  emptyStateText: {
-    fontSize: 14,
-    color: colors.dark.textSecondary,
-    textAlign: 'center' as const,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
-  },
-  guestScrollView: {
+  savedInfo: {
     flex: 1,
   },
-  guestContainer: {
-    padding: 16,
-    paddingBottom: 120,
+  savedTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 2,
   },
-  guestContent: {
+  savedCount: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+  },
+  // Section Card
+  sectionCard: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500' as const,
+    color: colors.dark.text,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: colors.dark.border,
+    marginLeft: 50,
+  },
+  // Login Card
+  loginCard: {
     backgroundColor: colors.dark.card,
     borderRadius: 16,
     padding: 24,
+    alignItems: 'center',
     marginBottom: 24,
   },
-  guestTitle: {
-    fontSize: 20,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
-    marginBottom: 12,
+  loginIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.dark.backgroundTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  guestDescription: {
-    fontSize: 14,
+  loginIcon: {
+    fontSize: 40,
+  },
+  loginTitle: {
+    fontSize: 22,
+    fontWeight: '800' as const,
+    color: colors.dark.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loginDescription: {
+    fontSize: 15,
     color: colors.dark.textSecondary,
-    lineHeight: 20,
+    textAlign: 'center',
+    lineHeight: 22,
     marginBottom: 20,
   },
-  guestButton: {
+  loginButton: {
     backgroundColor: colors.dark.primary,
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    width: '100%',
     alignItems: 'center',
   },
-  guestButtonText: {
+  loginButtonText: {
     fontSize: 16,
     fontWeight: '700' as const,
     color: colors.dark.background,
   },
-  guestSettingsSection: {
-    marginBottom: 24,
+  // Menu Overlay
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  guestSectionTitle: {
-    fontSize: 20,
-    fontWeight: '900' as const,
-    color: colors.dark.text,
-    marginBottom: 16,
-  },
-  guestSettingCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  guestSettingInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  guestSettingLabel: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-  },
-  guestSettingValue: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-    color: colors.dark.textSecondary,
-  },
-  settingsListContainer: {
+  menuDropdown: {
+    position: 'absolute',
+    right: 16,
     backgroundColor: colors.dark.card,
     borderRadius: 12,
-    overflow: 'hidden',
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  settingRow: {
+  menuDropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
   },
-  settingLabel: {
-    fontSize: 14,
+  menuDropdownText: {
+    fontSize: 16,
+    fontWeight: '500' as const,
     color: colors.dark.text,
   },
-  settingArrow: {
-    fontSize: 24,
-    color: colors.dark.textSecondary,
-    fontWeight: '300' as const,
+  menuDropdownDivider: {
+    height: 1,
+    backgroundColor: colors.dark.border,
   },
 });

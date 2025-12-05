@@ -2,7 +2,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Bot } from 'lucide-react-native';
+import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Bot, Search, SlidersHorizontal, Sparkles } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
@@ -243,64 +243,48 @@ export default function FeedScreen() {
         })}
       />
 
+      {/* New Clyx-style Header */}
       <View 
-        style={[styles.filtersContainer, { paddingTop: insets.top + 16 }]} 
+        style={[styles.headerContainer, { paddingTop: insets.top + 8 }]} 
         pointerEvents="box-none"
       >
-        <BlurView intensity={20} tint="dark" style={styles.filterBlurContainer}>
-          <Pressable 
-            style={[
-              styles.filterButton,
-              selectedFilter === 'nearMe' && styles.filterButtonActive
-            ]}
-            onPress={() => setSelectedFilter('nearMe')}
-          >
-            <Text style={[
-              styles.filterText,
-              selectedFilter === 'nearMe' && styles.filterTextActive
-            ]}>
-              {t('feed.nearMe')}
-            </Text>
-          </Pressable>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>NEAR ME</Text>
           
-          <View style={styles.filterButtonDisabledContainer}>
-            <View 
-              style={[
-                styles.filterButton,
-                styles.filterButtonDisabled
-              ]}
+          <View style={styles.headerRight}>
+            <Pressable 
+              style={styles.aiButton}
+              onPress={() => setShowAIChat(true)}
             >
-              <Text style={[
-                styles.filterText,
-                styles.filterTextDisabled
-              ]}>
-                {t('feed.availableToday')}
-              </Text>
-              <Text style={styles.comingSoonText}>coming soon</Text>
-            </View>
+              <Sparkles size={20} color={colors.dark.primary} />
+            </Pressable>
+            <Pressable style={styles.filterIconButton}>
+              <SlidersHorizontal size={20} color={colors.dark.text} />
+            </Pressable>
           </View>
-        </BlurView>
+        </View>
       </View>
 
-      {/* No Activities Nearby Message */}
+      {/* No Activities Nearby Message - Fullscreen Lisbon Style */}
       {showNoActivitiesMessage && selectedFilter === 'nearMe' && (
         <View style={styles.noActivitiesOverlay}>
-          <View style={styles.noActivitiesCard}>
-            <View style={styles.noActivitiesContent}>
-              <Text style={styles.noActivitiesEmoji}>🗺️</Text>
-              <Text style={styles.noActivitiesTitle}>
-                {t('feed.noActivitiesTitle')}
-              </Text>
-              <Text style={styles.noActivitiesSubtitle}>
-                {t('feed.noActivitiesSubtitle')}
-              </Text>
-              <Pressable 
-                style={styles.exploreLisbonButton}
-                onPress={() => setShowNoActivitiesMessage(false)}
-              >
-                <Text style={styles.exploreLisbonButtonText}>{t('feed.exploreLisbon')}</Text>
-              </Pressable>
-            </View>
+          <ExpoImage
+            source={{ uri: 'https://storage.googleapis.com/bored_tourist_media/images/25abril.jpg' }}
+            style={[styles.noActivitiesBackgroundImage, { opacity: 0.5 }]}
+            contentFit="cover"
+          />
+          <View style={styles.noActivitiesContent}>
+            <Text style={styles.noActivitiesTitle}>LISBON</Text>
+            <Text style={styles.noActivitiesTitleLine2}>EXCLUSIVE</Text>
+            <Text style={styles.noActivitiesSubtitle}>
+              We are currently curating experiences exclusively in Lisbon. Discover what's happening in the capital.
+            </Text>
+            <Pressable 
+              style={styles.exploreLisbonButton}
+              onPress={() => setShowNoActivitiesMessage(false)}
+            >
+              <Text style={styles.exploreLisbonButtonText}>EXPLORE LISBON</Text>
+            </Pressable>
           </View>
         </View>
       )}
@@ -375,139 +359,109 @@ Book this amazing experience on BoredTourist!`;
 
   return (
     <View style={styles.card}>
-      {experience.video ? (
-        <>
-          {!videoReady && (
+      {/* Blurred background - frame from video/image */}
+      <ExpoImage
+        source={{ uri: experience.image }}
+        style={styles.blurredBackground}
+        contentFit="cover"
+        blurRadius={50}
+      />
+      
+      {/* Color overlay for the blurred background */}
+      <View style={styles.colorOverlay} />
+      
+      {/* Main card container with video */}
+      <Pressable 
+        style={[styles.mainCard, { marginTop: insets.top + 52, marginBottom: insets.bottom + 70 }]}
+        onPress={() => router.push(`/experience/${experience.id}`)}
+      >
+        {/* Video/Image content */}
+        <View style={styles.videoWrapper}>
+          {experience.video ? (
+            <>
+              {!videoReady && (
+                <ExpoImage
+                  source={{ uri: experience.image }}
+                  style={styles.videoContent}
+                  contentFit="cover"
+                />
+              )}
+              <Video
+                ref={videoRef}
+                source={typeof experience.video === 'string' ? { uri: experience.video } : experience.video}
+                style={[styles.videoContent, !videoReady && { opacity: 0 }]}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay={isActive && videoReady && isTabFocused}
+                isLooping
+                isMuted={!isTabFocused || !isActive}
+                useNativeControls={false}
+                onError={(error) => console.log('❌ Video Error:', error)}
+                onLoad={() => {
+                  console.log('✅ Video Loaded:', experience.title);
+                  setVideoReady(true);
+                }}
+                onReadyForDisplay={() => {
+                  console.log('📹 Video Ready:', experience.title);
+                }}
+              />
+            </>
+          ) : (
             <ExpoImage
               source={{ uri: experience.image }}
-              style={styles.cardImage}
+              style={styles.videoContent}
               contentFit="cover"
             />
           )}
-          <Video
-            ref={videoRef}
-            source={typeof experience.video === 'string' ? { uri: experience.video } : experience.video}
-            style={[styles.cardImage, !videoReady && { opacity: 0 }]}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={isActive && videoReady && isTabFocused}
-            isLooping
-            isMuted={!isTabFocused || !isActive}
-            useNativeControls={false}
-            onError={(error) => console.log('❌ Video Error:', error)}
-            onLoad={() => {
-              console.log('✅ Video Loaded:', experience.title);
-              setVideoReady(true);
-            }}
-            onReadyForDisplay={() => {
-              console.log('📹 Video Ready:', experience.title);
-            }}
+
+          {/* Gradient overlay on video - stronger vignette at bottom */}
+          <LinearGradient
+            colors={['transparent', 'transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
+            locations={[0, 0.4, 0.7, 1]}
+            style={styles.videoGradient}
           />
-        </>
-      ) : (
-        <ExpoImage
-          source={{ uri: experience.image }}
-          style={styles.cardImage}
-          contentFit="cover"
-        />
-      )}
 
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.95)']}
-        style={styles.gradient}
-      />
-
-      <View style={[styles.bottomContainer, { paddingBottom: Math.max(insets.bottom + 60, 80) }]}>
-        <View style={styles.contentWrapper}>
-          <Pressable
-            style={[styles.infoSection, styles.infoCard]}
-            onPress={() => router.push(`/experience/${experience.id}`)}
-          >
-            <View style={styles.providerRow}>
-              {experience.providerLogo ? (
-                <Image
-                  source={{ uri: experience.providerLogo }}
-                  style={styles.providerLogoImage}
-                  resizeMode="cover"
-                  onError={(e) => console.log('❌ Logo failed to load:', experience.providerLogo, e.nativeEvent.error)}
-                  onLoad={() => console.log('✅ Logo loaded:', experience.providerLogo)}
-                />
-              ) : (
-                <View style={styles.providerAvatar}>
-                  <Text style={styles.providerInitial}>
-                    {experience.provider[0]}
-                  </Text>
-                </View>
-              )}
-              <Text style={styles.providerName}>{experience.provider}</Text>
-            </View>
-            
-            <Text style={styles.title}>{experience.title}</Text>
-            
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <Clock size={14} color={colors.dark.textSecondary} />
-                <Text style={styles.metaText}>{experience.duration}</Text>
+          {/* Content overlay on video */}
+          <View style={styles.cardContentOverlay}>
+            <View style={styles.cardContentRow}>
+              {/* Left side - Info */}
+              <View style={styles.cardInfoSection}>
+                {/* Title with price */}
+                <Text style={styles.clyxTitle}>
+                  {experience.title.toUpperCase()}{' '}
+                  <Text style={styles.priceInline}>{experience.price}€/person</Text>
+                </Text>
               </View>
-              <Text style={styles.metaDivider}>•</Text>
-              <View style={styles.metaItem}>
-                <MapPin size={14} color={colors.dark.textSecondary} />
-                <Text style={styles.metaText}>{experience.distance}</Text>
-              </View>
-              <Text style={styles.metaDivider}>•</Text>
-              <Text style={styles.price}>
-                {experience.currency}{experience.price}
-                <Text style={styles.priceUnit}>/{t('feed.person')}</Text>
-              </Text>
-            </View>
-            
-            <Pressable
-              style={[
-                styles.bookButton,
-                ['12', '19', '33', '38', '40'].includes(experience.id) && styles.interestButton
-              ]}
-              onPress={() => {
-                if (['12', '19', '33', '38', '40'].includes(experience.id)) {
-                  router.push(`/experience/interest/${experience.id}`);
-                } else {
-                  router.push(`/booking/${experience.id}`);
-                }
-              }}
-            >
-              <Text style={styles.bookButtonText}>
-                {['12', '19', '33', '38', '40'].includes(experience.id) ? "I'M INTERESTED!" : t('feed.bookNow').toUpperCase()}
-              </Text>
-            </Pressable>
-          </Pressable>
 
-          <View style={styles.sideActions}>
-            <Pressable style={styles.sideActionButton} onPress={onAIChatPress}>
-              <Bot size={28} color={colors.dark.text} />
-              <Text style={styles.sideActionLabel}>AI</Text>
-            </Pressable>
-            <Pressable style={styles.sideActionButton} onPress={onReviewsPress}>
-              <MessageCircle size={28} color={colors.dark.text} />
-              <Text style={styles.sideActionLabel}>{experience.rating}</Text>
-            </Pressable>
-            <Pressable style={styles.sideActionButton} onPress={handleShare}>
-              <Share2 size={28} color={colors.dark.text} />
-              <Text style={styles.sideActionLabel}>{t('feed.share')}</Text>
-            </Pressable>
-            <Pressable
-              style={styles.sideActionButton}
-              onPress={() => {
-                onSavePress();
-              }}
-            >
-              <Bookmark
-                size={28}
-                color={isSaved ? colors.dark.accent : colors.dark.text}
-                fill={isSaved ? colors.dark.accent : 'transparent'}
-              />
-              <Text style={styles.sideActionLabel}>{isSaved ? t('feed.saved') : t('feed.save')}</Text>
-            </Pressable>
+              {/* Right side - Actions */}
+              <View style={styles.clyxSideActions}>
+                <Pressable style={styles.clyxSideActionButton} onPress={onAIChatPress}>
+                  <Bot size={24} color={colors.dark.text} />
+                  <Text style={styles.clyxSideActionLabel}>AI</Text>
+                </Pressable>
+                <Pressable style={styles.clyxSideActionButton} onPress={onReviewsPress}>
+                  <MessageCircle size={24} color={colors.dark.text} />
+                  <Text style={styles.clyxSideActionLabel}>{experience.rating}</Text>
+                </Pressable>
+                <Pressable style={styles.clyxSideActionButton} onPress={handleShare}>
+                  <Share2 size={24} color={colors.dark.text} />
+                  <Text style={styles.clyxSideActionLabel}>{t('feed.share')}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.clyxSideActionButton}
+                  onPress={() => onSavePress()}
+                >
+                  <Bookmark
+                    size={24}
+                    color={isSaved ? colors.dark.primary : colors.dark.text}
+                    fill={isSaved ? colors.dark.primary : 'transparent'}
+                  />
+                  <Text style={styles.clyxSideActionLabel}>{isSaved ? t('feed.saved') : t('feed.save')}</Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
         </View>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -555,6 +509,60 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     width: SCREEN_WIDTH,
   },
+  // New Clyx-style header
+  headerContainer: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  headerRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  searchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  headerTitle: {
+    color: colors.dark.text,
+    fontSize: 20,
+    fontWeight: '900' as const,
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  headerRight: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  aiButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  filterIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  // Old filter styles (keeping for compatibility)
   filtersContainer: {
     position: 'absolute' as const,
     top: 0,
@@ -594,7 +602,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
   },
   comingSoonText: {
-    color: '#FFD700',
+    color: '#FF8C00',
     fontSize: 10,
     fontWeight: '600' as const,
     marginTop: 2,
@@ -609,7 +617,75 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: colors.dark.card,
+    backgroundColor: colors.dark.background,
+  },
+  // Blurred background that fills the whole screen
+  blurredBackground: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  // Color overlay to soften the blurred background
+  colorOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  // Main card in the center with rounded corners
+  mainCard: {
+    flex: 1,
+    marginHorizontal: 6,
+    marginTop: 2,
+    marginBottom: -50,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  // Wrapper for the video inside the card
+  videoWrapper: {
+    flex: 1,
+    position: 'relative' as const,
+  },
+  videoContent: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute' as const,
+  },
+  videoGradient: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '60%',
+  },
+  // Content overlay on top of video (provider, title, price, button, actions)
+  cardContentOverlay: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  cardContentRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-end' as const,
+    gap: 16,
+  },
+  cardInfoSection: {
+    flex: 1,
   },
   cardImage: {
     width: '100%',
@@ -621,19 +697,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '50%',
+    height: '40%',
   },
   bottomContainer: {
     position: 'absolute' as const,
     bottom: 0,
-    left: 0,
-    right: 0,
+    left: 12,
+    right: 12,
     paddingHorizontal: 16,
   },
   contentWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 12,
+    gap: 16,
   },
   infoSection: {
     flex: 1,
@@ -641,8 +717,8 @@ const styles = StyleSheet.create({
   infoCard: {
     backgroundColor: 'transparent',
     borderRadius: 16,
-    paddingTop: 220,
-    paddingHorizontal: 10,
+    paddingTop: 0,
+    paddingHorizontal: 0,
     paddingBottom: 10,
     marginBottom: 12,
   },
@@ -1141,56 +1217,148 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.dark.background, // Solid black background
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    backgroundColor: colors.dark.background,
     zIndex: 100,
   },
-  noActivitiesCard: {
-    borderRadius: 24,
-    overflow: 'hidden',
+  noActivitiesBackgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
-    maxWidth: 400,
-    backgroundColor: colors.dark.card,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
+    height: '100%',
+  },
+  noActivitiesGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   noActivitiesContent: {
-    padding: 32,
+    flex: 1,
+    justifyContent: 'flex-start',
     alignItems: 'center',
-  },
-  noActivitiesEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
+    paddingHorizontal: 32,
+    paddingTop: 140,
   },
   noActivitiesTitle: {
-    fontSize: 22,
-    fontFamily: typography.fonts.extrabold,
+    fontSize: 52,
+    fontWeight: '900' as const,
     color: colors.dark.text,
     textAlign: 'center',
-    marginBottom: 12,
+    letterSpacing: -1,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
+  },
+  noActivitiesTitleLine2: {
+    fontSize: 52,
+    fontWeight: '900' as const,
+    color: colors.dark.text,
+    textAlign: 'center',
+    letterSpacing: -1,
+    marginBottom: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   noActivitiesSubtitle: {
     fontSize: 16,
     fontFamily: typography.fonts.regular,
-    color: colors.dark.textSecondary,
+    color: colors.dark.text,
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 24,
+    marginBottom: 28,
+    maxWidth: 320,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   exploreLisbonButton: {
     backgroundColor: colors.dark.primary,
     paddingHorizontal: 32,
     paddingVertical: 16,
-    borderRadius: 12,
-    width: '100%',
+    borderRadius: 30,
   },
   exploreLisbonButtonText: {
     color: colors.dark.background,
-    fontSize: 16,
-    fontFamily: typography.fonts.extrabold,
+    fontSize: 14,
+    fontWeight: '700' as const,
     textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  // ============================================
+  // CLYX-STYLE EXPERIMENTAL DESIGN
+  // ============================================
+  clyxTitle: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 0,
+    lineHeight: 20,
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  priceInline: {
+    color: '#BFFF00',
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  priceTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start' as const,
+    marginBottom: 8,
+  },
+  priceTagText: {
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '700' as const,
+  },
+  priceTagUnit: {
+    color: '#666',
+    fontSize: 11,
+    fontWeight: '600' as const,
+  },
+  clyxBookButton: {
+    backgroundColor: colors.dark.text,
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: 'center' as const,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  clyxBookButtonText: {
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '800' as const,
+    letterSpacing: 1,
+  },
+  clyxSideActions: {
+    gap: 20,
+    alignItems: 'center' as const,
+    paddingVertical: 8,
+  },
+  clyxSideActionButton: {
+    alignItems: 'center' as const,
+    gap: 4,
+  },
+  clyxSideActionLabel: {
+    color: colors.dark.text,
+    fontSize: 10,
+    fontWeight: '700' as const,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
 
