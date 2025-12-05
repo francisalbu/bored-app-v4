@@ -248,3 +248,4 @@ initDB().then(() => {
 });
 
 module.exports = app;
+
