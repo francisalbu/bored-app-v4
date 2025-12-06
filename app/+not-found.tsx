@@ -1,9 +1,45 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Link, Stack, router } from 'expo-router';
+import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { useShareIntent } from 'expo-share-intent';
 
 import colors from '@/constants/colors';
 
 export default function NotFoundScreen() {
+  const [isChecking, setIsChecking] = useState(true);
+  const { hasShareIntent, shareIntent } = useShareIntent();
+
+  useEffect(() => {
+    // Check if there's a pending share intent - redirect to shared-content
+    if (hasShareIntent && shareIntent) {
+      console.log('📤 [NOT-FOUND] Share intent detected, redirecting to shared-content...');
+      const sharedUrl = shareIntent.webUrl || shareIntent.text || '';
+      const sharedText = shareIntent.text || '';
+      
+      router.replace({
+        pathname: '/shared-content',
+        params: { url: sharedUrl, text: sharedText }
+      });
+      return;
+    }
+
+    // Give a small delay to check for share intent, then show the not found screen
+    const timeout = setTimeout(() => {
+      setIsChecking(false);
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [hasShareIntent, shareIntent]);
+
+  // Show loading while checking for share intent
+  if (isChecking) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={colors.dark.primary} />
+      </View>
+    );
+  }
+
   return (
     <>
       <Stack.Screen options={{ title: 'Oops!', headerStyle: { backgroundColor: colors.dark.background }, headerTintColor: colors.dark.text }} />
