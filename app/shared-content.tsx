@@ -445,19 +445,14 @@ export default function SharedContentScreen() {
   };
 
   const handleExperiencePress = (experienceId: string) => {
-    // Close the modal first, then navigate to experience
-    // This avoids navigation stack issues when coming from a modal
+    // Navigate to experience WITHOUT closing the modal
+    // This allows the user to go back and see other experiences
     console.log('🔗 Navigating to experience:', experienceId);
     
-    // Dismiss the modal and navigate to the experience
-    // Using setTimeout to ensure modal is dismissed before navigation
-    router.dismiss();
-    setTimeout(() => {
-      router.push({
-        pathname: '/experience/[id]',
-        params: { id: experienceId }
-      });
-    }, 100);
+    router.push({
+      pathname: '/experience/[id]',
+      params: { id: experienceId }
+    });
   };
 
   const handleOpenOriginal = () => {

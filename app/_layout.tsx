@@ -43,7 +43,7 @@ function RootLayoutNav() {
         <Stack.Screen name="info/terms" options={{ headerShown: false }} />
         <Stack.Screen name="info/privacy" options={{ headerShown: false }} />
         <Stack.Screen name="info/cancellation" options={{ headerShown: false }} />
-        <Stack.Screen name="shared-content" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="shared-content" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       </Stack>
     </>
   );
