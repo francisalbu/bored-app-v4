@@ -348,21 +348,21 @@ export default function SharedContentScreen() {
   };
 
   useEffect(() => {
-    // PREVENT INFINITE LOOP - only process once
-    if (hasProcessed) {
-      console.log('📤 [shared-content] Already processed, skipping...');
-      return;
-    }
-    
     // Get the shared content from params
     const url = params.url as string;
     const text = params.text as string;
     
-    console.log('📤 [shared-content] Received params:', { url, text });
+    console.log('📤 [shared-content] Received params:', { url, text, hasProcessed });
     
     // If no params yet, wait
     if (!url && !text) {
       console.log('📤 [shared-content] Waiting for params...');
+      return;
+    }
+    
+    // PREVENT INFINITE LOOP - only process once per URL
+    if (hasProcessed) {
+      console.log('📤 [shared-content] Already processed this URL, skipping...');
       return;
     }
     

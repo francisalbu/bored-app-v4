@@ -73,22 +73,17 @@ export default function RootLayout() {
       const sharedUrl = shareIntent.webUrl || shareIntent.text || '';
       const sharedText = shareIntent.text || '';
       
-      // Wait a bit for navigation to be ready, then navigate
-      const timer = setTimeout(() => {
-        // Use replace instead of push to avoid the "not found" screen
-        router.replace({
-          pathname: '/shared-content',
-          params: { 
-            url: sharedUrl,
-            text: sharedText
-          }
-        });
-      }, 100);
+      // Navigate to the shared content screen
+      router.push({
+        pathname: '/shared-content',
+        params: { 
+          url: sharedUrl,
+          text: sharedText
+        }
+      });
       
       // Reset the share intent after handling
       resetShareIntent();
-      
-      return () => clearTimeout(timer);
     }
   }, [hasShareIntent, shareIntent]);
 
@@ -107,7 +102,7 @@ export default function RootLayout() {
         const sharedText = url.searchParams.get('text');
         
         if (sharedUrl || sharedText) {
-          router.replace({
+          router.push({
             pathname: '/shared-content',
             params: { url: sharedUrl || '', text: sharedText || '' }
           });
