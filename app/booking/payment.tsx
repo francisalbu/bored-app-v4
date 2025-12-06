@@ -91,19 +91,43 @@ export default function PaymentScreen() {
   const [processingMessage, setProcessingMessage] = useState('Processing...');
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentComplete, setPaymentComplete] = useState(false);
+  const [completedBookingId, setCompletedBookingId] = useState<number | null>(null);
+  const isProcessingRef = useRef(false); // Use ref to track processing state reliably
   
-  // Reset processing state when screen comes into focus (in case user navigated back)
+  // Reset ALL state when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('📱 [PAYMENT] Screen focused - resetting state');
-      setIsProcessing(false);
-      setProcessingMessage('Processing...');
-      setClientSecret(null);
-      setBookingId(null);
-      // Reset Stripe payment sheet state
-      resetPaymentSheetCustomer();
+      console.log('📱 [PAYMENT] Screen focused - resetting ALL state');
+      // Only reset if not in the middle of processing
+      if (!isProcessingRef.current) {
+        setIsProcessing(false);
+        setProcessingMessage('Processing...');
+        setClientSecret(null);
+        setBookingId(null);
+        setPaymentComplete(false);
+        setCompletedBookingId(null);
+        // Reset Stripe payment sheet state
+        resetPaymentSheetCustomer();
+      }
+      
+      // Cleanup function when leaving screen
+      return () => {
+        console.log('📱 [PAYMENT] Screen unfocused - cleaning up');
+        isProcessingRef.current = false;
+      };
     }, [])
   );
+  
+  // Navigation function - MUST be defined here before any conditional returns
+  const navigateToBookings = useCallback(() => {
+    console.log('🔵 [PAYMENT] Navigating to bookings tab...');
+    setPaymentComplete(false);
+    setCompletedBookingId(null);
+    
+    // Use router.replace to go directly to bookings
+    router.replace('/(tabs)/bookings');
+  }, []);
   
   // Early access confirmation modal
   const [showEarlyAccessModal, setShowEarlyAccessModal] = useState(false);
@@ -308,7 +332,7 @@ export default function PaymentScreen() {
 
   // Show early access confirmation modal before payment
   const handlePayButtonPress = () => {
-    if (isProcessing) return;
+    if (isProcessing || isProcessingRef.current) return;
     
     // Validate guest info first if guest checkout
     const isGuest = !user;
@@ -321,7 +345,11 @@ export default function PaymentScreen() {
   };
 
   const handlePayment = async () => {
-    if (isProcessing) return;
+    // Double-check we're not already processing (use ref for reliability)
+    if (isProcessing || isProcessingRef.current) {
+      console.log('⚠️ [PAYMENT] Already processing, ignoring...');
+      return;
+    }
     
     // Close the modal first
     setShowEarlyAccessModal(false);
@@ -354,12 +382,16 @@ export default function PaymentScreen() {
       return;
     }
 
+    // Set processing state with both state and ref
+    isProcessingRef.current = true;
     setIsProcessing(true);
     setProcessingMessage('Connecting to server...');
     
     // Reset previous payment state completely
     setClientSecret(null);
     setBookingId(null);
+    setPaymentComplete(false);
+    setCompletedBookingId(null);
     
     // IMPORTANT: Reset Stripe payment sheet to clear any cached state from previous payments
     console.log('🔄 [PAYMENT] Resetting Stripe payment sheet customer...');
@@ -418,6 +450,7 @@ export default function PaymentScreen() {
             [{ text: 'OK' }]
           );
         }
+        isProcessingRef.current = false;
         setIsProcessing(false);
         return;
       }
@@ -427,6 +460,7 @@ export default function PaymentScreen() {
       if (!response.ok) {
         console.log('❌ [PAYMENT] Response not OK:', response.status);
         Alert.alert('Error', `Server error: ${response.status}. Please try again.`);
+        isProcessingRef.current = false;
         setIsProcessing(false);
         return;
       }
@@ -437,6 +471,7 @@ export default function PaymentScreen() {
       if (!data.success || !data.clientSecret) {
         console.log('❌ [PAYMENT] Payment intent failed:', data);
         Alert.alert('Error', 'Failed to initialize payment');
+        isProcessingRef.current = false;
         setIsProcessing(false);
         return;
       }
@@ -483,12 +518,14 @@ export default function PaymentScreen() {
         if (initError) {
           console.log('❌ [PAYMENT] initPaymentSheet error:', initError);
           Alert.alert('Payment Error', initError.message || 'Failed to initialize payment. Please try again.');
+          isProcessingRef.current = false;
           setIsProcessing(false);
           return;
         }
       } catch (initException: any) {
         console.log('❌ [PAYMENT] initPaymentSheet exception:', initException);
         Alert.alert('Payment Error', initException.message || 'Failed to initialize payment system. Please try again.');
+        isProcessingRef.current = false;
         setIsProcessing(false);
         return;
       }
@@ -512,6 +549,7 @@ export default function PaymentScreen() {
         } else {
           console.log('ℹ️ [PAYMENT] User cancelled payment');
         }
+        isProcessingRef.current = false;
         setIsProcessing(false);
         return;
       }
@@ -532,6 +570,7 @@ export default function PaymentScreen() {
       if (!bookingResult.success || !bookingResult.data?.id) {
         console.log('❌ [PAYMENT] Booking creation failed after payment:', bookingResult.error);
         Alert.alert('Warning', 'Payment was successful but booking creation failed. Please contact support with payment ID: ' + paymentIntentId);
+        isProcessingRef.current = false;
         setIsProcessing(false);
         return;
       }
@@ -546,59 +585,60 @@ export default function PaymentScreen() {
         await updateUserPhoneInDatabase(fullPhone);
       }
 
-      // Payment and booking complete - stop processing
+      // Payment and booking complete - stop processing and show success UI
+      console.log('🎉 [PAYMENT] Setting payment complete state...');
+      isProcessingRef.current = false;
       setIsProcessing(false);
-
-      // Navigate to bookings tab to show the ticket
-      const navigateToBookings = () => {
-        console.log('🔵 [PAYMENT] Navigating to bookings tab...');
-        // Go back to root and then to bookings tab
-        while (router.canGoBack()) {
-          router.back();
-        }
-        // Small delay to ensure navigation stack is cleared
-        setTimeout(() => {
-          router.push('/(tabs)/bookings');
-        }, 100);
-      };
-
-      // Show success message
-      if (isGuest) {
-        Alert.alert(
-          '✅ Booking Confirmed!',
-          'Your booking is confirmed! Check your email for details.\n\n💡 Create an account to:\n• Track all your bookings\n• Get exclusive deals\n• Faster future checkouts',
-          [
-            { 
-              text: 'Maybe Later', 
-              style: 'cancel',
-              onPress: navigateToBookings
-            },
-            { 
-              text: 'Create Account', 
-              onPress: () => {
-                setShowAuthSheet(true);
-              }
-            }
-          ]
-        );
-      } else {
-        Alert.alert(
-          'Payment Successful!',
-          'Your booking is confirmed. Check your email for details.',
-          [{ 
-            text: 'View Ticket', 
-            onPress: navigateToBookings
-          }]
-        );
-      }
+      setPaymentComplete(true);
+      setCompletedBookingId(newBookingId);
+      
     } catch (error) {
       console.error('❌ [PAYMENT] Error:', error);
       Alert.alert('Error', 'Failed to process payment');
-    } finally {
-      // Always reset processing state to prevent getting stuck
+      isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
+
+  // If payment is complete, show success screen
+  if (paymentComplete && completedBookingId) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.successContainer}>
+          <Text style={styles.successEmoji}>🎉</Text>
+          <Text style={styles.successTitle}>Payment Successful!</Text>
+          <Text style={styles.successSubtitle}>
+            Your booking is confirmed.{'\n'}Check your email for details.
+          </Text>
+          
+          <Pressable 
+            style={styles.viewTicketButton} 
+            onPress={navigateToBookings}
+          >
+            <Text style={styles.viewTicketButtonText}>View Ticket</Text>
+          </Pressable>
+          
+          {!user && (
+            <>
+              <Text style={styles.createAccountHint}>
+                💡 Create an account to track all your bookings
+              </Text>
+              <Pressable 
+                style={styles.createAccountButton} 
+                onPress={() => {
+                  setPaymentComplete(false);
+                  setShowAuthSheet(true);
+                }}
+              >
+                <Text style={styles.createAccountButtonText}>Create Account</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView 
@@ -1438,5 +1478,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.dark.background,
+  },
+  // Success screen styles
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  successEmoji: {
+    fontSize: 80,
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.dark.text,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 16,
+    color: colors.dark.textSecondary,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  viewTicketButton: {
+    backgroundColor: colors.dark.primary,
+    paddingVertical: 18,
+    paddingHorizontal: 48,
+    borderRadius: 16,
+    marginBottom: 24,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  viewTicketButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.dark.background,
+  },
+  createAccountHint: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  createAccountButton: {
+    borderWidth: 1,
+    borderColor: colors.dark.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+  },
+  createAccountButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.dark.primary,
   },
 });
