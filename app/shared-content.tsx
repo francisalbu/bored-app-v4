@@ -7,10 +7,12 @@ import {
   Pressable,
   ActivityIndicator,
   Linking,
-  Image,
   Animated,
   Easing,
+  Dimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, ExternalLink, MapPin, Star, Clock, Sparkles, Search } from 'lucide-react-native';
@@ -18,6 +20,8 @@ import colors from '@/constants/colors';
 import typography from '@/constants/typography';
 import apiService from '@/services/api';
 import { useExperiences } from '@/hooks/useExperiences';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Keywords to match from social media content to experiences
 // Covers ALL experiences in the Bored Tourist platform
@@ -204,6 +208,7 @@ export default function SharedContentScreen() {
   const [matchedExperiences, setMatchedExperiences] = useState<MatchedExperience[]>([]);
   const [analyzing, setAnalyzing] = useState(true); // Start with analyzing state
   const [paramsReady, setParamsReady] = useState(false); // Track if params are loaded
+  const [hasProcessed, setHasProcessed] = useState(false); // PREVENT LOOP - only process once
   const [scanProgress] = useState(new Animated.Value(0));
   const [scanLineAnim] = useState(new Animated.Value(0));
   const [socialMetadata, setSocialMetadata] = useState<SocialMediaMetadata | null>(null);
@@ -343,6 +348,12 @@ export default function SharedContentScreen() {
   };
 
   useEffect(() => {
+    // PREVENT INFINITE LOOP - only process once
+    if (hasProcessed) {
+      console.log('📤 [shared-content] Already processed, skipping...');
+      return;
+    }
+    
     // Get the shared content from params
     const url = params.url as string;
     const text = params.text as string;
@@ -354,6 +365,9 @@ export default function SharedContentScreen() {
       console.log('📤 [shared-content] Waiting for params...');
       return;
     }
+    
+    // Mark as processed IMMEDIATELY to prevent re-runs
+    setHasProcessed(true);
     
     setParamsReady(true);
     if (url) setSharedUrl(url);
@@ -391,6 +405,7 @@ export default function SharedContentScreen() {
                 rating: exp.rating,
                 reviewCount: exp.reviewCount,
                 image: exp.image,
+                images: exp.images, // Include images array for proper display
                 provider: exp.provider,
               },
               score: 100, // AI matched
@@ -401,21 +416,20 @@ export default function SharedContentScreen() {
             setMatchedExperiences(matches);
             setMatchMethod(smartMatchResult.matchMethod);
             setAnalyzing(false);
-            return;
+            return; // DONE - exit here
           }
         }
         
-        // No fallback - if AI match fails, show empty state
-        // The user can try again or go back
+        // No matches found - show empty state and STOP
         setMatchedExperiences([]);
         setMatchMethod('none');
+        setAnalyzing(false);
         
       } catch (error) {
         console.error('Error processing shared content:', error);
-        // No fallback on error - show empty state
+        // Error - show empty state and STOP
         setMatchedExperiences([]);
         setMatchMethod('none');
-      } finally {
         setAnalyzing(false);
       }
     };
@@ -426,7 +440,7 @@ export default function SharedContentScreen() {
     }, 1500);
     
     return () => clearTimeout(timer);
-  }, [params, experiences]);
+  }, [params.url, params.text, hasProcessed]); // Only depend on specific params and hasProcessed flag
 
   const handleClose = () => {
     // Always go to home - this ensures clean navigation state
@@ -567,51 +581,54 @@ export default function SharedContentScreen() {
               {`Found ${matchedExperiences.length} experience${matchedExperiences.length > 1 ? 's' : ''} that match your content`}
             </Text>
 
-            {matchedExperiences.map(({ experience, matchedKeywords }) => (
-              <Pressable
-                key={experience.id}
-                style={styles.experienceCard}
-                onPress={() => handleExperiencePress(experience.id)}
-              >
-                {/* Large image with gradient overlay */}
-                <View style={styles.imageContainer}>
+            {matchedExperiences.map(({ experience, matchedKeywords }) => {
+              // Use images array like Explore tab does
+              const imageSource = experience.images && experience.images.length > 0
+                ? experience.images[0]
+                : { uri: experience.image };
+              
+              return (
+                <Pressable
+                  key={experience.id}
+                  style={styles.experienceCard}
+                  onPress={() => handleExperiencePress(experience.id)}
+                >
+                  {/* Image with gradient overlay - same as Explore */}
                   <Image
-                    source={{ uri: experience.image }}
+                    source={imageSource}
                     style={styles.experienceImage}
+                    contentFit="cover"
                   />
-                  {/* Price badge on image */}
+                  {/* Gradient overlay */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)']}
+                    locations={[0, 0.5, 1]}
+                    style={styles.cardGradient}
+                  />
+                  {/* Price badge */}
                   <View style={styles.priceBadge}>
                     <Text style={styles.priceText}>€{experience.price}</Text>
                   </View>
-                </View>
-                
-                {/* Experience info below image */}
-                <View style={styles.experienceInfo}>
-                  <Text style={styles.experienceTitle} numberOfLines={2}>
-                    {experience.title}
-                  </Text>
-                  
-                  <View style={styles.experienceMeta}>
-                    <View style={styles.metaItem}>
-                      <MapPin size={14} color={colors.dark.textSecondary} />
-                      <Text style={styles.metaText}>{experience.location}</Text>
+                  {/* Content inside the image */}
+                  <View style={styles.cardContent}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {experience.title}
+                    </Text>
+                    <View style={styles.cardMeta}>
+                      <MapPin size={12} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.cardLocation}>{experience.location}</Text>
+                    </View>
+                    <View style={styles.cardStats}>
+                      <Star size={12} color="#FFB800" fill="#FFB800" />
+                      <Text style={styles.cardStatText}>{experience.rating || '4.5'}</Text>
+                      <Text style={styles.cardStatDivider}>|</Text>
+                      <Clock size={12} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.cardStatText}>{experience.duration}</Text>
                     </View>
                   </View>
-                  
-                  <View style={styles.experienceStats}>
-                    <View style={styles.statItem}>
-                      <Star size={14} color="#FFB800" fill="#FFB800" />
-                      <Text style={styles.statText}>{experience.rating || '4.5'}</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Clock size={14} color={colors.dark.accent} />
-                      <Text style={styles.statText}>{experience.duration}</Text>
-                    </View>
-                  </View>
-                </View>
-              </Pressable>
-            ))}
+                </Pressable>
+              );
+            })}
           </View>
         )}
 
@@ -732,19 +749,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   experienceCard: {
-    backgroundColor: colors.dark.card,
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 16,
-  },
-  imageContainer: {
+    height: 220,
     position: 'relative',
-    width: '100%',
-    height: 180,
   },
   experienceImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 16,
+  },
+  cardGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '70%',
+    borderRadius: 16,
   },
   priceBadge: {
     position: 'absolute',
@@ -760,50 +782,45 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     color: colors.dark.background,
   },
-  experienceInfo: {
+  cardContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 16,
   },
-  experienceTitle: {
-    fontFamily: typography.fonts.semibold,
-    fontSize: typography.sizes.lg,
-    lineHeight: 26,
-    color: colors.dark.text,
-    marginBottom: 8,
+  cardTitle: {
+    fontFamily: typography.fonts.extrabold,
+    fontSize: 16,
+    color: '#FFFFFF',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  experienceMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  metaItem: {
+  cardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginBottom: 4,
   },
-  metaText: {
+  cardLocation: {
     fontFamily: typography.fonts.regular,
-    fontSize: typography.sizes.sm,
-    color: colors.dark.textSecondary,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
   },
-  experienceStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statItem: {
+  cardStats: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  statText: {
+  cardStatText: {
     fontFamily: typography.fonts.semibold,
-    fontSize: typography.sizes.sm,
-    color: colors.dark.text,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
   },
-  statDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: colors.dark.border,
-    marginHorizontal: 12,
+  cardStatDivider: {
+    color: 'rgba(255,255,255,0.5)',
+    marginHorizontal: 4,
   },
   noMatchesContainer: {
     alignItems: 'center',
