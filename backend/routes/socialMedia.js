@@ -372,12 +372,20 @@ router.get('/test', (req, res) => {
  * GET /api/social-media/debug
  */
 router.get('/debug', (req, res) => {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
+  const googleKey = process.env.GOOGLE_AI_KEY || process.env.EXPO_PUBLIC_GOOGLE_AI_KEY;
+  
   res.json({
     success: true,
     env: {
-      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasSupabaseUrl: !!supabaseUrl,
+      supabaseUrlPrefix: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : null,
+      hasSupabaseKey: !!supabaseKey,
+      supabaseKeyPrefix: supabaseKey ? supabaseKey.substring(0, 20) + '...' : null,
       hasRapidApiKey: !!process.env.RAPIDAPI_KEY,
-      hasGoogleAiKey: !!process.env.GOOGLE_AI_KEY,
+      hasGoogleAiKey: !!googleKey,
+      googleKeyPrefix: googleKey ? googleKey.substring(0, 15) + '...' : null,
     },
   });
 });
