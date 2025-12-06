@@ -92,6 +92,72 @@ async function extractTikTokMetadata(url) {
   }
 }
 
+// RapidAPI credentials (alternative to Apify - has free tier)
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+
+/**
+ * Extract Instagram metadata using RapidAPI (free tier available)
+ */
+async function extractWithRapidAPI(url) {
+  if (!RAPIDAPI_KEY) {
+    return { success: false, error: 'RapidAPI key not configured' };
+  }
+  
+  try {
+    console.log('🚀 Using RapidAPI for Instagram scraping...');
+    
+    // Extract shortcode from URL
+    const shortcodeMatch = url.match(/\/(p|reel|reels)\/([A-Za-z0-9_-]+)/);
+    if (!shortcodeMatch) {
+      return { success: false, error: 'Could not extract shortcode from URL' };
+    }
+    const shortcode = shortcodeMatch[2];
+    
+    // Use Instagram Scraper API on RapidAPI
+    const response = await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=${shortcode}`, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com',
+        'x-rapidapi-key': RAPIDAPI_KEY,
+      },
+    });
+    
+    if (!response.ok) {
+      console.log('❌ RapidAPI error:', response.status);
+      return { success: false, error: 'RapidAPI request failed' };
+    }
+    
+    const data = await response.json();
+    console.log('📦 RapidAPI response:', JSON.stringify(data).substring(0, 500));
+    
+    if (data.data) {
+      const post = data.data;
+      const caption = post.caption?.text || post.caption || '';
+      
+      // Extract hashtags
+      const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
+      const hashtags = caption.match(hashtagRegex) || [];
+      const description = caption.replace(hashtagRegex, '').trim();
+      
+      return {
+        platform: 'instagram',
+        success: true,
+        username: post.user?.username || post.owner?.username || null,
+        description: description,
+        fullTitle: caption,
+        hashtags: hashtags,
+        thumbnailUrl: post.thumbnail_url || post.image_versions2?.candidates?.[0]?.url || null,
+        method: 'rapidapi',
+      };
+    }
+    
+    return { success: false, error: 'No data in RapidAPI response' };
+  } catch (error) {
+    console.error('RapidAPI error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 /**
  * Extract metadata from Instagram Reel URL
  * Uses Apify instagram-scraper as primary method
@@ -111,7 +177,16 @@ async function extractInstagramMetadata(url) {
     // Remove query parameters for cleaner URL
     cleanUrl = cleanUrl.split('?')[0];
     
-    // PRIMARY: Use Apify Instagram Scraper
+    // PRIMARY: Try RapidAPI first (more reliable, has free tier)
+    if (RAPIDAPI_KEY) {
+      const rapidResult = await extractWithRapidAPI(cleanUrl);
+      if (rapidResult.success) {
+        return rapidResult;
+      }
+      console.log('⚠️ RapidAPI failed, trying Apify...');
+    }
+    
+    // SECONDARY: Use Apify Instagram Scraper
     if (APIFY_API_TOKEN) {
       console.log('🤖 Using Apify Instagram Scraper...');
       const apifyResult = await extractWithApify(cleanUrl, 'instagram');
@@ -342,9 +417,86 @@ async function extractWithApify(url, platform) {
 }
 
 /**
- * Use Gemini AI to intelligently match experiences based on social media content
+ * Use Gemini Vision AI to analyze an image and extract activity/content information
  */
-async function matchExperiencesWithAI(metadata, experiences) {
+async function analyzeImageWithVision(imageUrl) {
+  if (!GOOGLE_AI_KEY || !imageUrl) {
+    return null;
+  }
+  
+  try {
+    console.log('👁️ Analyzing image with Gemini Vision:', imageUrl);
+    
+    const genAI = new GoogleGenerativeAI(GOOGLE_AI_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    
+    // Fetch the image and convert to base64
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      console.log('❌ Failed to fetch image');
+      return null;
+    }
+    
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString('base64');
+    const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    
+    const prompt = `Analyze this image from a social media travel/experience video. 
+Identify what activity, location, or experience is shown.
+
+Return a JSON object with:
+{
+  "activities": ["list of activities shown, e.g. surfing, yoga, wine tasting, hiking, cooking"],
+  "location_hints": ["any location clues like beach, city, mountains, vineyard"],
+  "mood": "adventure/relaxation/cultural/nature/food/romantic",
+  "keywords": ["relevant keywords for matching travel experiences"]
+}
+
+Be specific about the activity. If you see:
+- Water/waves/boards → surfing
+- Horses → horseback riding
+- Wine glasses/vineyards → wine tasting
+- Kitchen/food prep → cooking class
+- Cliffs/heights → paragliding or climbing
+- Historic buildings → cultural tour
+- Dogs/puppies → puppy yoga
+- Tiles/ceramics → tile workshop
+- Beach → beach activities
+- Dolphins/whales → dolphin watching
+
+Return ONLY the JSON, no explanation.`;
+
+    const result = await model.generateContent([
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Image,
+        },
+      },
+    ]);
+
+    const response = await result.response;
+    const text = response.text().trim();
+    
+    console.log('👁️ Vision analysis result:', text);
+    
+    // Parse the JSON response
+    const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const analysis = JSON.parse(cleanedText);
+    
+    return analysis;
+  } catch (error) {
+    console.error('Vision analysis error:', error);
+    return null;
+  }
+}
+
+/**
+ * Use Gemini AI to intelligently match experiences based on social media content
+ * Now includes Vision analysis fallback when text metadata is insufficient
+ */
+async function matchExperiencesWithAI(metadata, experiences, imageAnalysis = null) {
   if (!GOOGLE_AI_KEY) {
     console.log('⚠️ Google AI key not configured, using keyword matching');
     return null;
@@ -356,42 +508,85 @@ async function matchExperiencesWithAI(metadata, experiences) {
     const genAI = new GoogleGenerativeAI(GOOGLE_AI_KEY);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
     
-    // Create a summary of available experiences
+    // Create a detailed summary of available experiences
     const experiencesSummary = experiences.map(exp => ({
       id: exp.id,
       title: exp.title,
       category: exp.category,
       tags: exp.tags,
       location: exp.location,
-      description: exp.description?.substring(0, 200),
+      description: exp.description?.substring(0, 300),
     }));
     
-    const prompt = `You are an experience matching assistant for Bored Tourist, a travel app in Portugal.
+    // Build context from metadata AND image analysis
+    let contentContext = '';
+    
+    if (metadata.description || metadata.fullTitle) {
+      contentContext += `Text from post: "${metadata.description || metadata.fullTitle}"\n`;
+    }
+    if (metadata.hashtags && metadata.hashtags.length > 0) {
+      contentContext += `Hashtags: ${metadata.hashtags.join(', ')}\n`;
+    }
+    if (metadata.username) {
+      contentContext += `Posted by: @${metadata.username}\n`;
+    }
+    
+    // Add image analysis if available
+    if (imageAnalysis) {
+      contentContext += `\nVISUAL ANALYSIS of the video thumbnail:\n`;
+      if (imageAnalysis.activities && imageAnalysis.activities.length > 0) {
+        contentContext += `- Activities detected: ${imageAnalysis.activities.join(', ')}\n`;
+      }
+      if (imageAnalysis.location_hints && imageAnalysis.location_hints.length > 0) {
+        contentContext += `- Location hints: ${imageAnalysis.location_hints.join(', ')}\n`;
+      }
+      if (imageAnalysis.mood) {
+        contentContext += `- Mood/vibe: ${imageAnalysis.mood}\n`;
+      }
+      if (imageAnalysis.keywords && imageAnalysis.keywords.length > 0) {
+        contentContext += `- Keywords: ${imageAnalysis.keywords.join(', ')}\n`;
+      }
+    }
+    
+    // If we have very little context, note that
+    if (!contentContext.trim() || contentContext.length < 30) {
+      contentContext = 'Minimal information available - suggest popular diverse experiences.';
+    }
+    
+    const prompt = `You are an experience matching assistant for Bored Tourist, a travel experiences app in Portugal.
 
-A user shared this social media content:
-- Platform: ${metadata.platform}
-- Description: "${metadata.description || metadata.fullTitle || 'No description'}"
-- Hashtags: ${(metadata.hashtags || []).join(', ') || 'None'}
-- Username: ${metadata.username || 'Unknown'}
+A user shared a ${metadata.platform || 'social media'} video. Here's what we know about it:
 
-Here are the available experiences in our app:
+${contentContext}
+
+Here are ALL available experiences in our app:
 ${JSON.stringify(experiencesSummary, null, 2)}
 
-TASK: Based on the social media content, identify which experiences would be the BEST matches for someone interested in this type of content.
+YOUR TASK: Match the social media content to the MOST RELEVANT experiences.
 
-RULES:
-1. Return ONLY a JSON array of experience IDs, ordered by relevance (best match first)
-2. Maximum 5 experiences
-3. Only include experiences that are genuinely relevant
-4. If nothing matches well, return an empty array []
-5. Consider: activity type, location, vibe, hashtags, and general interest
+MATCHING RULES:
+1. If we detected surfing/waves → prioritize surf experiences
+2. If we detected horses → prioritize horseback riding
+3. If we detected wine/vineyard → prioritize wine tasting
+4. If we detected cooking/food → prioritize cooking classes, food tours
+5. If we detected beach → prioritize beach activities (surf, beach yoga, etc.)
+6. If we detected city/urban → prioritize city tours, street art
+7. If we detected adventure/extreme → prioritize quad, climbing, skydiving
+8. If we detected relaxation → prioritize yoga, wellness
+9. If we detected cultural/historic → prioritize cultural tours, Sintra
+10. Match location when possible (Lisbon, Sintra, Setúbal, etc.)
 
-IMPORTANT: Return ONLY the JSON array, no explanation. Example: [3, 18, 5]`;
+CRITICAL: Be STRICT about relevance. A surf video should return surf experiences, NOT random tours.
+
+Return ONLY a JSON array of experience IDs (numbers), ordered by relevance (best first).
+Maximum 5 experiences. If nothing matches well, return fewer or [].
+
+Example: [18, 19, 20]`;
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.3, // Lower temperature for more consistent matching
+        temperature: 0.2, // Lower temperature for more consistent matching
         maxOutputTokens: 100,
       },
     });
@@ -422,43 +617,140 @@ IMPORTANT: Return ONLY the JSON array, no explanation. Example: [3, 18, 5]`;
 }
 
 /**
- * Keyword-based matching fallback
+ * Keyword-based matching fallback - now more comprehensive
  */
 function matchExperiencesWithKeywords(metadata, experiences) {
   const content = `${metadata.description || ''} ${metadata.fullTitle || ''} ${(metadata.hashtags || []).join(' ')}`.toLowerCase();
   
-  // Keywords mapping to experience categories
+  console.log('🔤 Keyword matching content:', content.substring(0, 200));
+  
+  // Comprehensive keywords mapping to experience categories
+  // Each category maps to keywords AND preferred experience IDs
   const keywordMap = {
-    surf: ['surf', 'surfing', 'waves', 'ondas', 'surfboard', 'beach'],
-    yoga: ['yoga', 'meditation', 'wellness', 'mindfulness', 'zen'],
-    wine: ['wine', 'vinho', 'vineyard', 'winery', 'tasting'],
-    cooking: ['cooking', 'cook', 'chef', 'kitchen', 'culinary', 'food'],
-    adventure: ['adventure', 'adrenaline', 'extreme', 'thrill'],
-    nature: ['nature', 'outdoor', 'hiking', 'natureza', 'forest'],
-    dolphins: ['dolphin', 'dolphins', 'whale', 'marine', 'boat'],
-    horse: ['horse', 'horseback', 'riding', 'equestrian'],
-    climb: ['climbing', 'climb', 'bridge', 'rappel'],
-    diving: ['diving', 'scuba', 'underwater', 'snorkel'],
-    paragliding: ['paragliding', 'gliding', 'parapente', 'flying'],
-    quad: ['quad', 'atv', '4x4', 'offroad', 'buggy'],
-    tiles: ['tiles', 'azulejos', 'ceramic', 'pottery', 'craft'],
-    sintra: ['sintra', 'palace', 'castle', 'pena'],
+    surf: {
+      keywords: ['surf', 'surfing', 'waves', 'ondas', 'surfboard', 'wave', 'surfer', 'barrel', 'board', 'surfcamp', 'surfschool'],
+      expIds: [18, 19], // Surf experiences
+    },
+    yoga: {
+      keywords: ['yoga', 'meditation', 'wellness', 'mindfulness', 'zen', 'stretch', 'breathe', 'relax', 'relaxation', 'namaste'],
+      expIds: [2, 16, 19], // Yoga experiences
+    },
+    puppy: {
+      keywords: ['puppy', 'puppies', 'dog', 'dogs', 'cachorro', 'pet', 'animal', 'cute'],
+      expIds: [2], // Puppy yoga
+    },
+    wine: {
+      keywords: ['wine', 'vinho', 'vineyard', 'winery', 'tasting', 'degustação', 'grapes', 'cellar', 'adega', 'sommelier'],
+      expIds: [16], // Wine tasting
+    },
+    cooking: {
+      keywords: ['cooking', 'cook', 'chef', 'kitchen', 'culinary', 'food', 'recipe', 'cuisine', 'gastronomia', 'gastronomy'],
+      expIds: [5, 6], // Cooking classes
+    },
+    pastry: {
+      keywords: ['pastel', 'pasteis', 'nata', 'custard', 'tart', 'bakery', 'baking', 'pastry', 'belem'],
+      expIds: [5], // Pastel de nata workshop
+    },
+    adventure: {
+      keywords: ['adventure', 'adrenaline', 'extreme', 'thrill', 'exciting', 'aventura', 'radical'],
+      expIds: [1, 3, 13, 14, 15, 17, 20], // Adventure experiences
+    },
+    nature: {
+      keywords: ['nature', 'outdoor', 'hiking', 'natureza', 'forest', 'floresta', 'green', 'natural', 'trail', 'walk'],
+      expIds: [8, 10, 12, 13], // Nature experiences
+    },
+    dolphins: {
+      keywords: ['dolphin', 'dolphins', 'whale', 'whales', 'marine', 'cetacean', 'golfinho', 'baleia', 'ocean', 'sea'],
+      expIds: [4], // Dolphin watching
+    },
+    boat: {
+      keywords: ['boat', 'barco', 'sailing', 'yacht', 'cruise', 'catamaran', 'speedboat', 'maritime'],
+      expIds: [4], // Boat tours
+    },
+    horse: {
+      keywords: ['horse', 'horseback', 'riding', 'equestrian', 'cavalo', 'pony', 'stable', 'equitação'],
+      expIds: [10], // Horseback riding
+    },
+    beach: {
+      keywords: ['beach', 'praia', 'coast', 'seaside', 'comporta', 'caparica', 'sand', 'shore', 'atlantic', 'summer'],
+      expIds: [10, 18, 19, 20], // Beach activities
+    },
+    climb: {
+      keywords: ['climbing', 'climb', 'bridge', 'rappel', 'abseil', 'escalada', 'ponte', '25 abril', 'heights'],
+      expIds: [3, 22], // Climbing experiences
+    },
+    diving: {
+      keywords: ['diving', 'dive', 'scuba', 'underwater', 'snorkel', 'snorkeling', 'mergulho', 'ocean'],
+      expIds: [21], // Scuba diving
+    },
+    paragliding: {
+      keywords: ['paragliding', 'paraglide', 'parapente', 'gliding', 'flying', 'soaring', 'tandem', 'cliffs', 'sky'],
+      expIds: [20], // Paragliding
+    },
+    skydiving: {
+      keywords: ['skydiving', 'skydive', 'freefall', 'windtunnel', 'indoor skydive', 'paraquedismo'],
+      expIds: [15], // Indoor skydiving
+    },
+    flying: {
+      keywords: ['pilot', 'airplane', 'aircraft', 'cockpit', 'flight', 'aviation', 'fly', 'avião', 'piloto'],
+      expIds: [14], // Flying experience
+    },
+    quad: {
+      keywords: ['quad', 'atv', '4x4', 'offroad', 'buggy', 'jeep', 'dirt', 'mud', 'terrain'],
+      expIds: [1, 13, 17], // Quad/ATV experiences
+    },
+    tiles: {
+      keywords: ['tiles', 'azulejos', 'ceramic', 'pottery', 'craft', 'workshop', 'art', 'handmade', 'paint'],
+      expIds: [11], // Tile workshop
+    },
+    sintra: {
+      keywords: ['sintra', 'palace', 'palácio', 'castle', 'castelo', 'pena', 'regaleira', 'monserrate', 'mystery', 'treasure'],
+      expIds: [8, 13], // Sintra experiences
+    },
+    lisbon: {
+      keywords: ['lisbon', 'lisboa', 'alfama', 'baixa', 'chiado', 'bairro alto', 'tram', 'elétrico', 'belém'],
+      expIds: [7, 9, 11], // Lisbon city experiences
+    },
+    streetart: {
+      keywords: ['street art', 'graffiti', 'mural', 'urban', 'art tour', 'cultural', 'multicultural'],
+      expIds: [9], // Street art tour
+    },
+    bees: {
+      keywords: ['bee', 'bees', 'beekeeping', 'honey', 'mel', 'abelha', 'apicultura', 'hive', 'farm'],
+      expIds: [12], // Beekeeping
+    },
+    romantic: {
+      keywords: ['romantic', 'couple', 'honeymoon', 'date', 'love', 'sunset', 'golden hour', 'anniversary'],
+      expIds: [4, 10, 16, 20], // Romantic experiences
+    },
+    family: {
+      keywords: ['family', 'kids', 'children', 'família', 'crianças', 'family-friendly'],
+      expIds: [4, 5, 7, 8], // Family-friendly experiences
+    },
   };
   
   // Score each experience
   const scored = experiences.map(exp => {
     let score = 0;
+    const matchedCategories = [];
     const expContent = `${exp.title} ${exp.description || ''} ${exp.category} ${(exp.tags || []).join(' ')}`.toLowerCase();
     
-    for (const [category, keywords] of Object.entries(keywordMap)) {
-      for (const keyword of keywords) {
+    for (const [category, config] of Object.entries(keywordMap)) {
+      for (const keyword of config.keywords) {
         if (content.includes(keyword)) {
-          // Check if experience matches this category
-          if (expContent.includes(keyword)) {
-            score += 10;
+          // Direct match - high priority if exp ID is in the preferred list
+          if (config.expIds.includes(exp.id) || config.expIds.includes(parseInt(exp.id))) {
+            score += 25; // High score for direct ID match
+            matchedCategories.push(category);
           }
-          for (const tag of (exp.tags || [])) {
-            if (tag.toLowerCase().includes(keyword)) {
+          // Check if experience content matches this keyword
+          else if (expContent.includes(keyword)) {
+            score += 10;
+            matchedCategories.push(category);
+          }
+          // Check tags
+          for (const tag of (Array.isArray(exp.tags) ? exp.tags : [])) {
+            if (tag && tag.toLowerCase().includes(keyword)) {
               score += 5;
             }
           }
@@ -466,15 +758,19 @@ function matchExperiencesWithKeywords(metadata, experiences) {
       }
     }
     
-    return { experience: exp, score };
+    return { experience: exp, score, matchedCategories: [...new Set(matchedCategories)] };
   });
   
+  // Log top matches for debugging
+  const topMatches = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+  console.log('🔤 Top keyword matches:', topMatches.map(m => ({
+    title: m.experience.title,
+    score: m.score,
+    categories: m.matchedCategories
+  })));
+  
   // Return top matches
-  return scored
-    .filter(s => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5)
-    .map(s => s.experience);
+  return topMatches.map(s => s.experience);
 }
 
 /**
@@ -669,21 +965,52 @@ router.post('/smart-match', async (req, res) => {
       });
     }
     
-    // Step 3: Try AI matching first
-    console.log('🤖 Step 3: Trying AI matching...');
-    let matchedExperiences = await matchExperiencesWithAI(metadata, experiences);
+    // Step 3: Check if we have enough text metadata
+    const hasGoodTextMetadata = (metadata.description && metadata.description.length > 20) || 
+                                 (metadata.hashtags && metadata.hashtags.length >= 2);
+    
+    // Step 3b: If we don't have good text, analyze the thumbnail image
+    let imageAnalysis = null;
+    if (!hasGoodTextMetadata && metadata.thumbnailUrl) {
+      console.log('👁️ Step 3b: Not enough text metadata, analyzing thumbnail...');
+      imageAnalysis = await analyzeImageWithVision(metadata.thumbnailUrl);
+      if (imageAnalysis) {
+        console.log('👁️ Image analysis successful:', imageAnalysis);
+      }
+    }
+    
+    // Step 4: Try AI matching with all available context
+    console.log('🤖 Step 4: Trying AI matching...');
+    let matchedExperiences = await matchExperiencesWithAI(metadata, experiences, imageAnalysis);
     let matchMethod = 'ai';
     
-    // Step 4: Fallback to keyword matching if AI fails
+    // Step 5: Fallback to keyword matching if AI fails
     if (!matchedExperiences || matchedExperiences.length === 0) {
-      console.log('🔤 Step 4: Falling back to keyword matching...');
-      matchedExperiences = matchExperiencesWithKeywords(metadata, experiences);
+      console.log('🔤 Step 5: Falling back to keyword matching...');
+      
+      // Include image analysis keywords in matching
+      if (imageAnalysis) {
+        // Create enhanced metadata with image analysis
+        const enhancedMetadata = {
+          ...metadata,
+          description: [
+            metadata.description || '',
+            (imageAnalysis.activities || []).join(' '),
+            (imageAnalysis.keywords || []).join(' '),
+            (imageAnalysis.location_hints || []).join(' '),
+            imageAnalysis.mood || '',
+          ].join(' '),
+        };
+        matchedExperiences = matchExperiencesWithKeywords(enhancedMetadata, experiences);
+      } else {
+        matchedExperiences = matchExperiencesWithKeywords(metadata, experiences);
+      }
       matchMethod = 'keywords';
     }
     
-    // Step 5: If still no matches, suggest top-rated experiences
+    // Step 6: If still no matches, suggest top-rated experiences
     if (!matchedExperiences || matchedExperiences.length === 0) {
-      console.log('⭐ Step 5: No matches found, suggesting top experiences...');
+      console.log('⭐ Step 6: No matches found, suggesting top experiences...');
       matchedExperiences = experiences
         .filter(e => e.rating >= 4.0)
         .slice(0, 5);
