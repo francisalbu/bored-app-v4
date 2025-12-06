@@ -202,11 +202,11 @@ If nothing matches well, return [].`;
       matchMethod = 'none';
     }
     
-    // Get full experience data
+    // Get full experience data - return TOP 3 only
     const matchedExperiences = matchedIds
       .map(id => experiences.find(exp => exp.id === id || exp.id === String(id)))
       .filter(Boolean)
-      .slice(0, 5)
+      .slice(0, 3)
       .map(exp => ({
         id: String(exp.id),
         title: exp.title,
