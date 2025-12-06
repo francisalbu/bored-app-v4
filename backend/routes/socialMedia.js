@@ -96,7 +96,8 @@ async function extractTikTokMetadata(url) {
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
 /**
- * Extract Instagram metadata using RapidAPI (instagram120 API)
+ * Extract Instagram metadata using RapidAPI (Instagram Scraper Stable API)
+ * This API reliably extracts reel captions and metadata
  */
 async function extractWithRapidAPI(url) {
   if (!RAPIDAPI_KEY) {
@@ -104,7 +105,7 @@ async function extractWithRapidAPI(url) {
   }
   
   try {
-    console.log('🚀 Using RapidAPI (instagram120) for Instagram scraping...');
+    console.log('🚀 Using RapidAPI (Instagram Scraper Stable API) for Instagram scraping...');
     
     // Extract shortcode from URL
     const shortcodeMatch = url.match(/\/(p|reel|reels)\/([A-Za-z0-9_-]+)/);
@@ -112,20 +113,21 @@ async function extractWithRapidAPI(url) {
       return { success: false, error: 'Could not extract shortcode from URL' };
     }
     const shortcode = shortcodeMatch[2];
+    const isReel = shortcodeMatch[1] === 'reel' || shortcodeMatch[1] === 'reels';
     
-    console.log('📝 Extracted shortcode:', shortcode);
+    console.log('📝 Extracted shortcode:', shortcode, 'isReel:', isReel);
     
-    // Use instagram120 API on RapidAPI
-    const response = await fetch('https://instagram120.p.rapidapi.com/api/instagram/posts', {
-      method: 'POST',
+    // Use Instagram Scraper Stable API - different endpoints for reels vs posts
+    const endpoint = isReel 
+      ? `https://instagram-scraper-stable-api.p.rapidapi.com/get_reel_title.php?reel_post_code_or_url=${shortcode}&type=reel`
+      : `https://instagram-scraper-stable-api.p.rapidapi.com/get_post_title.php?post_code_or_url=${shortcode}&type=post`;
+    
+    const response = await fetch(endpoint, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'x-rapidapi-host': 'instagram120.p.rapidapi.com',
+        'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY,
       },
-      body: JSON.stringify({
-        shortcode: shortcode,
-      }),
     });
     
     if (!response.ok) {
@@ -136,22 +138,9 @@ async function extractWithRapidAPI(url) {
     const data = await response.json();
     console.log('📦 RapidAPI response:', JSON.stringify(data).substring(0, 800));
     
-    // Parse the response - instagram120 has different response format
-    if (data) {
-      // Try different possible response structures
-      const post = data.data || data.result || data;
-      
-      // Get caption from various possible fields
-      let caption = '';
-      if (post.caption?.text) {
-        caption = post.caption.text;
-      } else if (post.edge_media_to_caption?.edges?.[0]?.node?.text) {
-        caption = post.edge_media_to_caption.edges[0].node.text;
-      } else if (typeof post.caption === 'string') {
-        caption = post.caption;
-      } else if (post.text) {
-        caption = post.text;
-      }
+    // Parse the response from Instagram Scraper Stable API
+    if (data && (data.post_caption || data.description)) {
+      const caption = data.post_caption || data.description || '';
       
       console.log('📝 Caption extracted:', caption.substring(0, 200));
       
@@ -160,18 +149,12 @@ async function extractWithRapidAPI(url) {
       const hashtags = caption.match(hashtagRegex) || [];
       const description = caption.replace(hashtagRegex, '').trim();
       
-      // Get username
-      const username = post.owner?.username || 
-                       post.user?.username || 
-                       post.username || 
-                       null;
-      
-      // Get thumbnail
-      const thumbnailUrl = post.thumbnail_url ||
-                           post.display_url ||
-                           post.image_versions2?.candidates?.[0]?.url ||
-                           post.thumbnail_src ||
-                           null;
+      // Extract username from description if available (format: "username on date:")
+      let username = null;
+      const usernameMatch = data.description?.match(/^[\d,]+\s+likes?,\s+[\d,]+\s+comments?\s+-\s+(\w+)\s+on/i);
+      if (usernameMatch) {
+        username = usernameMatch[1];
+      }
       
       return {
         platform: 'instagram',
@@ -180,12 +163,16 @@ async function extractWithRapidAPI(url) {
         description: description,
         fullTitle: caption,
         hashtags: hashtags,
-        thumbnailUrl: thumbnailUrl,
-        method: 'rapidapi_instagram120',
+        thumbnailUrl: null, // This API doesn't return thumbnails
+        postId: data.post_id,
+        postUrl: data.url,
+        likes: data.post_likes,
+        comments: data.post_comments,
+        method: 'rapidapi_stable',
       };
     }
     
-    return { success: false, error: 'No data in RapidAPI response' };
+    return { success: false, error: 'No caption data in RapidAPI response' };
   } catch (error) {
     console.error('RapidAPI error:', error);
     return { success: false, error: error.message };
