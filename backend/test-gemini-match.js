@@ -2,11 +2,12 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createClient } = require('@supabase/supabase-js');
 
 async function test() {
+  // Dados REAIS do Reel de surf
   const metadata = {
     platform: 'instagram',
-    description: 'Amazing day at the beach',
-    hashtags: ['#surf', '#paradise'],
-    fullTitle: 'Amazing day at the beach #surf #paradise'
+    description: 'Sun set sesh Are THE BEST 🌴🌎🔥🌎🌎🌎🌎🌅🌅☀️🌅🌅🌅🌅🌅🌅NEVER STOP WORKING 🌎🌴🦾🌎🌎🌎🌎🌎',
+    hashtags: ['#surf', '#sunset', '#surfing', '#surflife', '#surfphotography', '#world', '#day', '#sun', '#surftrip', '#livingmybestlife', '#life', '#lifestyle', '#livingthegoodlife', '#ocean'],
+    fullTitle: 'Sun set sesh Are THE BEST #surf #sunset #surfing #surflife #ocean'
   };
   
   console.log('📱 Metadata simulado:', metadata);

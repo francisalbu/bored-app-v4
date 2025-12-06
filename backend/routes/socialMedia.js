@@ -11,9 +11,13 @@ const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// API credentials
+// API credentials - with hardcoded fallbacks
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-const GOOGLE_AI_KEY = process.env.GOOGLE_AI_KEY || process.env.EXPO_PUBLIC_GOOGLE_AI_KEY;
+const GOOGLE_AI_KEY = process.env.GOOGLE_AI_KEY || process.env.EXPO_PUBLIC_GOOGLE_AI_KEY || 'AIzaSyAlvnCcn8ndC6avTq2BlW7LJ-H3VgCEAk4';
+
+// Supabase credentials - with hardcoded fallbacks
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://hnivuisqktlrusyqywaz.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
 
 // Supabase for fetching experiences
 const { createClient } = require('@supabase/supabase-js');
@@ -21,15 +25,12 @@ let supabase = null;
 
 function getSupabase() {
   if (!supabase) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
-    
-    if (!url || !key) {
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
       console.error('⚠️ Supabase credentials not configured');
       return null;
     }
     
-    supabase = createClient(url, key);
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
   }
   return supabase;
 }
