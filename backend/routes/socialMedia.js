@@ -96,7 +96,7 @@ async function extractTikTokMetadata(url) {
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
 /**
- * Extract Instagram metadata using RapidAPI (free tier available)
+ * Extract Instagram metadata using RapidAPI (instagram120 API)
  */
 async function extractWithRapidAPI(url) {
   if (!RAPIDAPI_KEY) {
@@ -104,7 +104,7 @@ async function extractWithRapidAPI(url) {
   }
   
   try {
-    console.log('🚀 Using RapidAPI for Instagram scraping...');
+    console.log('🚀 Using RapidAPI (instagram120) for Instagram scraping...');
     
     // Extract shortcode from URL
     const shortcodeMatch = url.match(/\/(p|reel|reels)\/([A-Za-z0-9_-]+)/);
@@ -113,41 +113,75 @@ async function extractWithRapidAPI(url) {
     }
     const shortcode = shortcodeMatch[2];
     
-    // Use Instagram Scraper API on RapidAPI
-    const response = await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=${shortcode}`, {
-      method: 'GET',
+    console.log('📝 Extracted shortcode:', shortcode);
+    
+    // Use instagram120 API on RapidAPI
+    const response = await fetch('https://instagram120.p.rapidapi.com/api/instagram/posts', {
+      method: 'POST',
       headers: {
-        'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com',
+        'Content-Type': 'application/json',
+        'x-rapidapi-host': 'instagram120.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY,
       },
+      body: JSON.stringify({
+        shortcode: shortcode,
+      }),
     });
     
     if (!response.ok) {
       console.log('❌ RapidAPI error:', response.status);
-      return { success: false, error: 'RapidAPI request failed' };
+      return { success: false, error: `RapidAPI request failed: ${response.status}` };
     }
     
     const data = await response.json();
-    console.log('📦 RapidAPI response:', JSON.stringify(data).substring(0, 500));
+    console.log('📦 RapidAPI response:', JSON.stringify(data).substring(0, 800));
     
-    if (data.data) {
-      const post = data.data;
-      const caption = post.caption?.text || post.caption || '';
+    // Parse the response - instagram120 has different response format
+    if (data) {
+      // Try different possible response structures
+      const post = data.data || data.result || data;
+      
+      // Get caption from various possible fields
+      let caption = '';
+      if (post.caption?.text) {
+        caption = post.caption.text;
+      } else if (post.edge_media_to_caption?.edges?.[0]?.node?.text) {
+        caption = post.edge_media_to_caption.edges[0].node.text;
+      } else if (typeof post.caption === 'string') {
+        caption = post.caption;
+      } else if (post.text) {
+        caption = post.text;
+      }
+      
+      console.log('📝 Caption extracted:', caption.substring(0, 200));
       
       // Extract hashtags
       const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
       const hashtags = caption.match(hashtagRegex) || [];
       const description = caption.replace(hashtagRegex, '').trim();
       
+      // Get username
+      const username = post.owner?.username || 
+                       post.user?.username || 
+                       post.username || 
+                       null;
+      
+      // Get thumbnail
+      const thumbnailUrl = post.thumbnail_url ||
+                           post.display_url ||
+                           post.image_versions2?.candidates?.[0]?.url ||
+                           post.thumbnail_src ||
+                           null;
+      
       return {
         platform: 'instagram',
         success: true,
-        username: post.user?.username || post.owner?.username || null,
+        username: username,
         description: description,
         fullTitle: caption,
         hashtags: hashtags,
-        thumbnailUrl: post.thumbnail_url || post.image_versions2?.candidates?.[0]?.url || null,
-        method: 'rapidapi',
+        thumbnailUrl: thumbnailUrl,
+        method: 'rapidapi_instagram120',
       };
     }
     
@@ -869,6 +903,7 @@ router.get('/debug', (req, res) => {
       hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
       hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
       hasApifyToken: !!process.env.APIFY_API_TOKEN,
+      hasRapidApiKey: !!process.env.RAPIDAPI_KEY,
       hasGoogleAiKey: !!process.env.GOOGLE_AI_KEY,
       hasFacebookAppId: !!process.env.FACEBOOK_APP_ID,
     },
