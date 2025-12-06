@@ -40,25 +40,33 @@ async function extractTikTokMetadata(url) {
   }
 }
 
-// Extract Instagram metadata
+// Extract Instagram metadata - CORRECT ENDPOINT from RapidAPI docs
 async function extractInstagramMetadata(url) {
   try {
     let cleanUrl = url.split('?')[0];
     if (!cleanUrl.endsWith('/')) cleanUrl += '/';
     
-    const response = await fetch('https://instagram-scraper-stable-api.p.rapidapi.com/get-reel', {
-      method: 'POST',
+    console.log('📸 Calling RapidAPI with URL:', cleanUrl);
+    console.log('📸 Using key:', RAPIDAPI_KEY.substring(0, 10) + '...');
+    
+    // CORRECT ENDPOINT: GET request with query params
+    const apiUrl = `https://instagram-scraper-stable-api.p.rapidapi.com/get_reel_title.php?reel_post_code_or_url=${encodeURIComponent(cleanUrl)}&type=reel`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY,
       },
-      body: JSON.stringify({ url: cleanUrl }),
     });
     
-    if (response.ok) {
-      const data = await response.json();
-      const caption = data.caption || data.title || '';
+    console.log('📸 RapidAPI response status:', response.status);
+    const data = await response.json();
+    console.log('📸 RapidAPI response data:', JSON.stringify(data).substring(0, 500));
+    
+    // Extract caption from response - field is "post_caption"
+    const caption = data.post_caption || data.description || data.caption || '';
+    if (caption) {
       const hashtags = caption.match(/#[\w\u00C0-\u024F]+/g) || [];
       const description = caption.replace(/#[\w\u00C0-\u024F]+/g, '').trim();
       
@@ -68,11 +76,12 @@ async function extractInstagramMetadata(url) {
         description,
         fullTitle: caption,
         hashtags,
-        username: data.username || null,
+        username: data.username || data.owner?.username || null,
       };
     }
-    throw new Error('RapidAPI failed');
+    throw new Error('RapidAPI failed: ' + JSON.stringify(data).substring(0, 200));
   } catch (error) {
+    console.error('📸 Instagram extraction error:', error.message);
     return { platform: 'instagram', success: false, error: error.message };
   }
 }
