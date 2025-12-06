@@ -25,7 +25,7 @@ function getSupabase() {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
     
     if (!url || !key) {
-      console.error('Supabase credentials not configured');
+      console.error('⚠️ Supabase credentials not configured');
       return null;
     }
     
@@ -35,15 +35,17 @@ function getSupabase() {
 }
 
 /**
- * Extract metadata from TikTok URL using oEmbed API
+ * Extract metadata from TikTok URL using oEmbed API (free, no auth required)
  */
 async function extractTikTokMetadata(url) {
   try {
-    const oembedUrl = 'https://www.tiktok.com/oembed?url=' + encodeURIComponent(url);
+    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
     const response = await fetch(oembedUrl);
     
     if (response.ok) {
       const data = await response.json();
+      
+      // Extract hashtags from title
       const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
       const hashtags = data.title?.match(hashtagRegex) || [];
       const description = data.title?.replace(hashtagRegex, '').trim() || '';
@@ -59,18 +61,24 @@ async function extractTikTokMetadata(url) {
         method: 'oembed',
       };
     }
+    
     throw new Error('Failed to fetch TikTok metadata');
   } catch (error) {
     console.error('TikTok extraction error:', error);
-    return { platform: 'tiktok', success: false, error: error.message };
+    return {
+      platform: 'tiktok',
+      success: false,
+      error: error.message,
+    };
   }
 }
 
 /**
- * Extract Instagram metadata using RapidAPI
+ * Extract Instagram metadata using RapidAPI (Instagram Scraper Stable API)
  */
 async function extractInstagramMetadata(url) {
   try {
+    // Clean the URL
     let cleanUrl = url;
     if (url.includes('instagr.am')) {
       const redirectResponse = await fetch(url, { redirect: 'follow' });
@@ -82,8 +90,9 @@ async function extractInstagramMetadata(url) {
       return { platform: 'instagram', success: false, error: 'RapidAPI key not configured' };
     }
     
-    console.log('Using RapidAPI for Instagram scraping...');
+    console.log('🚀 Using RapidAPI for Instagram scraping...');
     
+    // Extract shortcode from URL
     const shortcodeMatch = cleanUrl.match(/\/(p|reel|reels)\/([A-Za-z0-9_-]+)/);
     if (!shortcodeMatch) {
       return { platform: 'instagram', success: false, error: 'Could not extract shortcode from URL' };
@@ -92,11 +101,12 @@ async function extractInstagramMetadata(url) {
     const shortcode = shortcodeMatch[2];
     const isReel = shortcodeMatch[1] === 'reel' || shortcodeMatch[1] === 'reels';
     
-    console.log('Shortcode:', shortcode, '| isReel:', isReel);
+    console.log('📝 Shortcode:', shortcode, '| isReel:', isReel);
     
+    // Use Instagram Scraper Stable API
     const endpoint = isReel 
-      ? 'https://instagram-scraper-stable-api.p.rapidapi.com/get_reel_title.php?reel_post_code_or_url=' + shortcode + '&type=reel'
-      : 'https://instagram-scraper-stable-api.p.rapidapi.com/get_post_title.php?post_code_or_url=' + shortcode + '&type=post';
+      ? `https://instagram-scraper-stable-api.p.rapidapi.com/get_reel_title.php?reel_post_code_or_url=${shortcode}&type=reel`
+      : `https://instagram-scraper-stable-api.p.rapidapi.com/get_post_title.php?post_code_or_url=${shortcode}&type=post`;
     
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -107,20 +117,22 @@ async function extractInstagramMetadata(url) {
     });
     
     if (!response.ok) {
-      console.log('RapidAPI error:', response.status);
-      return { platform: 'instagram', success: false, error: 'RapidAPI request failed: ' + response.status };
+      console.log('❌ RapidAPI error:', response.status);
+      return { platform: 'instagram', success: false, error: `RapidAPI request failed: ${response.status}` };
     }
     
     const data = await response.json();
-    console.log('RapidAPI response:', JSON.stringify(data).substring(0, 500));
+    console.log('📦 RapidAPI response:', JSON.stringify(data).substring(0, 500));
     
     if (data && (data.post_caption || data.description)) {
       const caption = data.post_caption || data.description || '';
+      
+      // Extract hashtags
       const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
       const hashtags = caption.match(hashtagRegex) || [];
       const description = caption.replace(hashtagRegex, '').trim();
       
-      console.log('Caption extracted:', caption.substring(0, 200));
+      console.log('✅ Caption extracted:', caption.substring(0, 200));
       
       return {
         platform: 'instagram',
@@ -142,52 +154,96 @@ async function extractInstagramMetadata(url) {
 }
 
 /**
- * Use Gemini AI to match experiences
+ * Use Gemini AI to match experiences based on social media content
  */
 async function matchExperiencesWithAI(metadata, experiences) {
   if (!GOOGLE_AI_KEY) {
-    console.log('Google AI key not configured, using keyword matching');
+    console.log('⚠️ Google AI key not configured, using keyword matching');
     return null;
   }
   
   try {
-    console.log('Using Gemini AI for experience matching...');
+    console.log('🤖 Using Gemini AI for experience matching...');
     
     const genAI = new GoogleGenerativeAI(GOOGLE_AI_KEY);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
     
-    const experiencesSummary = experiences.map(function(exp) {
-      return { id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location };
-    });
+    // Create summary of experiences
+    const experiencesSummary = experiences.map(exp => ({
+      id: exp.id,
+      title: exp.title,
+      category: exp.category,
+      tags: exp.tags,
+      location: exp.location,
+    }));
     
+    // Build context from metadata
     let contentContext = '';
     if (metadata.description || metadata.fullTitle) {
-      contentContext += 'Description: "' + (metadata.description || metadata.fullTitle) + '"\n';
+      contentContext += `Description: "${metadata.description || metadata.fullTitle}"\n`;
     }
     if (metadata.hashtags && metadata.hashtags.length > 0) {
-      contentContext += 'Hashtags: ' + metadata.hashtags.join(', ') + '\n';
+      contentContext += `Hashtags: ${metadata.hashtags.join(', ')}\n`;
     }
     
-    if (!contentContext.trim()) return null;
+    if (!contentContext.trim()) {
+      return null;
+    }
     
-    const prompt = 'You are matching social media content to travel experiences in Portugal.\n\nSOCIAL MEDIA CONTENT:\n' + contentContext + '\n\nAVAILABLE EXPERIENCES:\n' + JSON.stringify(experiencesSummary, null, 2) + '\n\nMATCHING RULES:\n- surf/waves/surfing -> surf experiences\n- wine/vineyard/tasting -> wine experiences\n- cooking/chef/food -> cooking classes\n- yoga/meditation -> yoga experiences\n- horse/riding -> horseback riding\n- beach/praia -> beach activities\n- adventure/adrenaline -> adventure experiences\n- sintra/palace -> Sintra tours\n- lisbon/lisboa -> Lisbon tours\n\nReturn ONLY a JSON array of experience IDs (max 5), ordered by relevance.\nExample: [18, 19, 5]\n\nIf nothing matches well, return [].';
+    const prompt = `You are matching social media content to travel experiences in Portugal.
+
+SOCIAL MEDIA CONTENT:
+${contentContext}
+
+AVAILABLE EXPERIENCES:
+${JSON.stringify(experiencesSummary, null, 2)}
+
+MATCHING PRIORITY (follow strictly):
+
+1. DIRECT MATCH (highest priority): If a hashtag is a SPECIFIC activity (surf, yoga, wine, cooking, horse), 
+   ALWAYS include ALL experiences that contain that exact word in title or tags.
+   Example: #surf → MUST include every experience with "surf" in title/tags
+
+2. RELATED MATCH (second priority): After direct matches, add experiences with related concepts.
+   Example: #surf → also add beach experiences, water sports, coastal activities
+
+3. CONTEXTUAL MATCH (third priority): For GENERIC hashtags (beach, summer, paradise, vacation, adventure),
+   use creativity to find thematically related experiences.
+   Example: #summer → beach activities, outdoor tours, water sports
+
+KEYWORD MAPPINGS:
+- surf/surfing/waves → surf lessons, surf camps, beach activities
+- wine/vineyard/tasting → wine tours, wine experiences
+- cooking/chef/food/gastronomy → cooking classes, food tours
+- yoga/meditation/wellness → yoga retreats, wellness experiences
+- horse/riding/equestrian → horseback riding
+- beach/praia/coastal → beach activities, coastal tours
+- adventure/adrenaline/extreme → adventure experiences, outdoor activities
+
+Return ONLY a JSON array of experience IDs (max 5), ordered by relevance (direct matches first).
+Example: [26, 18, 19, 5, 3]
+
+If nothing matches well, return [].`;
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { temperature: 0.2, maxOutputTokens: 100 },
     });
 
-    const text = result.response.text().trim();
-    console.log('AI Response:', text);
+    let text = result.response.text().trim();
+    console.log('🤖 AI Response (raw):', text);
+    
+    // Clean markdown wrapper if present
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     const matchedIds = JSON.parse(text);
     
     if (Array.isArray(matchedIds) && matchedIds.length > 0) {
       const matchedExperiences = matchedIds
-        .map(function(id) { return experiences.find(function(exp) { return exp.id === id || exp.id === String(id); }); })
+        .map(id => experiences.find(exp => exp.id === id || exp.id === String(id)))
         .filter(Boolean);
       
-      console.log('AI matched:', matchedExperiences.map(function(e) { return e.title; }));
+      console.log('✅ AI matched:', matchedExperiences.map(e => e.title));
       return matchedExperiences;
     }
     
@@ -202,54 +258,52 @@ async function matchExperiencesWithAI(metadata, experiences) {
  * Keyword-based matching fallback
  */
 function matchExperiencesWithKeywords(metadata, experiences) {
-  const content = (metadata.description || '') + ' ' + (metadata.fullTitle || '') + ' ' + (metadata.hashtags || []).join(' ');
-  const contentLower = content.toLowerCase();
+  const content = `${metadata.description || ''} ${metadata.fullTitle || ''} ${(metadata.hashtags || []).join(' ')}`.toLowerCase();
   
-  console.log('Keyword matching:', contentLower.substring(0, 200));
+  console.log('🔤 Keyword matching:', content.substring(0, 200));
   
   const keywordMap = {
     surf: ['surf', 'surfing', 'waves', 'ondas', 'surfboard', 'surfer'],
     yoga: ['yoga', 'meditation', 'wellness', 'mindfulness', 'zen'],
-    wine: ['wine', 'vinho', 'vineyard', 'winery', 'tasting'],
+    wine: ['wine', 'vinho', 'vineyard', 'winery', 'tasting', 'degustação'],
     cooking: ['cooking', 'cook', 'chef', 'kitchen', 'culinary', 'food', 'pastel', 'nata'],
     dolphins: ['dolphin', 'dolphins', 'whale', 'golfinho', 'marine'],
     horse: ['horse', 'horseback', 'riding', 'equestrian', 'cavalo'],
     beach: ['beach', 'praia', 'coast', 'seaside', 'comporta', 'caparica'],
     adventure: ['adventure', 'adrenaline', 'extreme', 'quad', 'atv', 'buggy'],
-    sintra: ['sintra', 'palace', 'castle', 'pena', 'regaleira'],
+    sintra: ['sintra', 'palace', 'palácio', 'castle', 'pena', 'regaleira'],
     lisbon: ['lisbon', 'lisboa', 'alfama', 'baixa', 'chiado', 'tram'],
     tiles: ['tiles', 'azulejos', 'ceramic', 'pottery', 'craft'],
     climbing: ['climbing', 'climb', 'bridge', 'rappel', '25 abril'],
   };
   
-  var scored = experiences.map(function(exp) {
-    var score = 0;
-    var expContent = (exp.title + ' ' + (exp.description || '') + ' ' + exp.category + ' ' + (exp.tags || []).join(' ')).toLowerCase();
+  // Score experiences
+  const scored = experiences.map(exp => {
+    let score = 0;
+    const expContent = `${exp.title} ${exp.description || ''} ${exp.category} ${(exp.tags || []).join(' ')}`.toLowerCase();
     
-    Object.keys(keywordMap).forEach(function(category) {
-      keywordMap[category].forEach(function(keyword) {
-        if (contentLower.includes(keyword)) {
+    for (const [category, keywords] of Object.entries(keywordMap)) {
+      for (const keyword of keywords) {
+        if (content.includes(keyword)) {
           if (expContent.includes(keyword)) {
             score += 20;
           }
-          if (Array.isArray(exp.tags)) {
-            exp.tags.forEach(function(tag) {
-              if (tag && tag.toLowerCase().includes(keyword)) {
-                score += 10;
-              }
-            });
+          for (const tag of (Array.isArray(exp.tags) ? exp.tags : [])) {
+            if (tag && tag.toLowerCase().includes(keyword)) {
+              score += 10;
+            }
           }
         }
-      });
-    });
+      }
+    }
     
-    return { experience: exp, score: score };
+    return { experience: exp, score };
   });
   
-  var topMatches = scored.filter(function(s) { return s.score > 0; }).sort(function(a, b) { return b.score - a.score; }).slice(0, 5);
-  console.log('Top matches:', topMatches.map(function(m) { return { title: m.experience.title, score: m.score }; }));
+  const topMatches = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+  console.log('🔤 Top matches:', topMatches.map(m => ({ title: m.experience.title, score: m.score })));
   
-  return topMatches.map(function(s) { return s.experience; });
+  return topMatches.map(s => s.experience);
 }
 
 /**
@@ -257,7 +311,7 @@ function matchExperiencesWithKeywords(metadata, experiences) {
  */
 function detectPlatform(url) {
   if (!url) return null;
-  var lowerUrl = url.toLowerCase();
+  const lowerUrl = url.toLowerCase();
   
   if (lowerUrl.includes('tiktok.com') || lowerUrl.includes('vm.tiktok')) return 'tiktok';
   if (lowerUrl.includes('instagram.com') || lowerUrl.includes('instagr.am')) return 'instagram';
@@ -267,21 +321,27 @@ function detectPlatform(url) {
 
 // ============ ROUTES ============
 
-router.post('/extract', async function(req, res) {
+/**
+ * POST /api/social-media/extract
+ */
+router.post('/extract', async (req, res) => {
   try {
-    var url = req.body.url;
+    const { url } = req.body;
     
     if (!url) {
       return res.status(400).json({ success: false, error: 'URL is required' });
     }
     
-    var platform = detectPlatform(url);
+    const platform = detectPlatform(url);
     
     if (!platform) {
-      return res.status(400).json({ success: false, error: 'Unsupported platform. Only TikTok and Instagram are supported.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported platform. Only TikTok and Instagram are supported.',
+      });
     }
     
-    var metadata;
+    let metadata;
     if (platform === 'tiktok') {
       metadata = await extractTikTokMetadata(url);
     } else {
@@ -297,11 +357,21 @@ router.post('/extract', async function(req, res) {
   }
 });
 
-router.get('/test', function(req, res) {
-  res.json({ success: true, message: 'Social media API is working', supportedPlatforms: ['tiktok', 'instagram'] });
+/**
+ * GET /api/social-media/test
+ */
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Social media API is working',
+    supportedPlatforms: ['tiktok', 'instagram'],
+  });
 });
 
-router.get('/debug', function(req, res) {
+/**
+ * GET /api/social-media/debug
+ */
+router.get('/debug', (req, res) => {
   res.json({
     success: true,
     env: {
@@ -312,86 +382,111 @@ router.get('/debug', function(req, res) {
   });
 });
 
-router.post('/smart-match', async function(req, res) {
+/**
+ * POST /api/social-media/smart-match
+ * Extract metadata AND find matching experiences
+ */
+router.post('/smart-match', async (req, res) => {
   try {
-    var url = req.body.url;
+    const { url } = req.body;
     
-    console.log('Smart match for:', url);
+    console.log('🔍 Smart match for:', url);
     
     if (!url) {
       return res.status(400).json({ success: false, error: 'URL is required' });
     }
     
-    var platform = detectPlatform(url);
+    const platform = detectPlatform(url);
     
     if (!platform) {
-      return res.status(400).json({ success: false, error: 'Unsupported platform. Only TikTok and Instagram are supported.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported platform. Only TikTok and Instagram are supported.',
+      });
     }
     
-    console.log('Extracting metadata...');
-    var metadata;
+    // Step 1: Extract metadata
+    console.log('📱 Extracting metadata...');
+    let metadata;
     if (platform === 'tiktok') {
       metadata = await extractTikTokMetadata(url);
     } else {
       metadata = await extractInstagramMetadata(url);
     }
     metadata.originalUrl = url;
-    console.log('Metadata:', metadata);
+    console.log('📱 Metadata:', metadata);
     
-    var db = getSupabase();
+    // Step 2: Fetch experiences
+    const db = getSupabase();
     if (!db) {
-      return res.json({ success: true, metadata: metadata, matchedExperiences: [], matchMethod: 'none', error: 'Database not configured' });
+      return res.json({
+        success: true,
+        metadata,
+        matchedExperiences: [],
+        matchMethod: 'none',
+        error: 'Database not configured',
+      });
     }
     
-    var result = await db.from('experiences').select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, operator_name').order('rating', { ascending: false });
+    const { data: experiences, error: dbError } = await db
+      .from('experiences')
+      .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, operator_name')
+      .order('rating', { ascending: false });
     
-    if (result.error || !result.data || !result.data.length) {
-      return res.json({ success: true, metadata: metadata, matchedExperiences: [], matchMethod: 'none' });
+    if (dbError || !experiences?.length) {
+      return res.json({
+        success: true,
+        metadata,
+        matchedExperiences: [],
+        matchMethod: 'none',
+      });
     }
     
-    var experiences = result.data;
-    console.log('Found ' + experiences.length + ' experiences');
+    console.log(`📦 Found ${experiences.length} experiences`);
     
-    var matchedExperiences = await matchExperiencesWithAI(metadata, experiences);
-    var matchMethod = 'ai';
+    // Step 3: Try AI matching
+    let matchedExperiences = await matchExperiencesWithAI(metadata, experiences);
+    let matchMethod = 'ai';
     
-    if (!matchedExperiences || !matchedExperiences.length) {
-      console.log('Falling back to keyword matching...');
+    // Step 4: Fallback to keywords
+    if (!matchedExperiences?.length) {
+      console.log('🔤 Falling back to keyword matching...');
       matchedExperiences = matchExperiencesWithKeywords(metadata, experiences);
       matchMethod = 'keywords';
     }
     
-    if (!matchedExperiences || !matchedExperiences.length) {
-      console.log('Suggesting top experiences...');
-      matchedExperiences = experiences.filter(function(e) { return e.rating >= 4.0; }).slice(0, 5);
+    // Step 5: Fallback to top-rated
+    if (!matchedExperiences?.length) {
+      console.log('⭐ Suggesting top experiences...');
+      matchedExperiences = experiences.filter(e => e.rating >= 4.0).slice(0, 5);
       matchMethod = 'suggested';
     }
     
-    var transformedExperiences = matchedExperiences.map(function(exp) {
-      var tags = exp.tags;
-      if (!Array.isArray(tags)) {
-        try { tags = JSON.parse(tags); } catch(e) { tags = []; }
-      }
-      return {
-        id: String(exp.id),
-        title: exp.title,
-        description: exp.description,
-        category: exp.category,
-        tags: tags,
-        location: exp.location,
-        price: exp.price,
-        currency: exp.currency || 'EUR',
-        duration: exp.duration,
-        rating: exp.rating,
-        reviewCount: exp.review_count,
-        image: exp.image_url,
-        provider: exp.operator_name,
-      };
+    // Transform for frontend
+    const transformedExperiences = matchedExperiences.map(exp => ({
+      id: String(exp.id),
+      title: exp.title,
+      description: exp.description,
+      category: exp.category,
+      tags: Array.isArray(exp.tags) ? exp.tags : (exp.tags ? JSON.parse(exp.tags) : []),
+      location: exp.location,
+      price: exp.price,
+      currency: exp.currency || 'EUR',
+      duration: exp.duration,
+      rating: exp.rating,
+      reviewCount: exp.review_count,
+      image: exp.image_url,
+      provider: exp.operator_name,
+    }));
+    
+    console.log(`✅ Returning ${transformedExperiences.length} experiences (${matchMethod})`);
+    
+    res.json({
+      success: true,
+      metadata,
+      matchedExperiences: transformedExperiences,
+      matchMethod,
     });
-    
-    console.log('Returning ' + transformedExperiences.length + ' experiences (' + matchMethod + ')');
-    
-    res.json({ success: true, metadata: metadata, matchedExperiences: transformedExperiences, matchMethod: matchMethod });
     
   } catch (error) {
     console.error('Smart match error:', error);
