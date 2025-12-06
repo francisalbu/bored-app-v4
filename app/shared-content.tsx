@@ -203,6 +203,7 @@ export default function SharedContentScreen() {
   const [sharedText, setSharedText] = useState<string | null>(null);
   const [matchedExperiences, setMatchedExperiences] = useState<MatchedExperience[]>([]);
   const [analyzing, setAnalyzing] = useState(true); // Start with analyzing state
+  const [paramsReady, setParamsReady] = useState(false); // Track if params are loaded
   const [scanProgress] = useState(new Animated.Value(0));
   const [scanLineAnim] = useState(new Animated.Value(0));
   const [socialMetadata, setSocialMetadata] = useState<SocialMediaMetadata | null>(null);
@@ -348,6 +349,13 @@ export default function SharedContentScreen() {
     
     console.log('📤 [shared-content] Received params:', { url, text });
     
+    // If no params yet, wait
+    if (!url && !text) {
+      console.log('📤 [shared-content] Waiting for params...');
+      return;
+    }
+    
+    setParamsReady(true);
     if (url) setSharedUrl(url);
     if (text) setSharedText(text);
     
@@ -397,35 +405,16 @@ export default function SharedContentScreen() {
           }
         }
         
-        // Fallback to local keyword matching
-        if (experiences.length > 0) {
-          const localMatches = localKeywordMatch(url, text);
-          
-          if (localMatches.length > 0) {
-            setMatchedExperiences(localMatches);
-            setMatchMethod('keywords');
-          } else {
-            // Show top-rated experiences as suggestions
-            const topRated = experiences
-              .filter(e => e.rating >= 4.0)
-              .slice(0, 5)
-              .map(exp => ({ experience: exp, score: 0, matchedKeywords: ['suggested'] }));
-            setMatchedExperiences(topRated);
-            setMatchMethod('suggested');
-          }
-        }
+        // No fallback - if AI match fails, show empty state
+        // The user can try again or go back
+        setMatchedExperiences([]);
+        setMatchMethod('none');
         
       } catch (error) {
         console.error('Error processing shared content:', error);
-        // Show suggestions on error
-        if (experiences.length > 0) {
-          const topRated = experiences
-            .filter(e => e.rating >= 4.0)
-            .slice(0, 3)
-            .map(exp => ({ experience: exp, score: 0, matchedKeywords: ['suggested'] }));
-          setMatchedExperiences(topRated);
-          setMatchMethod('suggested');
-        }
+        // No fallback on error - show empty state
+        setMatchedExperiences([]);
+        setMatchMethod('none');
       } finally {
         setAnalyzing(false);
       }
@@ -468,13 +457,8 @@ export default function SharedContentScreen() {
     return 'Social Media';
   };
 
-  const handleSaveInBackground = () => {
-    // Close the modal and let it "save in background"
-    router.back();
-  };
-
-  // Show the detecting/scanning screen
-  if (analyzing) {
+  // Show the detecting/scanning screen while loading or analyzing
+  if (!paramsReady || analyzing) {
     return (
       <View style={[styles.detectingContainer, { paddingTop: insets.top }]}>
         {/* Close button */}
@@ -539,18 +523,6 @@ export default function SharedContentScreen() {
 
         {/* Status text */}
         <Text style={styles.detectingText}>Detecting....</Text>
-
-        {/* Save in background option */}
-        <Pressable style={styles.backgroundSaveCard} onPress={handleSaveInBackground}>
-          <View style={styles.backgroundSaveIcon}>
-            <Text style={styles.backgroundSaveIconText}>⬇️</Text>
-          </View>
-          <View style={styles.backgroundSaveContent}>
-            <Text style={styles.backgroundSaveTitle}>Don't want to wait?</Text>
-            <Text style={styles.backgroundSaveSubtitle}>Bored Tourist will save in the background</Text>
-          </View>
-          <Text style={styles.backgroundSaveConfirm}>Confirm</Text>
-        </Pressable>
       </View>
     );
   }
@@ -587,18 +559,12 @@ export default function SharedContentScreen() {
         {matchedExperiences.length > 0 && (
           <View style={styles.matchesSection}>
             <Text style={styles.sectionTitle}>
-              {matchMethod === 'suggested' || matchedExperiences[0]?.matchedKeywords?.includes('suggested') 
-                ? '✨ Suggested Experiences' 
-                : matchMethod === 'ai' 
-                  ? '🤖 AI-Matched Experiences'
-                  : '🎯 Matching Experiences'}
+              {matchMethod === 'ai' 
+                ? '🤖 AI-Matched Experiences'
+                : '🎯 Matching Experiences'}
             </Text>
             <Text style={styles.sectionSubtitle}>
-              {matchMethod === 'suggested' || matchedExperiences[0]?.matchedKeywords?.includes('suggested')
-                ? 'Check out these popular experiences'
-                : matchMethod === 'ai'
-                  ? `Found ${matchedExperiences.length} experience${matchedExperiences.length > 1 ? 's' : ''} that match your content`
-                  : `Found ${matchedExperiences.length} related experience${matchedExperiences.length > 1 ? 's' : ''}`}
+              {`Found ${matchedExperiences.length} experience${matchedExperiences.length > 1 ? 's' : ''} that match your content`}
             </Text>
 
             {matchedExperiences.map(({ experience, matchedKeywords }) => (
@@ -607,88 +573,58 @@ export default function SharedContentScreen() {
                 style={styles.experienceCard}
                 onPress={() => handleExperiencePress(experience.id)}
               >
-                <Image
-                  source={{ uri: experience.image }}
-                  style={styles.experienceImage}
-                />
+                {/* Large image with gradient overlay */}
+                <View style={styles.imageContainer}>
+                  <Image
+                    source={{ uri: experience.image }}
+                    style={styles.experienceImage}
+                  />
+                  {/* Price badge on image */}
+                  <View style={styles.priceBadge}>
+                    <Text style={styles.priceText}>€{experience.price}</Text>
+                  </View>
+                </View>
+                
+                {/* Experience info below image */}
                 <View style={styles.experienceInfo}>
                   <Text style={styles.experienceTitle} numberOfLines={2}>
                     {experience.title}
                   </Text>
+                  
                   <View style={styles.experienceMeta}>
                     <View style={styles.metaItem}>
-                      <MapPin size={12} color={colors.dark.textSecondary} />
+                      <MapPin size={14} color={colors.dark.textSecondary} />
                       <Text style={styles.metaText}>{experience.location}</Text>
                     </View>
-                    <View style={styles.metaItem}>
-                      <Star size={12} color="#FFB800" fill="#FFB800" />
-                      <Text style={styles.metaText}>{experience.rating}</Text>
+                  </View>
+                  
+                  <View style={styles.experienceStats}>
+                    <View style={styles.statItem}>
+                      <Star size={14} color="#FFB800" fill="#FFB800" />
+                      <Text style={styles.statText}>{experience.rating || '4.5'}</Text>
                     </View>
-                    <View style={styles.metaItem}>
-                      <Clock size={12} color={colors.dark.textSecondary} />
-                      <Text style={styles.metaText}>{experience.duration}</Text>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Clock size={14} color={colors.dark.accent} />
+                      <Text style={styles.statText}>{experience.duration}</Text>
                     </View>
                   </View>
-                  {matchedKeywords.length > 0 && !matchedKeywords.includes('suggested') && (
-                    <View style={styles.keywordsContainer}>
-                      {matchedKeywords.slice(0, 3).map((keyword) => (
-                        <View key={keyword} style={styles.keywordBadge}>
-                          <Text style={styles.keywordText}>{keyword}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
                 </View>
-                <Text style={styles.experiencePrice}>
-                  €{experience.price}
-                </Text>
               </Pressable>
             ))}
           </View>
         )}
 
-        {/* No Matches - Show top experiences instead */}
+        {/* No Matches - Simple message */}
         {!analyzing && matchedExperiences.length === 0 && !loading && (
           <View style={styles.noMatchesContainer}>
             <Text style={styles.noMatchesEmoji}>🔍</Text>
-            <Text style={styles.noMatchesTitle}>We're still learning!</Text>
+            <Text style={styles.noMatchesTitle}>No matches found</Text>
             <Text style={styles.noMatchesText}>
-              We couldn't find a perfect match for this content yet, but check out our top experiences below!
+              We couldn't find experiences matching this content. Try sharing a different video!
             </Text>
             
-            {/* Show some suggested experiences anyway */}
-            {experiences.slice(0, 3).map((experience) => (
-              <Pressable
-                key={experience.id}
-                style={styles.experienceCard}
-                onPress={() => handleExperiencePress(experience.id)}
-              >
-                <Image
-                  source={{ uri: experience.image }}
-                  style={styles.experienceImage}
-                />
-                <View style={styles.experienceInfo}>
-                  <Text style={styles.experienceTitle} numberOfLines={2}>
-                    {experience.title}
-                  </Text>
-                  <View style={styles.experienceMeta}>
-                    <View style={styles.metaItem}>
-                      <MapPin size={12} color={colors.dark.textSecondary} />
-                      <Text style={styles.metaText}>{experience.location}</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Star size={12} color="#FFB800" fill="#FFB800" />
-                      <Text style={styles.metaText}>{experience.rating}</Text>
-                    </View>
-                  </View>
-                </View>
-                <Text style={styles.experiencePrice}>
-                  €{experience.price}
-                </Text>
-              </Pressable>
-            ))}
-            
-            {/* Back to Instagram/TikTok button */}
+            {/* Back button */}
             <Pressable 
               style={styles.backToAppButton}
               onPress={handleClose}
@@ -796,32 +732,48 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   experienceCard: {
-    flexDirection: 'row',
     backgroundColor: colors.dark.card,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 180,
   },
   experienceImage: {
-    width: 100,
-    height: 100,
+    width: '100%',
+    height: '100%',
+  },
+  priceBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: colors.dark.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  priceText: {
+    fontFamily: typography.fonts.extrabold,
+    fontSize: typography.sizes.base,
+    color: colors.dark.background,
   },
   experienceInfo: {
-    flex: 1,
-    padding: 12,
+    padding: 16,
   },
   experienceTitle: {
     fontFamily: typography.fonts.semibold,
-    fontSize: typography.sizes.base,
-    lineHeight: 24,
+    fontSize: typography.sizes.lg,
+    lineHeight: 26,
     color: colors.dark.text,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   experienceMeta: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 12,
   },
   metaItem: {
     flexDirection: 'row',
@@ -830,34 +782,28 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontFamily: typography.fonts.regular,
-    fontSize: typography.sizes.xs,
-    lineHeight: 16,
+    fontSize: typography.sizes.sm,
     color: colors.dark.textSecondary,
   },
-  keywordsContainer: {
+  experienceStats: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
-  keywordBadge: {
-    backgroundColor: colors.dark.accent + '20',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  keywordText: {
-    fontFamily: typography.fonts.regular,
-    fontSize: 10,
-    lineHeight: 16,
-    color: colors.dark.accent,
-  },
-  experiencePrice: {
+  statText: {
     fontFamily: typography.fonts.semibold,
-    fontSize: typography.sizes.base,
-    lineHeight: 24,
-    color: colors.dark.accent,
-    padding: 12,
-    alignSelf: 'center',
+    fontSize: typography.sizes.sm,
+    color: colors.dark.text,
+  },
+  statDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: colors.dark.border,
+    marginHorizontal: 12,
   },
   noMatchesContainer: {
     alignItems: 'center',
