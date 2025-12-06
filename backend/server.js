@@ -95,7 +95,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/interest', interestRoutes);
 app.use('/api/social-media', socialMediaRoutes);
 
-// Privacy Policy page (required for Facebook App)
+// Privacy Policy page (required for App Store)
 app.get('/privacy', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -105,38 +105,90 @@ app.get('/privacy', (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Privacy Policy - Bored Tourist</title>
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
-        h1 { color: #F4E04D; }
-        h2 { color: #333; margin-top: 30px; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+          max-width: 800px; 
+          margin: 0 auto; 
+          padding: 20px; 
+          line-height: 1.6; 
+          background-color: #1a1a2e;
+          color: #ffffff;
+        }
+        h1 { color: #F4E04D; margin-bottom: 8px; }
+        h2 { color: #F4E04D; margin-top: 30px; font-size: 18px; }
+        p { color: #b0b0b0; margin-bottom: 16px; }
+        .date { color: #666; font-size: 12px; margin-bottom: 24px; }
+        a { color: #F4E04D; }
+        ul { color: #b0b0b0; padding-left: 20px; }
+        li { margin-bottom: 8px; }
       </style>
     </head>
     <body>
-      <h1>🌍 Bored Tourist - Privacy Policy</h1>
-      <p><strong>Last updated:</strong> December 2025</p>
+      <h1>🌍 Privacy Policy</h1>
+      <p class="date">Last updated: November 22, 2025</p>
       
       <h2>1. Information We Collect</h2>
-      <p>We collect information you provide directly, including your name, email address, and booking preferences when you use our app.</p>
+      <p>We collect information that you provide directly to us, including:</p>
+      <ul>
+        <li>Name and contact information</li>
+        <li>Email address</li>
+        <li>Payment information</li>
+        <li>Booking history</li>
+        <li>Reviews and ratings</li>
+        <li>Location data (with your permission)</li>
+      </ul>
       
       <h2>2. How We Use Your Information</h2>
-      <p>We use your information to provide and improve our travel experience booking services, process your bookings, and communicate with you about your reservations.</p>
+      <p>We use the information we collect to:</p>
+      <ul>
+        <li>Process your bookings and payments</li>
+        <li>Send booking confirmations and updates</li>
+        <li>Provide customer support</li>
+        <li>Personalize your experience</li>
+        <li>Send marketing communications (with your consent)</li>
+        <li>Improve our services</li>
+      </ul>
       
       <h2>3. Information Sharing</h2>
-      <p>We do not sell your personal information. We may share your information with experience providers to fulfill your bookings.</p>
+      <p>We share your information with:</p>
+      <ul>
+        <li>Experience providers to facilitate your bookings</li>
+        <li>Payment processors to handle transactions</li>
+        <li>Service providers who assist in operating our platform</li>
+        <li>Law enforcement when required by law</li>
+      </ul>
       
       <h2>4. Data Security</h2>
-      <p>We implement appropriate security measures to protect your personal information.</p>
+      <p>We implement appropriate security measures to protect your personal information. However, no method of transmission over the internet is 100% secure.</p>
       
       <h2>5. Your Rights</h2>
-      <p>You have the right to access, correct, or delete your personal information. Contact us at support@boredtourist.com.</p>
+      <p>You have the right to:</p>
+      <ul>
+        <li>Access your personal information</li>
+        <li>Correct inaccurate data</li>
+        <li>Request deletion of your data</li>
+        <li>Object to processing of your data</li>
+        <li>Withdraw consent at any time</li>
+      </ul>
       
-      <h2>6. Contact Us</h2>
-      <p>For questions about this Privacy Policy, contact us at: <a href="mailto:support@boredtourist.com">support@boredtourist.com</a></p>
+      <h2>6. Cookies and Tracking</h2>
+      <p>We use cookies and similar technologies to enhance your experience, analyze usage patterns, and deliver personalized content.</p>
+      
+      <h2>7. Children's Privacy</h2>
+      <p>Our Service is not intended for children under 16. We do not knowingly collect personal information from children under 16.</p>
+      
+      <h2>8. Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page.</p>
+      
+      <h2>9. Contact Us</h2>
+      <p>If you have questions about this Privacy Policy, please contact us at:<br>
+      <a href="mailto:francisco.albuquerque@boredtourist.com">francisco.albuquerque@boredtourist.com</a></p>
     </body>
     </html>
   `);
 });
 
-// Terms of Service page (required for Facebook App)
+// Terms of Service page (required for App Store)
 app.get('/terms', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -146,14 +198,25 @@ app.get('/terms', (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Terms of Service - Bored Tourist</title>
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
-        h1 { color: #F4E04D; }
-        h2 { color: #333; margin-top: 30px; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+          max-width: 800px; 
+          margin: 0 auto; 
+          padding: 20px; 
+          line-height: 1.6; 
+          background-color: #1a1a2e;
+          color: #ffffff;
+        }
+        h1 { color: #F4E04D; margin-bottom: 8px; }
+        h2 { color: #F4E04D; margin-top: 30px; font-size: 18px; }
+        p { color: #b0b0b0; margin-bottom: 16px; }
+        .date { color: #666; font-size: 12px; margin-bottom: 24px; }
+        a { color: #F4E04D; }
       </style>
     </head>
     <body>
-      <h1>🌍 Bored Tourist - Terms of Service</h1>
-      <p><strong>Last updated:</strong> December 2025</p>
+      <h1>🌍 Terms of Service</h1>
+      <p class="date">Last updated: November 22, 2025</p>
       
       <h2>1. Acceptance of Terms</h2>
       <p>By using Bored Tourist, you agree to these Terms of Service. If you do not agree, please do not use our services.</p>
@@ -174,7 +237,8 @@ app.get('/terms', (req, res) => {
       <p>Bored Tourist is not liable for any damages arising from your use of our services or third-party experience providers.</p>
       
       <h2>7. Contact Us</h2>
-      <p>For questions about these Terms, contact us at: <a href="mailto:support@boredtourist.com">support@boredtourist.com</a></p>
+      <p>For questions about these Terms, contact us at:<br>
+      <a href="mailto:francisco.albuquerque@boredtourist.com">francisco.albuquerque@boredtourist.com</a></p>
     </body>
     </html>
   `);
