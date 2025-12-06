@@ -120,7 +120,7 @@ router.post('/smart-match', async (req, res) => {
     // Fetch experiences from Supabase
     const { data: experiences, error: dbError } = await supabase
       .from('experiences')
-      .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, operator_name')
+      .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, highlights')
       .order('rating', { ascending: false });
     
     if (dbError || !experiences?.length) {
@@ -133,7 +133,7 @@ router.post('/smart-match', async (req, res) => {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
     
     const experiencesSummary = experiences.map(exp => ({
-      id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location
+      id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location, highlights: exp.highlights
     }));
     
     const contentContext = 'Description: "' + (metadata.description || metadata.fullTitle || '') + '"\nHashtags: ' + (metadata.hashtags || []).join(', ');
@@ -220,7 +220,6 @@ If nothing matches well, return [].`;
         rating: exp.rating,
         reviewCount: exp.review_count,
         image: exp.image_url,
-        provider: exp.operator_name,
       }));
     
     console.log('✅ Returning', matchedExperiences.length, 'experiences');
