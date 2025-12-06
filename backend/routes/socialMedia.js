@@ -2,19 +2,16 @@
  * Social Media Metadata Extraction Routes
  * 
  * Extracts metadata (description, username, hashtags) from TikTok and Instagram Reels
- * Uses Apify for robust scraping and Gemini AI for intelligent experience matching
+ * Uses RapidAPI Instagram Scraper Stable API for extraction
+ * Uses Gemini AI for intelligent experience matching
  */
 
 const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Facebook/Instagram oEmbed API credentials
-const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID;
-const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET;
-
-// Apify API credentials for more robust scraping
-const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN;
+// RapidAPI credentials for Instagram scraping
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
 // Google AI credentials for smart matching
 const GOOGLE_AI_KEY = process.env.GOOGLE_AI_KEY || process.env.EXPO_PUBLIC_GOOGLE_AI_KEY;
@@ -962,7 +959,6 @@ router.post('/smart-match', async (req, res) => {
     const { data: experiences, error: dbError } = await db
       .from('experiences')
       .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, operator_name')
-      .eq('active', true)
       .order('rating', { ascending: false });
     
     if (dbError) {
