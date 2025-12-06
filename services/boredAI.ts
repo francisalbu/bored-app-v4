@@ -98,6 +98,9 @@ export interface ExperienceInfo {
   highlights?: string[];
   category?: string;
   providerName?: string;
+  maxGroupSize?: number;
+  languages?: string[];
+  cancellationPolicy?: string;
 }
 
 export const getExperienceAnswer = async (
@@ -115,46 +118,52 @@ export const getExperienceAnswer = async (
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    // Build context from experience data
+    // Build context from experience data - ONLY verified data
     const experienceContext = `
-Experience: ${experience.title}
+=== VERIFIED EXPERIENCE DATA ===
+Title: ${experience.title}
 ${experience.description ? `Description: ${experience.description}` : ''}
-${experience.location ? `Location: ${experience.location}` : ''}
+${experience.location ? `Meeting Point/Location: ${experience.location}` : ''}
 ${experience.duration ? `Duration: ${experience.duration}` : ''}
 ${experience.price ? `Price: €${experience.price} per person` : ''}
+${experience.maxGroupSize ? `Maximum group size: ${experience.maxGroupSize} people` : ''}
 ${experience.included?.length ? `What's included: ${experience.included.join(', ')}` : ''}
 ${experience.whatToBring?.length ? `What to bring: ${experience.whatToBring.join(', ')}` : ''}
 ${experience.highlights?.length ? `Highlights: ${experience.highlights.join(', ')}` : ''}
 ${experience.category ? `Category: ${experience.category}` : ''}
-${experience.providerName ? `Provider: ${experience.providerName}` : ''}
+${experience.providerName ? `Host/Provider: ${experience.providerName}` : ''}
+${experience.languages?.length ? `Available languages: ${experience.languages.join(', ')}` : ''}
+${experience.cancellationPolicy ? `Cancellation policy: ${experience.cancellationPolicy}` : ''}
+=== END OF DATA ===
     `.trim();
 
     const systemPrompt = `
-You are a friendly and helpful assistant for a travel experiences booking app called "Bored Tourist".
-You're answering questions about a specific experience that a user is considering booking.
+You are a helpful assistant for the "Bored Tourist" travel app. You answer questions about a specific experience.
 
 ${experienceContext}
 
-Rules:
-1. Be helpful, warm, and conversational - like a knowledgeable friend.
-2. Keep answers concise (max 80 words) but informative.
-3. If you don't have specific information, give a reasonable general answer based on similar experiences.
-4. Always be encouraging about the experience.
-5. For cancellation questions: "You can cancel up to 24 hours before for a full refund."
-6. For age/children questions: Be inclusive but mention adult supervision for younger kids.
-7. Never make up specific prices, times, or requirements not in the context.
-8. Use emojis sparingly (1-2 max) to be friendly.
+STRICT RULES:
+1. ONLY use information from the VERIFIED DATA above. Do NOT invent or guess facts.
+2. If data is missing, say "I don't have that specific information - please check with the host when booking or contact support."
+3. Keep answers short (max 50 words), friendly, and accurate.
+4. For start times: If not specified, say "Start times vary - you'll see available time slots when you select a date!"
+5. For group size: Only mention if maxGroupSize is provided in the data.
+6. For kids/children: Say "Please check with the host for age restrictions" unless explicitly mentioned.
+7. Use 1 emoji max to keep it friendly.
+8. NEVER make up prices, times, requirements, or inclusions that aren't in the data.
+9. If asked about something not in the data, be honest: "I don't have that info, but you can ask the host!"
 
 User question: ${question}
     `.trim();
 
     console.log('🤖 Experience AI: Generating answer...');
+    console.log('📋 Context:', experienceContext);
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
       generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 150,
+        temperature: 0.3, // Lower temperature for more factual responses
+        maxOutputTokens: 120,
       },
     });
 

@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useStripe } from '@stripe/stripe-react-native';
+import Constants from 'expo-constants';
 
 import colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
@@ -26,6 +27,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { useExperience } from '@/hooks/useApi';
+
+// Check if running in Expo Go (Stripe doesn't work in Expo Go)
+const isExpoGo = Constants.appOwnership === 'expo';
 
 // Production API URL - always use production in builds
 const API_URL = __DEV__ 
@@ -80,10 +84,11 @@ export default function PaymentScreen() {
   const insets = useSafeAreaInsets();
   const { createBooking } = useBookings();
   const { user, refreshUser } = useAuth();
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { initPaymentSheet, presentPaymentSheet, resetPaymentSheetCustomer } = useStripe();
   
   const [couponCode, setCouponCode] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('Processing...');
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   
@@ -92,8 +97,11 @@ export default function PaymentScreen() {
     useCallback(() => {
       console.log('📱 [PAYMENT] Screen focused - resetting state');
       setIsProcessing(false);
+      setProcessingMessage('Processing...');
       setClientSecret(null);
       setBookingId(null);
+      // Reset Stripe payment sheet state
+      resetPaymentSheetCustomer();
     }, [])
   );
   
@@ -347,25 +355,34 @@ export default function PaymentScreen() {
     }
 
     setIsProcessing(true);
+    setProcessingMessage('Connecting to server...');
     
-    // Reset previous payment state
+    // Reset previous payment state completely
     setClientSecret(null);
     setBookingId(null);
+    
+    // IMPORTANT: Reset Stripe payment sheet to clear any cached state from previous payments
+    console.log('🔄 [PAYMENT] Resetting Stripe payment sheet customer...');
+    await resetPaymentSheetCustomer();
 
     try {
       // Wake up server first (cold start protection)
       console.log('🔵 [PAYMENT] Waking up server...');
+      setProcessingMessage('Waking up server...');
       try {
+        const wakeStart = Date.now();
         await fetch(`${API_URL}/health`, { 
           method: 'GET',
-          signal: AbortSignal.timeout(10000) 
+          signal: AbortSignal.timeout(15000) 
         });
-        console.log('✅ [PAYMENT] Server is awake');
+        const wakeTime = Date.now() - wakeStart;
+        console.log(`✅ [PAYMENT] Server is awake (took ${wakeTime}ms)`);
       } catch (wakeError) {
         console.log('⚠️ [PAYMENT] Wake-up call failed, continuing anyway');
       }
 
       // Step 1: Create payment intent FIRST (without booking)
+      setProcessingMessage('Preparing payment...');
       console.log('🔵 [PAYMENT] Step 1: Creating payment intent...');
       console.log('🔵 [PAYMENT] URL:', `${API_URL}/api/payments/create-intent`);
       console.log('🔵 [PAYMENT] Amount:', totalPrice);
@@ -430,27 +447,48 @@ export default function PaymentScreen() {
       setClientSecret(secret);
 
       // Step 2: Initialize payment sheet
+      setProcessingMessage('Initializing payment...');
       console.log('🔵 [PAYMENT] Step 2: Initializing payment sheet...');
-      const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'Bored Explorer',
-        paymentIntentClientSecret: secret,
-        defaultBillingDetails: {
-          name: customerName,
-          email: customerEmail,
-        },
-        returnURL: 'boredtourist://payment',
-        applePay: {
-          merchantCountryCode: 'PT',
-        },
-        googlePay: {
-          merchantCountryCode: 'PT',
-          testEnv: false,
-        },
-      });
+      console.log('🔵 [PAYMENT] clientSecret:', secret?.substring(0, 30) + '...');
+      
+      // Helper function to add timeout to promises
+      const withTimeout = <T,>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+        return Promise.race([
+          promise,
+          new Promise<T>((_, reject) => 
+            setTimeout(() => reject(new Error(errorMessage)), ms)
+          )
+        ]);
+      };
+      
+      try {
+        const initConfig = {
+          merchantDisplayName: 'Bored Tourist',
+          paymentIntentClientSecret: secret,
+          defaultBillingDetails: {
+            name: customerName,
+            email: customerEmail,
+          },
+          returnURL: 'boredtourist://payment-complete',
+        };
+        
+        console.log('🔵 [PAYMENT] Calling initPaymentSheet...');
+        
+        const { error: initError } = await withTimeout(
+          initPaymentSheet(initConfig),
+          30000, // 30 second timeout
+          'Payment initialization timed out. Please try again.'
+        );
 
-      if (initError) {
-        console.log('❌ [PAYMENT] initPaymentSheet error:', initError);
-        Alert.alert('Error', initError.message);
+        if (initError) {
+          console.log('❌ [PAYMENT] initPaymentSheet error:', initError);
+          Alert.alert('Payment Error', initError.message || 'Failed to initialize payment. Please try again.');
+          setIsProcessing(false);
+          return;
+        }
+      } catch (initException: any) {
+        console.log('❌ [PAYMENT] initPaymentSheet exception:', initException);
+        Alert.alert('Payment Error', initException.message || 'Failed to initialize payment system. Please try again.');
         setIsProcessing(false);
         return;
       }
@@ -458,7 +496,12 @@ export default function PaymentScreen() {
       console.log('✅ [PAYMENT] Payment sheet initialized successfully!');
 
       // Step 3: Present payment sheet
+      setProcessingMessage('Opening payment...');
       console.log('🔵 [PAYMENT] Step 3: Presenting payment sheet...');
+      
+      // Small delay to ensure UI updates
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const { error: presentError } = await presentPaymentSheet();
 
       if (presentError) {
@@ -767,7 +810,7 @@ export default function PaymentScreen() {
           {isProcessing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={colors.dark.background} />
-              <Text style={[styles.confirmButtonText, { marginLeft: 10 }]}>Processing...</Text>
+              <Text style={[styles.confirmButtonText, { marginLeft: 10 }]}>{processingMessage}</Text>
             </View>
           ) : (
             <Text style={styles.confirmButtonText}>Pay €{totalPrice.toFixed(2)}</Text>

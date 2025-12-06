@@ -31,7 +31,6 @@ const ALL_CATEGORIES = APP_CATEGORIES
 
 // Price ranges
 const PRICE_RANGES = [
-  { id: 'free', label: 'Free', min: 0, max: 0 },
   { id: 'budget', label: '€1 - €30', min: 1, max: 30 },
   { id: 'mid', label: '€31 - €60', min: 31, max: 60 },
   { id: 'premium', label: '€61 - €100', min: 61, max: 100 },

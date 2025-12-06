@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -11,7 +11,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { Bot, Send } from 'lucide-react-native';
+import { Bot, Send, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import typography from '@/constants/typography';
@@ -33,34 +33,67 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Pre-fabricated questions
+  // Log when modal opens and reset messages
+  useEffect(() => {
+    if (visible && experience) {
+      console.log('🤖 AI Chat Modal opened for:', experience.title);
+      console.log('📦 Experience data:', JSON.stringify({
+        title: experience.title,
+        description: experience.description?.substring(0, 100),
+        location: experience.location || experience.meetingPoint,
+        duration: experience.duration,
+        price: experience.price,
+        maxGroupSize: experience.maxGroupSize,
+        included: experience.included,
+        whatToBring: experience.whatToBring,
+        highlights: experience.highlights,
+        provider: experience.provider,
+        category: experience.category,
+      }, null, 2));
+      // Reset messages when opening for a new experience
+      setMessages([]);
+    }
+  }, [visible, experience]);
+
+  // Pre-fabricated questions - more relevant for booking
   const quickQuestions = [
-    "What's included in the price?",
-    "What should I bring?",
-    "Is this suitable for children?",
-    "What's the cancellation policy?",
+    "What time does it start?",
+    "How many people can I bring?",
+    "What's included?",
+    "Where do we meet?",
   ];
 
-  // Convert experience to ExperienceInfo format
+  // Convert experience to ExperienceInfo format - capture ALL available data
   const getExperienceInfo = (): ExperienceInfo | null => {
     if (!experience) return null;
     
-    return {
+    const info: ExperienceInfo = {
       title: experience.title || '',
       description: experience.description || '',
-      location: experience.location || experience.meeting_point || '',
+      location: experience.meetingPoint || experience.meeting_point || experience.location || '',
       duration: experience.duration || '',
       price: experience.price || 0,
-      included: experience.included || experience.whats_included || [],
+      included: experience.included || [],
       whatToBring: experience.whatToBring || experience.what_to_bring || [],
       highlights: experience.highlights || [],
       category: experience.category || '',
-      providerName: experience.provider || experience.operator_name || experience.providerName || '',
+      providerName: experience.provider || experience.operator_name || '',
+      maxGroupSize: experience.maxGroupSize || experience.max_group_size || undefined,
+      languages: experience.languages || [],
+      cancellationPolicy: experience.cancellationPolicy || experience.cancellation_policy || '',
     };
+    
+    console.log('📋 ExperienceInfo prepared:', JSON.stringify(info, null, 2));
+    return info;
   };
 
   const handleQuestion = async (question: string) => {
-    if (!experience) return;
+    if (!experience) {
+      console.log('❌ No experience data available');
+      return;
+    }
+    
+    console.log('💬 User asked:', question);
     
     // Add user message
     setMessages(prev => [...prev, { text: question, isUser: true }]);
@@ -74,18 +107,22 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
     try {
       const experienceInfo = getExperienceInfo();
       if (!experienceInfo) {
+        console.log('❌ Could not prepare experience info');
         setMessages(prev => [...prev, { 
           text: "Sorry, I couldn't load the experience details. Please try again.", 
           isUser: false 
         }]);
+        setIsLoading(false);
         return;
       }
 
+      console.log('🚀 Calling Google AI...');
       const answer = await getExperienceAnswer(question, experienceInfo);
+      console.log('✅ AI Response:', answer);
       setMessages(prev => [...prev, { text: answer, isUser: false }]);
       
     } catch (error) {
-      console.error('AI Chat error:', error);
+      console.error('❌ AI Chat error:', error);
       setMessages(prev => [...prev, { 
         text: "Oops! Something went wrong. Please try again.", 
         isUser: false 
@@ -137,8 +174,8 @@ export default function AIChatModal({ visible, experience, onClose }: AIChatModa
                 </View>
                 <Text style={styles.aiModalTitle}>{t('feed.aiModalTitle')}</Text>
               </View>
-              <Pressable style={styles.aiCloseButton} onPress={handleClose}>
-                <Text style={styles.aiCloseButtonText}>✕</Text>
+              <Pressable style={styles.aiCloseButton} onPress={handleClose} hitSlop={10}>
+                <X size={20} color={colors.dark.textSecondary} />
               </Pressable>
             </View>
 
@@ -244,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   aiModalContainer: {
-    maxHeight: '85%',
+    height: '70%',
     backgroundColor: colors.dark.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -252,7 +289,6 @@ const styles = StyleSheet.create({
   },
   aiModalContent: {
     flex: 1,
-    minHeight: 400,
   },
   aiModalHeader: {
     flexDirection: 'row',
@@ -279,14 +315,16 @@ const styles = StyleSheet.create({
   aiModalTitle: {
     ...typography.styles.h3,
     color: colors.dark.text,
+    flex: 1,
   },
   aiCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.dark.background,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 12,
   },
   aiCloseButtonText: {
     color: colors.dark.text,

@@ -9,8 +9,6 @@ import {
   Users,
   MapPin,
   Star,
-  Globe,
-  Footprints,
 } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, Dimensions, FlatList, Linking, Alert, Share, ActivityIndicator } from 'react-native';
@@ -194,6 +192,7 @@ Book this amazing experience on BoredTourist!`;
   };
 
   const handleAIChat = () => {
+    console.log('🤖 AI Chat button pressed! Experience:', experience?.title);
     setShowAIChat(true);
   };
 
@@ -351,14 +350,6 @@ Book this amazing experience on BoredTourist!`;
                 <View style={styles.infoChip}>
                   <Clock size={16} color={colors.dark.text} />
                   <Text style={styles.infoChipText}>{experience.duration}</Text>
-                </View>
-                <View style={styles.infoChip}>
-                  <Footprints size={16} color={colors.dark.text} />
-                  <Text style={styles.infoChipText}>Walking</Text>
-                </View>
-                <View style={styles.infoChip}>
-                  <Globe size={16} color={colors.dark.text} />
-                  <Text style={styles.infoChipText}>{experience.languages?.[0] || 'English'}</Text>
                 </View>
               </View>
             )}
