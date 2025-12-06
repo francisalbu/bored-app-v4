@@ -174,20 +174,33 @@ Example: [26, 18, 19, 5, 3]
 If nothing matches well, return [].`;
 
     console.log('🤖 Calling Gemini AI...');
+    console.log('🤖 Content context:', contentContext);
     
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 100 },
-    });
+    let matchedIds = [];
+    let matchMethod = 'none';
+    
+    try {
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 100 },
+      });
 
-    let text = result.response.text().trim();
-    console.log('🤖 Gemini Response (raw):', text);
-    
-    // Clean markdown wrapper
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    console.log('🧹 Cleaned:', text);
-    
-    const matchedIds = JSON.parse(text);
+      let text = result.response.text().trim();
+      console.log('🤖 Gemini Response (raw):', text);
+      
+      // Clean markdown wrapper
+      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      console.log('🧹 Cleaned:', text);
+      
+      matchedIds = JSON.parse(text);
+      matchMethod = 'ai';
+      console.log('✅ Parsed IDs:', matchedIds);
+    } catch (geminiError) {
+      console.error('❌ Gemini error:', geminiError.message);
+      // Fallback: return empty but don't crash
+      matchedIds = [];
+      matchMethod = 'none';
+    }
     
     // Get full experience data
     const matchedExperiences = matchedIds
@@ -216,7 +229,7 @@ If nothing matches well, return [].`;
       success: true,
       metadata,
       matchedExperiences,
-      matchMethod: 'ai',
+      matchMethod,
     });
     
   } catch (error) {
