@@ -7,12 +7,10 @@ import {
   Pressable,
   ActivityIndicator,
   Linking,
+  Image,
   Animated,
   Easing,
-  Dimensions,
 } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, ExternalLink, MapPin, Star, Clock, Sparkles, Search } from 'lucide-react-native';
@@ -20,8 +18,6 @@ import colors from '@/constants/colors';
 import typography from '@/constants/typography';
 import apiService from '@/services/api';
 import { useExperiences } from '@/hooks/useExperiences';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Keywords to match from social media content to experiences
 // Covers ALL experiences in the Bored Tourist platform
@@ -208,7 +204,6 @@ export default function SharedContentScreen() {
   const [matchedExperiences, setMatchedExperiences] = useState<MatchedExperience[]>([]);
   const [analyzing, setAnalyzing] = useState(true); // Start with analyzing state
   const [paramsReady, setParamsReady] = useState(false); // Track if params are loaded
-  const [hasProcessed, setHasProcessed] = useState(false); // PREVENT LOOP - only process once
   const [scanProgress] = useState(new Animated.Value(0));
   const [scanLineAnim] = useState(new Animated.Value(0));
   const [socialMetadata, setSocialMetadata] = useState<SocialMediaMetadata | null>(null);
@@ -352,22 +347,13 @@ export default function SharedContentScreen() {
     const url = params.url as string;
     const text = params.text as string;
     
-    console.log('📤 [shared-content] Received params:', { url, text, hasProcessed });
+    console.log('📤 [shared-content] Received params:', { url, text });
     
     // If no params yet, wait
     if (!url && !text) {
       console.log('📤 [shared-content] Waiting for params...');
       return;
     }
-    
-    // PREVENT INFINITE LOOP - only process once per URL
-    if (hasProcessed) {
-      console.log('📤 [shared-content] Already processed this URL, skipping...');
-      return;
-    }
-    
-    // Mark as processed IMMEDIATELY to prevent re-runs
-    setHasProcessed(true);
     
     setParamsReady(true);
     if (url) setSharedUrl(url);
@@ -405,7 +391,6 @@ export default function SharedContentScreen() {
                 rating: exp.rating,
                 reviewCount: exp.reviewCount,
                 image: exp.image,
-                images: exp.images, // Include images array for proper display
                 provider: exp.provider,
               },
               score: 100, // AI matched
@@ -416,20 +401,21 @@ export default function SharedContentScreen() {
             setMatchedExperiences(matches);
             setMatchMethod(smartMatchResult.matchMethod);
             setAnalyzing(false);
-            return; // DONE - exit here
+            return;
           }
         }
         
-        // No matches found - show empty state and STOP
+        // No fallback - if AI match fails, show empty state
+        // The user can try again or go back
         setMatchedExperiences([]);
         setMatchMethod('none');
-        setAnalyzing(false);
         
       } catch (error) {
         console.error('Error processing shared content:', error);
-        // Error - show empty state and STOP
+        // No fallback on error - show empty state
         setMatchedExperiences([]);
         setMatchMethod('none');
+      } finally {
         setAnalyzing(false);
       }
     };
@@ -440,7 +426,7 @@ export default function SharedContentScreen() {
     }, 1500);
     
     return () => clearTimeout(timer);
-  }, [params.url, params.text, hasProcessed]); // Only depend on specific params and hasProcessed flag
+  }, [params, experiences]);
 
   const handleClose = () => {
     // Always go to home - this ensures clean navigation state
@@ -581,54 +567,51 @@ export default function SharedContentScreen() {
               {`Found ${matchedExperiences.length} experience${matchedExperiences.length > 1 ? 's' : ''} that match your content`}
             </Text>
 
-            {matchedExperiences.map(({ experience, matchedKeywords }) => {
-              // Use images array like Explore tab does
-              const imageSource = experience.images && experience.images.length > 0
-                ? experience.images[0]
-                : { uri: experience.image };
-              
-              return (
-                <Pressable
-                  key={experience.id}
-                  style={styles.experienceCard}
-                  onPress={() => handleExperiencePress(experience.id)}
-                >
-                  {/* Image with gradient overlay - same as Explore */}
+            {matchedExperiences.map(({ experience, matchedKeywords }) => (
+              <Pressable
+                key={experience.id}
+                style={styles.experienceCard}
+                onPress={() => handleExperiencePress(experience.id)}
+              >
+                {/* Large image with gradient overlay */}
+                <View style={styles.imageContainer}>
                   <Image
-                    source={imageSource}
+                    source={{ uri: experience.image }}
                     style={styles.experienceImage}
-                    contentFit="cover"
                   />
-                  {/* Gradient overlay */}
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)']}
-                    locations={[0, 0.5, 1]}
-                    style={styles.cardGradient}
-                  />
-                  {/* Price badge */}
+                  {/* Price badge on image */}
                   <View style={styles.priceBadge}>
                     <Text style={styles.priceText}>€{experience.price}</Text>
                   </View>
-                  {/* Content inside the image */}
-                  <View style={styles.cardContent}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>
-                      {experience.title}
-                    </Text>
-                    <View style={styles.cardMeta}>
-                      <MapPin size={12} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.cardLocation}>{experience.location}</Text>
-                    </View>
-                    <View style={styles.cardStats}>
-                      <Star size={12} color="#FFB800" fill="#FFB800" />
-                      <Text style={styles.cardStatText}>{experience.rating || '4.5'}</Text>
-                      <Text style={styles.cardStatDivider}>|</Text>
-                      <Clock size={12} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.cardStatText}>{experience.duration}</Text>
+                </View>
+                
+                {/* Experience info below image */}
+                <View style={styles.experienceInfo}>
+                  <Text style={styles.experienceTitle} numberOfLines={2}>
+                    {experience.title}
+                  </Text>
+                  
+                  <View style={styles.experienceMeta}>
+                    <View style={styles.metaItem}>
+                      <MapPin size={14} color={colors.dark.textSecondary} />
+                      <Text style={styles.metaText}>{experience.location}</Text>
                     </View>
                   </View>
-                </Pressable>
-              );
-            })}
+                  
+                  <View style={styles.experienceStats}>
+                    <View style={styles.statItem}>
+                      <Star size={14} color="#FFB800" fill="#FFB800" />
+                      <Text style={styles.statText}>{experience.rating || '4.5'}</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Clock size={14} color={colors.dark.accent} />
+                      <Text style={styles.statText}>{experience.duration}</Text>
+                    </View>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
           </View>
         )}
 
@@ -749,24 +732,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   experienceCard: {
+    backgroundColor: colors.dark.card,
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 16,
-    height: 220,
+  },
+  imageContainer: {
     position: 'relative',
+    width: '100%',
+    height: 180,
   },
   experienceImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
-  },
-  cardGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '70%',
-    borderRadius: 16,
   },
   priceBadge: {
     position: 'absolute',
@@ -782,45 +760,50 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     color: colors.dark.background,
   },
-  cardContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  experienceInfo: {
     padding: 16,
   },
-  cardTitle: {
-    fontFamily: typography.fonts.extrabold,
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  experienceTitle: {
+    fontFamily: typography.fonts.semibold,
+    fontSize: typography.sizes.lg,
+    lineHeight: 26,
+    color: colors.dark.text,
+    marginBottom: 8,
   },
-  cardMeta: {
+  experienceMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 4,
   },
-  cardLocation: {
+  metaText: {
     fontFamily: typography.fonts.regular,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: typography.sizes.sm,
+    color: colors.dark.textSecondary,
   },
-  cardStats: {
+  experienceStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  cardStatText: {
+  statText: {
     fontFamily: typography.fonts.semibold,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: typography.sizes.sm,
+    color: colors.dark.text,
   },
-  cardStatDivider: {
-    color: 'rgba(255,255,255,0.5)',
-    marginHorizontal: 4,
+  statDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: colors.dark.border,
+    marginHorizontal: 12,
   },
   noMatchesContainer: {
     alignItems: 'center',

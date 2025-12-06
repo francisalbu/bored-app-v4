@@ -120,7 +120,7 @@ router.post('/smart-match', async (req, res) => {
     // Fetch experiences from Supabase
     const { data: experiences, error: dbError } = await supabase
       .from('experiences')
-      .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, highlights')
+      .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, images, highlights')
       .order('rating', { ascending: false });
     
     if (dbError || !experiences?.length) {
@@ -207,20 +207,33 @@ If nothing matches well, return [].`;
       .map(id => experiences.find(exp => exp.id === id || exp.id === String(id)))
       .filter(Boolean)
       .slice(0, 3)
-      .map(exp => ({
-        id: String(exp.id),
-        title: exp.title,
-        description: exp.description,
-        category: exp.category,
-        tags: Array.isArray(exp.tags) ? exp.tags : [],
-        location: exp.location,
-        price: exp.price,
-        currency: exp.currency || 'EUR',
-        duration: exp.duration,
-        rating: exp.rating,
-        reviewCount: exp.review_count,
-        image: exp.image_url,
-      }));
+      .map(exp => {
+        // Get the first image from images array (JSONB), fallback to image_url
+        let firstImage = null;
+        if (exp.images) {
+          // images can be a JSON string or already parsed array
+          const imagesArray = typeof exp.images === 'string' ? JSON.parse(exp.images) : exp.images;
+          if (Array.isArray(imagesArray) && imagesArray.length > 0) {
+            firstImage = imagesArray[0];
+          }
+        }
+        
+        return {
+          id: String(exp.id),
+          title: exp.title,
+          description: exp.description,
+          category: exp.category,
+          tags: Array.isArray(exp.tags) ? exp.tags : [],
+          location: exp.location,
+          price: exp.price,
+          currency: exp.currency || 'EUR',
+          duration: exp.duration,
+          rating: exp.rating,
+          reviewCount: exp.review_count,
+          image: firstImage || exp.image_url, // USE images[0] first!
+          images: exp.images, // Also send full array
+        };
+      });
     
     console.log('✅ Returning', matchedExperiences.length, 'experiences');
     
