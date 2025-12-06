@@ -343,7 +343,22 @@ export default function FeedScreen() {
             <Pressable style={styles.aiButton} onPress={() => setShowBoredAI(true)}>
               <Sparkles size={20} color={colors.dark.primary} />
             </Pressable>
-            <Pressable style={styles.importButton} onPress={() => setShowImportTutorial(true)}>
+            <Pressable 
+              style={styles.importButton} 
+              onPress={() => setShowImportTutorial(true)}
+              onLongPress={() => {
+                // TEST: Simulate a share intent - long press to test without building
+                console.log('🧪 [TEST] Simulating share intent...');
+                router.push({
+                  pathname: '/shared-content',
+                  params: { 
+                    url: 'https://www.instagram.com/reel/DOgjcxnEw8h/?igsh=MXVtZzNrdnhrMmFnZQ==', 
+                    text: ''
+                  }
+                });
+              }}
+              delayLongPress={1000}
+            >
               <Image 
                 source={require('@/assets/images/icons.png')} 
                 style={styles.importButtonIcon}

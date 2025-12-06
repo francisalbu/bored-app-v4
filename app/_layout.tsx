@@ -73,17 +73,20 @@ export default function RootLayout() {
       const sharedUrl = shareIntent.webUrl || shareIntent.text || '';
       const sharedText = shareIntent.text || '';
       
-      // Navigate to the shared content screen
-      router.push({
-        pathname: '/shared-content',
-        params: { 
-          url: sharedUrl,
-          text: sharedText
-        }
-      });
-      
-      // Reset the share intent after handling
-      resetShareIntent();
+      // Small delay to ensure router is ready
+      setTimeout(() => {
+        // Navigate to the shared content screen
+        router.push({
+          pathname: '/shared-content',
+          params: { 
+            url: sharedUrl,
+            text: sharedText
+          }
+        });
+        
+        // Reset the share intent after handling
+        resetShareIntent();
+      }, 100);
     }
   }, [hasShareIntent, shareIntent]);
 

@@ -1,20 +1,52 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Stack, router } from 'expo-router';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { useShareIntent } from 'expo-share-intent';
 
 import colors from '@/constants/colors';
 
 export default function NotFoundScreen() {
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+  const [hasCheckedIntent, setHasCheckedIntent] = useState(false);
+
+  // Always try to recover - either with share intent or go to feed
+  useEffect(() => {
+    // Small delay to let share intent load
+    const timer = setTimeout(() => {
+      if (hasShareIntent && shareIntent) {
+        console.log('📤 [NOT-FOUND] Recovering share intent:', shareIntent);
+        
+        const sharedUrl = shareIntent.webUrl || shareIntent.text || '';
+        const sharedText = shareIntent.text || '';
+        
+        // Navigate to shared-content with the intent data
+        router.replace({
+          pathname: '/shared-content',
+          params: { 
+            url: sharedUrl,
+            text: sharedText
+          }
+        });
+        
+        resetShareIntent();
+      } else {
+        // No share intent - just go to feed
+        console.log('📤 [NOT-FOUND] No share intent, going to feed');
+        router.replace('/(tabs)');
+      }
+      setHasCheckedIntent(true);
+    }, 300); // Give share intent time to load
+
+    return () => clearTimeout(timer);
+  }, [hasShareIntent, shareIntent]);
+
+  // Show loading spinner briefly while checking for share intent
+  // This replaces the "Lost in the adventure?" screen
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!', headerStyle: { backgroundColor: colors.dark.background }, headerTintColor: colors.dark.text }} />
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.container}>
-        <Text style={styles.emoji}>🧭</Text>
-        <Text style={styles.title}>Lost in the adventure?</Text>
-        <Text style={styles.subtitle}>This page doesn&apos;t exist</Text>
-
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Back to Feed</Text>
-        </Link>
+        <ActivityIndicator size="large" color={colors.dark.primary} />
       </View>
     </>
   );
@@ -25,33 +57,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
     backgroundColor: colors.dark.background,
-  },
-  emoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700' as const,
-    color: colors.dark.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.dark.textSecondary,
-    marginBottom: 32,
-  },
-  link: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: colors.dark.primary,
-    borderRadius: 12,
-  },
-  linkText: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: colors.dark.background,
   },
 });

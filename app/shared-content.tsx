@@ -376,8 +376,35 @@ export default function SharedContentScreen() {
           const smartMatchResult = await smartMatchExperiences(url);
           
           if (smartMatchResult?.success && smartMatchResult.matchedExperiences?.length > 0) {
+            // DEBUG: Log raw API response
+            console.log('🖼️ RAW API RESPONSE:', JSON.stringify(smartMatchResult.matchedExperiences[0], null, 2));
+            
             // Transform API response to frontend format
-            const matches = smartMatchResult.matchedExperiences.map(exp => ({
+            const matches = smartMatchResult.matchedExperiences.map(exp => {
+              // Parse images if it's a string (JSONB from database)
+              let imagesArray = exp.images;
+              if (typeof exp.images === 'string') {
+                try {
+                  imagesArray = JSON.parse(exp.images);
+                } catch (e) {
+                  imagesArray = [];
+                }
+              }
+              
+              // Get the first real image from images array
+              const firstImage = Array.isArray(imagesArray) && imagesArray.length > 0 
+                ? imagesArray[0] 
+                : null;
+              
+              console.log('🖼️ Experience:', exp.title);
+              console.log('   - exp.images:', exp.images);
+              console.log('   - imagesArray:', imagesArray);
+              console.log('   - firstImage:', firstImage);
+              console.log('   - exp.image:', exp.image);
+              console.log('   - exp.image_url:', exp.image_url);
+              console.log('   - exp.provider_logo:', exp.provider_logo);
+              
+              return {
               experience: {
                 id: exp.id,
                 title: exp.title,
@@ -390,12 +417,13 @@ export default function SharedContentScreen() {
                 duration: exp.duration,
                 rating: exp.rating,
                 reviewCount: exp.reviewCount,
-                image: exp.image,
+                image: firstImage || exp.image_url || exp.image, // USE firstImage from parsed array!
+                images: imagesArray,
                 provider: exp.provider,
               },
               score: 100, // AI matched
               matchedKeywords: smartMatchResult.matchMethod === 'suggested' ? ['suggested'] : ['ai-matched'],
-            }));
+            }});
             
             setSocialMetadata(smartMatchResult.metadata);
             setMatchedExperiences(matches);
@@ -426,7 +454,7 @@ export default function SharedContentScreen() {
     }, 1500);
     
     return () => clearTimeout(timer);
-  }, [params, experiences]);
+  }, [params.url, params.text]); // FIXED: Only depend on specific params, NOT on experiences array
 
   const handleClose = () => {
     // Always go to home - this ensures clean navigation state
@@ -567,7 +595,13 @@ export default function SharedContentScreen() {
               {`Found ${matchedExperiences.length} experience${matchedExperiences.length > 1 ? 's' : ''} that match your content`}
             </Text>
 
-            {matchedExperiences.map(({ experience, matchedKeywords }) => (
+            {matchedExperiences.map(({ experience, matchedKeywords }) => {
+              // Use images[0] if available, fallback to image
+              const imageUri = experience.images && experience.images.length > 0 
+                ? experience.images[0] 
+                : experience.image;
+              
+              return (
               <Pressable
                 key={experience.id}
                 style={styles.experienceCard}
@@ -576,7 +610,7 @@ export default function SharedContentScreen() {
                 {/* Large image with gradient overlay */}
                 <View style={styles.imageContainer}>
                   <Image
-                    source={{ uri: experience.image }}
+                    source={{ uri: imageUri }}
                     style={styles.experienceImage}
                   />
                   {/* Price badge on image */}
@@ -611,7 +645,8 @@ export default function SharedContentScreen() {
                   </View>
                 </View>
               </Pressable>
-            ))}
+              );
+            })}
           </View>
         )}
 
