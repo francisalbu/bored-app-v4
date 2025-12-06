@@ -38,9 +38,9 @@ import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { BoredAIModal } from '@/components/BoredAIModal';
 import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
 import { useLanguage } from '@/contexts/LanguageContext';
-import WelcomeOverlay from '@/components/WelcomeOverlay';
+import OnboardingScreen from '@/components/OnboardingScreen';
 
-const WELCOME_SHOWN_KEY = '@bored_tourist_welcome_shown';
+const ONBOARDING_SHOWN_KEY = '@bored_tourist_onboarding_shown';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -75,7 +75,7 @@ export default function FeedScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [showNoActivitiesMessage, setShowNoActivitiesMessage] = useState<boolean>(false);
-  const [showWelcome, setShowWelcome] = useState<boolean>(false);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Wrapper for setFilters with logging
@@ -90,30 +90,29 @@ export default function FeedScreen() {
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading: loadingExperiences, error: experiencesError } = useExperiences();
 
-  // Check if welcome screen should be shown (first time user)
+  // Check if onboarding should be shown (first time user)
   useEffect(() => {
-    const checkWelcomeShown = async () => {
+    const checkOnboardingShown = async () => {
       try {
-        const hasSeenWelcome = await AsyncStorage.getItem(WELCOME_SHOWN_KEY);
-        if (!hasSeenWelcome) {
-          // Small delay to let the app load first
-          setTimeout(() => setShowWelcome(true), 500);
+        const hasSeenOnboarding = await AsyncStorage.getItem(ONBOARDING_SHOWN_KEY);
+        if (!hasSeenOnboarding) {
+          setShowOnboarding(true);
         }
       } catch (error) {
-        console.error('Error checking welcome status:', error);
+        console.error('Error checking onboarding status:', error);
       }
     };
-    checkWelcomeShown();
+    checkOnboardingShown();
   }, []);
 
-  // Dismiss welcome overlay and save preference
-  const handleDismissWelcome = async () => {
+  // Complete onboarding
+  const handleOnboardingComplete = async () => {
     try {
-      await AsyncStorage.setItem(WELCOME_SHOWN_KEY, 'true');
-      setShowWelcome(false);
+      await AsyncStorage.setItem(ONBOARDING_SHOWN_KEY, 'true');
+      setShowOnboarding(false);
     } catch (error) {
-      console.error('Error saving welcome status:', error);
-      setShowWelcome(false);
+      console.error('Error saving onboarding status:', error);
+      setShowOnboarding(false);
     }
   };
 
@@ -406,11 +405,15 @@ export default function FeedScreen() {
         onClose={() => setShowAuthModal(false)}
       />
 
-      {/* Welcome Overlay for first-time users */}
-      <WelcomeOverlay
-        visible={showWelcome}
-        onDismiss={handleDismissWelcome}
-      />
+      {/* Onboarding for first-time users - using Modal to cover tab bar */}
+      <Modal
+        visible={showOnboarding}
+        animationType="fade"
+        statusBarTranslucent
+        presentationStyle="fullScreen"
+      >
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      </Modal>
     </View>
   );
 }

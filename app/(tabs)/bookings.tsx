@@ -29,12 +29,13 @@ import { useRouter } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.65;
+const CARD_HEIGHT = 420; // Fixed height for expanded cards
+const COLLAPSED_HEIGHT = 110; // Fixed collapsed height
 
 // Dynamic collapsed height based on number of cards
 const getCollapsedHeight = (totalCards: number): number => {
-  if (totalCards <= 1) return 0;
-  if (totalCards === 2) return 110; // Bigger cards for 2
+  if (totalCards <= 1) return COLLAPSED_HEIGHT;
+  if (totalCards === 2) return 110;
   if (totalCards === 3) return 90;
   if (totalCards === 4) return 75;
   return 65; // 5 or more cards
@@ -164,10 +165,6 @@ export default function BookingsScreen() {
   };
 
   const handleCardPress = (index: number) => {
-    if (filteredBookings.length === 1) {
-      // Single card - always expanded
-      return;
-    }
     setExpandedCardIndex(expandedCardIndex === index ? null : index);
   };
 
@@ -240,30 +237,36 @@ export default function BookingsScreen() {
             </Pressable>
         </View>
       ) : (
-        // Apple Wallet Style Stack
-        <View style={styles.walletContainer}>
-          {filteredBookings.map((booking, index) => {
-            const isExpanded = expandedCardIndex === index || filteredBookings.length === 1;
-            const isTopCard = expandedCardIndex === null ? index === 0 : expandedCardIndex === index;
-            
-            return (
-              <WalletCard
-                key={booking.id}
-                booking={booking}
-                index={index}
-                totalCards={filteredBookings.length}
-                isExpanded={isExpanded}
-                isTopCard={isTopCard}
-                expandedIndex={expandedCardIndex}
-                onPress={() => handleCardPress(index)}
-                onCancel={handleCancelBooking}
-                isCancelling={cancellingId === booking.id}
-                onWriteReview={handleOpenReviewModal}
-                insets={insets}
-              />
-            );
-          })}
-        </View>
+        // Apple Wallet Style Stack with ScrollView
+        <ScrollView 
+          style={styles.walletScrollView}
+          contentContainerStyle={styles.walletScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.walletContainer, { minHeight: expandedCardIndex !== null ? CARD_HEIGHT + (filteredBookings.length - 1) * getCollapsedHeight(filteredBookings.length) + 100 : filteredBookings.length * getCollapsedHeight(filteredBookings.length) + 100 }]}>
+            {filteredBookings.map((booking, index) => {
+              const isExpanded = expandedCardIndex === index;
+              const isTopCard = expandedCardIndex === null ? index === 0 : expandedCardIndex === index;
+              
+              return (
+                <WalletCard
+                  key={booking.id}
+                  booking={booking}
+                  index={index}
+                  totalCards={filteredBookings.length}
+                  isExpanded={isExpanded}
+                  isTopCard={isTopCard}
+                  expandedIndex={expandedCardIndex}
+                  onPress={() => handleCardPress(index)}
+                  onCancel={handleCancelBooking}
+                  isCancelling={cancellingId === booking.id}
+                  onWriteReview={handleOpenReviewModal}
+                  insets={insets}
+                />
+              );
+            })}
+          </View>
+        </ScrollView>
         )}
       </Animated.View>
 
@@ -360,9 +363,7 @@ function WalletCard({
   }
 
   // When only 1 card, make it fullscreen; otherwise use CARD_HEIGHT
-  const cardHeight = isExpanded 
-    ? (totalCards === 1 ? SCREEN_HEIGHT - 180 : CARD_HEIGHT) 
-    : collapsedHeight;
+  const cardHeight = isExpanded ? CARD_HEIGHT : collapsedHeight;
 
   return (
     <Pressable
@@ -900,6 +901,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   // Apple Wallet Style
+  walletScrollView: {
+    flex: 1,
+  },
+  walletScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 120,
+  },
   walletContainer: {
     flex: 1,
     paddingHorizontal: 16,
