@@ -2,7 +2,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Search, SlidersHorizontal, Sparkles } from 'lucide-react-native';
+import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Search, SlidersHorizontal, Sparkles, Share as ShareIcon } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
@@ -39,6 +39,7 @@ import { BoredAIModal } from '@/components/BoredAIModal';
 import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OnboardingScreen from '@/components/OnboardingScreen';
+import ImportTutorialModal from '@/components/ImportTutorialModal';
 
 const ONBOARDING_SHOWN_KEY = '@bored_tourist_onboarding_shown';
 
@@ -70,6 +71,7 @@ export default function FeedScreen() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showBoredAI, setShowBoredAI] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [showImportTutorial, setShowImportTutorial] = useState<boolean>(false);
   const [filters, setFiltersState] = useState<FilterOptions>({ categories: [], priceRange: null });
   const [selectedFilter, setSelectedFilter] = useState<'nearMe' | 'availableToday'>('nearMe');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -341,6 +343,13 @@ export default function FeedScreen() {
             <Pressable style={styles.aiButton} onPress={() => setShowBoredAI(true)}>
               <Sparkles size={20} color={colors.dark.primary} />
             </Pressable>
+            <Pressable style={styles.importButton} onPress={() => setShowImportTutorial(true)}>
+              <Image 
+                source={require('@/assets/images/icons.png')} 
+                style={styles.importButtonIcon}
+                resizeMode="contain"
+              />
+            </Pressable>
             <Pressable style={styles.filterIconButton} onPress={() => setShowFilters(true)}>
               <SlidersHorizontal size={20} color={colors.dark.text} />
               {(filters.categories.length > 0 || filters.priceRange) && (
@@ -403,6 +412,12 @@ export default function FeedScreen() {
       <AuthBottomSheet
         visible={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+      />
+
+      {/* Import Tutorial Modal */}
+      <ImportTutorialModal
+        visible={showImportTutorial}
+        onClose={() => setShowImportTutorial(false)}
       />
 
       {/* Onboarding for first-time users - using Modal to cover tab bar */}
@@ -689,6 +704,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+  },
+  importButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  importButtonIcon: {
+    width: 30,
+    height: 30,
   },
   filterIconButton: {
     width: 40,
