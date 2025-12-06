@@ -61,7 +61,7 @@ export default function RootLayout() {
   // Handle shared content from other apps (TikTok, Instagram, etc.)
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent({
     debug: true,
-    resetOnBackground: true,
+    resetOnBackground: false, // Don't reset on background - causes issues with navigation
   });
 
   // Navigate to shared-content screen when share intent is received
@@ -73,20 +73,21 @@ export default function RootLayout() {
       const sharedUrl = shareIntent.webUrl || shareIntent.text || '';
       const sharedText = shareIntent.text || '';
       
-      // Small delay to ensure router is ready
+      console.log('📤 [ROOT] Navigating to shared-content with:', { sharedUrl, sharedText });
+      
+      // Navigate to the shared content screen
+      router.push({
+        pathname: '/shared-content',
+        params: { 
+          url: sharedUrl,
+          text: sharedText
+        }
+      });
+      
+      // Reset the share intent after a delay to ensure navigation completes
       setTimeout(() => {
-        // Navigate to the shared content screen
-        router.push({
-          pathname: '/shared-content',
-          params: { 
-            url: sharedUrl,
-            text: sharedText
-          }
-        });
-        
-        // Reset the share intent after handling
         resetShareIntent();
-      }, 100);
+      }, 500);
     }
   }, [hasShareIntent, shareIntent]);
 

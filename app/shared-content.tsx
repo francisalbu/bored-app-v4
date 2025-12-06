@@ -14,6 +14,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, ExternalLink, MapPin, Star, Clock, Sparkles, Search } from 'lucide-react-native';
+import { useShareIntent } from 'expo-share-intent';
 import colors from '@/constants/colors';
 import typography from '@/constants/typography';
 import apiService from '@/services/api';
@@ -198,6 +199,9 @@ export default function SharedContentScreen() {
   const params = useLocalSearchParams();
   const { experiences } = useExperiences();
   
+  // Also get share intent directly as fallback
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+  
   const [loading, setLoading] = useState(true);
   const [sharedUrl, setSharedUrl] = useState<string | null>(null);
   const [sharedText, setSharedText] = useState<string | null>(null);
@@ -343,13 +347,21 @@ export default function SharedContentScreen() {
   };
 
   useEffect(() => {
-    // Get the shared content from params
-    const url = params.url as string;
-    const text = params.text as string;
+    // Get the shared content from params OR from share intent directly
+    let url = params.url as string;
+    let text = params.text as string;
     
-    console.log('📤 [shared-content] Received params:', { url, text });
+    // Fallback: if params are empty but we have a share intent, use it directly
+    if ((!url && !text) && hasShareIntent && shareIntent) {
+      console.log('📤 [shared-content] Using share intent directly:', shareIntent);
+      url = shareIntent.webUrl || shareIntent.text || '';
+      text = shareIntent.text || '';
+      resetShareIntent();
+    }
     
-    // If no params yet, wait
+    console.log('📤 [shared-content] Final URL/Text:', { url, text });
+    
+    // If still no params, wait a bit more
     if (!url && !text) {
       console.log('📤 [shared-content] Waiting for params...');
       return;
@@ -454,7 +466,7 @@ export default function SharedContentScreen() {
     }, 1500);
     
     return () => clearTimeout(timer);
-  }, [params.url, params.text]); // FIXED: Only depend on specific params, NOT on experiences array
+  }, [params.url, params.text, hasShareIntent, shareIntent]); // Include share intent as fallback source
 
   const handleClose = () => {
     // Always go to home - this ensures clean navigation state
