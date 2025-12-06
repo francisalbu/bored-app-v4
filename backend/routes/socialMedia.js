@@ -394,6 +394,7 @@ router.get('/debug', (req, res) => {
 /**
  * POST /api/social-media/smart-match
  * Extract metadata AND find matching experiences
+ * Using the EXACT same logic as test-gemini-match.js that works!
  */
 router.post('/smart-match', async (req, res) => {
   try {
@@ -425,51 +426,88 @@ router.post('/smart-match', async (req, res) => {
     metadata.originalUrl = url;
     console.log('📱 Metadata:', metadata);
     
-    // Step 2: Fetch experiences
-    const db = getSupabase();
-    if (!db) {
-      return res.json({
-        success: true,
-        metadata,
-        matchedExperiences: [],
-        matchMethod: 'none',
-        error: 'Database not configured',
-      });
-    }
+    // Step 2: Connect to Supabase with HARDCODED credentials (same as test)
+    const SUPABASE_URL_DIRECT = 'https://hnivuisqktlrusyqywaz.supabase.co';
+    const SUPABASE_KEY_DIRECT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
+    const GOOGLE_AI_KEY_DIRECT = 'AIzaSyAlvnCcn8ndC6avTq2BlW7LJ-H3VgCEAk4';
     
-    const { data: experiences, error: dbError } = await db
+    const supabaseClient = createClient(SUPABASE_URL_DIRECT, SUPABASE_KEY_DIRECT);
+    
+    const { data: experiences, error: dbError } = await supabaseClient
       .from('experiences')
       .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, operator_name')
       .order('rating', { ascending: false });
     
     if (dbError || !experiences?.length) {
+      console.error('❌ Supabase error:', dbError);
       return res.json({
         success: true,
         metadata,
         matchedExperiences: [],
         matchMethod: 'none',
+        error: 'Database error'
       });
     }
     
     console.log(`📦 Found ${experiences.length} experiences`);
     
-    // Step 3: Try AI matching
-    let matchedExperiences = await matchExperiencesWithAI(metadata, experiences);
-    let matchMethod = 'ai';
+    // Step 3: Call Gemini AI (same as test)
+    const genAI = new GoogleGenerativeAI(GOOGLE_AI_KEY_DIRECT);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
     
-    // Step 4: Fallback to keywords
-    if (!matchedExperiences?.length) {
-      console.log('🔤 Falling back to keyword matching...');
-      matchedExperiences = matchExperiencesWithKeywords(metadata, experiences);
-      matchMethod = 'keywords';
-    }
+    const experiencesSummary = experiences.map(exp => ({
+      id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location
+    }));
     
-    // Step 5: Fallback to top-rated
-    if (!matchedExperiences?.length) {
-      console.log('⭐ Suggesting top experiences...');
-      matchedExperiences = experiences.filter(e => e.rating >= 4.0).slice(0, 5);
-      matchMethod = 'suggested';
-    }
+    const contentContext = 'Description: "' + (metadata.description || metadata.fullTitle || '') + '"\nHashtags: ' + (metadata.hashtags || []).join(', ');
+    
+    const prompt = `You are matching social media content to travel experiences in Portugal.
+
+SOCIAL MEDIA CONTENT:
+${contentContext}
+
+AVAILABLE EXPERIENCES:
+${JSON.stringify(experiencesSummary, null, 2)}
+
+MATCHING PRIORITY (follow strictly):
+
+1. DIRECT MATCH (highest priority): If a hashtag is a SPECIFIC activity (surf, yoga, wine, cooking, horse), 
+   ALWAYS include ALL experiences that contain that exact word in title or tags.
+   Example: #surf → MUST include every experience with "surf" in title/tags
+
+2. RELATED MATCH (second priority): After direct matches, add experiences with related concepts.
+   Example: #surf → also add beach experiences, water sports, coastal activities
+
+3. CONTEXTUAL MATCH (third priority): For GENERIC hashtags (beach, summer, paradise, vacation, adventure),
+   use creativity to find thematically related experiences.
+   Example: #summer → beach activities, outdoor tours, water sports
+
+Return ONLY a JSON array of experience IDs (max 5), ordered by relevance (direct matches first).
+Example: [26, 18, 19, 5, 3]
+
+If nothing matches well, return [].`;
+
+    console.log('🤖 Calling Gemini AI...');
+    
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 100 },
+    });
+
+    let text = result.response.text().trim();
+    console.log('🤖 Gemini Response (raw):', text);
+    
+    // Clean markdown wrapper if present
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    console.log('🧹 Cleaned:', text);
+    
+    const matchedIds = JSON.parse(text);
+    
+    // Get full experience data for matched IDs
+    const matchedExperiences = matchedIds
+      .map(id => experiences.find(exp => exp.id === id || exp.id === String(id)))
+      .filter(Boolean)
+      .slice(0, 5);
     
     // Transform for frontend
     const transformedExperiences = matchedExperiences.map(exp => ({
@@ -488,18 +526,18 @@ router.post('/smart-match', async (req, res) => {
       provider: exp.operator_name,
     }));
     
-    console.log(`✅ Returning ${transformedExperiences.length} experiences (${matchMethod})`);
+    console.log(`✅ Returning ${transformedExperiences.length} experiences (ai)`);
     
     res.json({
       success: true,
       metadata,
       matchedExperiences: transformedExperiences,
-      matchMethod,
+      matchMethod: 'ai',
     });
     
   } catch (error) {
     console.error('Smart match error:', error);
-    res.status(500).json({ success: false, error: 'Failed to process content' });
+    res.status(500).json({ success: false, error: 'Failed to process content: ' + error.message });
   }
 });
 
