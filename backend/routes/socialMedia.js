@@ -157,13 +157,21 @@ router.post('/smart-match', async (req, res) => {
     console.log('📦 Found', experiences.length, 'experiences');
     
     // Call Gemini AI
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
     const experiencesSummary = experiences.map(exp => ({
-      id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location, highlights: exp.highlights
+      id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location
     }));
     
-    const contentContext = 'Description: "' + (metadata.description || metadata.fullTitle || '') + '"\nHashtags: ' + (metadata.hashtags || []).join(', ');
+    // Build content context - use comments as fallback if no description/hashtags
+    let contentContext = '';
+    if (metadata.description || (metadata.hashtags && metadata.hashtags.length > 0)) {
+      contentContext = 'Description: "' + (metadata.description || '') + '"\nHashtags: ' + (metadata.hashtags || []).join(', ');
+    } else if (metadata.topComments && metadata.topComments.length > 0) {
+      contentContext = 'Top Comments (no description available):\n' + metadata.topComments.map((c, i) => `${i+1}. "${c}"`).join('\n');
+    } else {
+      contentContext = 'No content available';
+    }
     
     const prompt = `You are matching social media content to travel experiences in Portugal.
 
@@ -173,32 +181,27 @@ ${contentContext}
 AVAILABLE EXPERIENCES:
 ${JSON.stringify(experiencesSummary, null, 2)}
 
-MATCHING PRIORITY (follow strictly):
+STRICT MATCHING RULES:
 
-1. DIRECT MATCH (highest priority): If a hashtag is a SPECIFIC activity (surf, yoga, wine, cooking, horse), 
-   ALWAYS include ALL experiences that contain that exact word in title or tags.
-   Example: #surf → MUST include every experience with "surf" in title/tags
+1. ONLY return experiences with a CLEAR, DIRECT connection to the content
+2. Quality over quantity - if only 1-2 experiences truly match, return only those
+3. DO NOT force matches just to fill slots - empty array is better than bad matches
 
-2. RELATED MATCH (second priority): After direct matches, add experiences with related concepts.
-   Example: #surf → also add beach experiences, water sports, coastal activities
+WHAT COUNTS AS A MATCH:
+✅ Same activity (kayak content → kayak experience)
+✅ Same environment (ocean/water content → water-based experiences)
+✅ Same theme (adventure content → adventure experiences)
 
-3. CONTEXTUAL MATCH (third priority): For GENERIC hashtags (beach, summer, paradise, vacation, adventure),
-   use creativity to find thematically related experiences.
-   Example: #summer → beach activities, outdoor tours, water sports
+WHAT DOES NOT COUNT:
+❌ Same location only (both mention "Atlantic" but different activities)
+❌ Vague connections (beach content → random outdoor activity)
+❌ Forcing unrelated experiences to reach a number
 
-KEYWORD MAPPINGS:
-- surf/surfing/waves → surf lessons, surf camps, beach activities
-- wine/vineyard/tasting → wine tours, wine experiences
-- cooking/chef/food/gastronomy → cooking classes, food tours
-- yoga/meditation/wellness → yoga retreats, wellness experiences
-- horse/riding/equestrian → horseback riding
-- beach/praia/coastal → beach activities, coastal tours
-- adventure/adrenaline/extreme → adventure experiences, outdoor activities
+Return ONLY a JSON array of experience IDs, ordered by relevance.
+Return between 0-3 IDs depending on how many TRULY match.
+Example: [26, 18] or [5] or []
 
-Return ONLY a JSON array of experience IDs (max 5), ordered by relevance (direct matches first).
-Example: [26, 18, 19, 5, 3]
-
-If nothing matches well, return [].`;
+IMPORTANT: It's better to return 1-2 perfect matches than 3+ mediocre ones.`;
 
     console.log('🤖 Calling Gemini AI...');
     console.log('🤖 Content context:', contentContext);
