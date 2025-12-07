@@ -13,7 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Sparkles, Send, Trash2, ChevronRight } from 'lucide-react-native';
+import { Sparkles, Send, Trash2, Plus, ChevronRight, Calendar, Compass, Map } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -40,6 +40,13 @@ interface Message {
   timestamp: Date;
 }
 
+// Quick action buttons config
+const quickActions = [
+  { icon: Calendar, text: 'Plan an experience', emoji: '📅' },
+  { icon: Compass, text: 'What should I do today?', emoji: '🧭' },
+  { icon: Map, text: 'Explore experiences', emoji: '🗺️' },
+];
+
 export default function AIScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -48,17 +55,6 @@ export default function AIScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<ConciergeSuggestion[]>([]);
-
-  // Load suggestions on mount
-  useEffect(() => {
-    loadSuggestions();
-  }, []);
-
-  const loadSuggestions = async () => {
-    const data = await getSuggestions();
-    setSuggestions(data);
-  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -113,6 +109,11 @@ export default function AIScreen() {
     setMessages([]);
   };
 
+  const handleNewChat = async () => {
+    await clearConversation();
+    setMessages([]);
+  };
+
   const handleExperiencePress = (experience: ConciergeExperience) => {
     router.push({
       pathname: '/experience/[id]',
@@ -120,8 +121,8 @@ export default function AIScreen() {
     });
   };
 
-  const handleSuggestionPress = (suggestion: ConciergeSuggestion) => {
-    handleSend(suggestion.text);
+  const handleQuickAction = (action: typeof quickActions[0]) => {
+    handleSend(action.text);
   };
 
   // Render experience card
@@ -188,34 +189,34 @@ export default function AIScreen() {
     </View>
   );
 
-  // Welcome screen (no messages yet)
+  // Welcome screen - Mindtrip style
   const renderWelcome = () => (
     <View style={styles.welcomeContainer}>
-      <LinearGradient
-        colors={[colors.dark.primary, '#8BC34A']}
-        style={styles.welcomeIcon}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <Sparkles size={40} color="#fff" />
-      </LinearGradient>
+      {/* Logo/Icon */}
+      <View style={styles.welcomeIconContainer}>
+        <LinearGradient
+          colors={[colors.dark.primary, '#8BC34A']}
+          style={styles.welcomeIcon}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Sparkles size={36} color="#fff" />
+        </LinearGradient>
+      </View>
       
-      <Text style={styles.welcomeTitle}>Your AI Travel Concierge</Text>
-      <Text style={styles.welcomeSubtitle}>
-        I can help you plan activities, suggest experiences based on your mood, 
-        and answer questions about things to do in Lisbon!
-      </Text>
+      {/* Main Title */}
+      <Text style={styles.welcomeTitle}>What's the plan?</Text>
 
-      <Text style={styles.suggestionsTitle}>Try asking:</Text>
-      <View style={styles.suggestionsContainer}>
-        {suggestions.map((suggestion, index) => (
+      {/* Quick Actions */}
+      <View style={styles.quickActionsContainer}>
+        {quickActions.map((action, index) => (
           <Pressable
             key={index}
-            style={styles.suggestionChip}
-            onPress={() => handleSuggestionPress(suggestion)}
+            style={styles.quickActionButton}
+            onPress={() => handleQuickAction(action)}
           >
-            <Text style={styles.suggestionEmoji}>{suggestion.emoji}</Text>
-            <Text style={styles.suggestionText}>{suggestion.text}</Text>
+            <action.icon size={18} color={colors.dark.text} />
+            <Text style={styles.quickActionText}>{action.text}</Text>
           </Pressable>
         ))}
       </View>
@@ -224,17 +225,27 @@ export default function AIScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
+      {/* Header - Mindtrip style */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Sparkles size={24} color={colors.dark.primary} />
-          <Text style={styles.headerTitle}>AI Concierge</Text>
+        {/* New Chat Button */}
+        <Pressable style={styles.headerButton} onPress={handleNewChat}>
+          <Plus size={22} color={colors.dark.text} />
+        </Pressable>
+        
+        {/* Title */}
+        <View style={styles.headerCenter}>
+          <Sparkles size={20} color={colors.dark.primary} />
+          <Text style={styles.headerTitle}>Bored AI</Text>
         </View>
-        {messages.length > 0 && (
-          <Pressable style={styles.clearButton} onPress={handleClearChat}>
-            <Trash2 size={20} color={colors.dark.textSecondary} />
-          </Pressable>
-        )}
+        
+        {/* Delete Button */}
+        <Pressable 
+          style={[styles.headerButton, messages.length === 0 && styles.headerButtonDisabled]} 
+          onPress={handleClearChat}
+          disabled={messages.length === 0}
+        >
+          <Trash2 size={20} color={messages.length > 0 ? colors.dark.text : colors.dark.textSecondary} />
+        </Pressable>
       </View>
 
       {/* Chat area */}
@@ -272,9 +283,12 @@ export default function AIScreen() {
         {/* Input area */}
         <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 16) + 70 }]}>
           <View style={styles.inputWrapper}>
+            <Pressable style={styles.inputPlusButton}>
+              <Plus size={20} color={colors.dark.textSecondary} />
+            </Pressable>
             <TextInput
               style={styles.input}
-              placeholder="Ask me anything about Lisbon..."
+              placeholder="Ask anything..."
               placeholderTextColor={colors.dark.textSecondary}
               value={inputText}
               onChangeText={setInputText}
@@ -292,7 +306,7 @@ export default function AIScreen() {
               onPress={() => handleSend()}
               disabled={!inputText.trim() || isLoading}
             >
-              <Send size={20} color={inputText.trim() && !isLoading ? '#fff' : colors.dark.textSecondary} />
+              <Send size={18} color={inputText.trim() && !isLoading ? '#fff' : colors.dark.textSecondary} />
             </Pressable>
           </View>
         </View>
@@ -306,27 +320,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.dark.background,
   },
+  
+  // Header - Mindtrip style
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  headerLeft: {
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.dark.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerButtonDisabled: {
+    opacity: 0.5,
+  },
+  headerCenter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   headerTitle: {
     ...typography.styles.h3,
     color: colors.dark.text,
+    fontWeight: '600',
   },
-  clearButton: {
-    padding: 8,
-  },
+  
   chatContainer: {
     flex: 1,
   },
@@ -342,57 +366,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   
-  // Welcome screen
+  // Welcome screen - Mindtrip style
   welcomeContainer: {
     alignItems: 'center',
     paddingHorizontal: 20,
   },
+  welcomeIconContainer: {
+    marginBottom: 24,
+  },
   welcomeIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
   },
   welcomeTitle: {
-    ...typography.styles.h2,
+    fontSize: 28,
+    fontWeight: '600',
     color: colors.dark.text,
     textAlign: 'center',
-    marginBottom: 12,
-  },
-  welcomeSubtitle: {
-    ...typography.styles.body,
-    color: colors.dark.textSecondary,
-    textAlign: 'center',
     marginBottom: 32,
-    lineHeight: 22,
   },
-  suggestionsTitle: {
-    ...typography.styles.caption,
-    color: colors.dark.textSecondary,
-    marginBottom: 12,
-  },
-  suggestionsContainer: {
+  
+  // Quick Actions - Mindtrip style
+  quickActionsContainer: {
     width: '100%',
-    gap: 10,
+    gap: 12,
   },
-  suggestionChip: {
+  quickActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: 50,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     gap: 12,
   },
-  suggestionEmoji: {
-    fontSize: 20,
-  },
-  suggestionText: {
+  quickActionText: {
     ...typography.styles.body,
     color: colors.dark.text,
-    flex: 1,
+    fontWeight: '500',
   },
 
   // Messages
@@ -493,22 +507,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Input
+  // Input - Mindtrip style
   inputContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
     backgroundColor: colors.dark.background,
   },
   inputWrapper: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     backgroundColor: colors.dark.card,
-    borderRadius: 24,
-    paddingLeft: 16,
-    paddingRight: 6,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: colors.dark.border,
+    paddingHorizontal: 6,
     paddingVertical: 6,
+  },
+  inputPlusButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.dark.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   input: {
     flex: 1,
@@ -518,14 +540,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.dark.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: colors.dark.border,
+    backgroundColor: 'transparent',
   },
 });
