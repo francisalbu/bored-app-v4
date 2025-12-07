@@ -157,7 +157,7 @@ router.post('/smart-match', async (req, res) => {
     console.log('📦 Found', experiences.length, 'experiences');
     
     // Call Gemini AI
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
     const experiencesSummary = experiences.map(exp => ({
       id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location
