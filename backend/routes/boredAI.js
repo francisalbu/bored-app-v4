@@ -15,7 +15,7 @@ const { createClient } = require('@supabase/supabase-js');
 const SUPABASE_URL = 'https://hnivuisqktlrusyqywaz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
 const GOOGLE_AI_KEY = 'AIzaSyAlvnCcn8ndC6avTq2BlW7LJ-H3VgCEAk4';
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '26aboroi';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p11d71ejsn0d42966b3d99';
 
 // Initialize clients
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -64,45 +64,89 @@ async function extractTikTokMetadata(url) {
 }
 
 /**
- * Extract Instagram metadata using RapidAPI
+ * Extract Instagram metadata using RapidAPI - Media Data V2 endpoint
+ * Only extracts: description, hashtags, and top 5 comments as fallback
  */
 async function extractInstagramMetadata(url) {
   try {
-    // Clean URL
+    // Clean URL - extract shortcode (media_code)
     let cleanUrl = url.split('?')[0];
     if (!cleanUrl.endsWith('/')) cleanUrl += '/';
     
-    console.log('📸 Extracting Instagram metadata for:', cleanUrl);
+    // Extract shortcode from URL (works for /p/, /reel/, /reels/)
+    const shortcodeMatch = cleanUrl.match(/\/(p|reel|reels)\/([^\/]+)/);
+    const mediaCode = shortcodeMatch ? shortcodeMatch[2] : null;
     
-    const response = await fetch('https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=' + encodeURIComponent(cleanUrl), {
+    console.log('📸 Extracting Instagram metadata for:', mediaCode);
+    
+    if (!mediaCode) {
+      throw new Error('Could not extract media code from URL');
+    }
+    
+    // Use get_media_data_v2.php endpoint (stable and recommended by support)
+    const response = await fetch('https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php?media_code=' + encodeURIComponent(mediaCode), {
       method: 'GET',
       headers: {
         'x-rapidapi-key': RAPIDAPI_KEY,
-        'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com'
+        'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com'
       }
     });
 
+    console.log('📸 RapidAPI response status:', response.status);
+
     if (response.ok) {
       const data = await response.json();
-      const caption = data.data?.caption?.text || '';
+      
+      // Check for error responses
+      if (data.message) {
+        console.log('⚠️ RapidAPI error:', data.message);
+        return { 
+          platform: 'instagram', 
+          success: false, 
+          error: data.message,
+          originalUrl: url
+        };
+      }
+      
+      // Extract caption from edge_media_to_caption
+      const captionEdges = data.edge_media_to_caption?.edges || [];
+      const caption = captionEdges.length > 0 ? captionEdges[0]?.node?.text || '' : '';
+      
+      // Extract hashtags from caption
       const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
       const hashtags = caption.match(hashtagRegex) || [];
       const description = caption.replace(hashtagRegex, '').trim();
+      
+      // If no description/hashtags, get top 5 comments as fallback
+      let topComments = [];
+      if (!description && hashtags.length === 0) {
+        const commentEdges = data.edge_media_to_parent_comment?.edges || [];
+        topComments = commentEdges
+          .slice(0, 5)
+          .map(edge => edge.node?.text || '')
+          .filter(text => text.length > 0);
+        console.log('📸 No caption found, using top comments as fallback');
+      }
+      
+      console.log('📸 Extracted - Description:', description.substring(0, 100) + '...');
+      console.log('📸 Extracted - Hashtags:', hashtags);
+      if (topComments.length > 0) {
+        console.log('📸 Extracted - Top Comments:', topComments.length);
+      }
 
       return {
         platform: 'instagram',
         success: true,
-        username: data.data?.user?.username || null,
         description: description,
-        fullTitle: caption,
         hashtags: hashtags,
-        thumbnailUrl: data.data?.thumbnail_url || null,
+        topComments: topComments, // Only populated if no description/hashtags
+        originalUrl: url
       };
     }
-    throw new Error('Failed to fetch Instagram metadata');
+    throw new Error('Failed to fetch Instagram metadata: ' + response.status);
   } catch (error) {
     console.error('Instagram extraction error:', error);
-    return { platform: 'instagram', success: false, error: error.message };
+    return { platform: 'instagram', success: false, error: error.message, originalUrl: url };
   }
 }
 
@@ -142,9 +186,13 @@ router.post('/match', async (req, res) => {
     }
     
     if (!metadata.success) {
+      console.log('⚠️ Metadata extraction failed:', metadata.error);
       return res.json({
         success: false,
-        error: 'Failed to extract metadata from ' + platform,
+        error: metadata.error || 'Failed to extract metadata from ' + platform,
+        message: metadata.error === 'Post is private or unavailable' 
+          ? 'This post seems to be private or unavailable. Try sharing a public post!' 
+          : 'Could not read this post. Try a different one!',
         metadata
       });
     }
@@ -180,7 +228,15 @@ router.post('/match', async (req, res) => {
       location: exp.location
     }));
     
-    const contentContext = 'Description: "' + (metadata.description || '') + '"\nHashtags: ' + (metadata.hashtags || []).join(', ');
+    // Build content context - use comments as fallback if no description/hashtags
+    let contentContext = '';
+    if (metadata.description || (metadata.hashtags && metadata.hashtags.length > 0)) {
+      contentContext = 'Description: "' + (metadata.description || '') + '"\nHashtags: ' + (metadata.hashtags || []).join(', ');
+    } else if (metadata.topComments && metadata.topComments.length > 0) {
+      contentContext = 'Top Comments (no description available):\n' + metadata.topComments.map((c, i) => `${i+1}. "${c}"`).join('\n');
+    } else {
+      contentContext = 'No content available - match based on general travel experiences';
+    }
     
     const prompt = `You are matching social media content to travel experiences in Portugal.
 
