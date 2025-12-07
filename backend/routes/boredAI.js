@@ -205,7 +205,7 @@ router.post('/match', async (req, res) => {
     console.log('📦 Fetching experiences from Supabase...');
     const { data: experiences, error: dbError } = await supabase
       .from('experiences')
-      .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, operator_name')
+      .select('id, title, description, category, tags, location, price, currency, duration, rating, review_count, image_url, images')
       .order('rating', { ascending: false });
     
     if (dbError) {
