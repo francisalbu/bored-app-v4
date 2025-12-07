@@ -24,7 +24,7 @@ export const getVibeCheckRecommendation = async (userVibe: string): Promise<Vibe
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const systemInstruction = `
       You are a sassy, irreverent, and high-energy local guide for Lisbon, Portugal. 
@@ -116,7 +116,7 @@ export const getExperienceAnswer = async (
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Build context from experience data - ONLY verified data
     const experienceContext = `

@@ -333,7 +333,7 @@ export default function FeedScreen() {
 
       {/* New Clyx-style Header */}
       <View 
-        style={[styles.headerContainer, { paddingTop: insets.top + 8 }]} 
+        style={[styles.headerContainer, { paddingTop: insets.top + 6 }]} 
         pointerEvents="box-none"
       >
         <View style={styles.headerRow}>
@@ -346,18 +346,6 @@ export default function FeedScreen() {
             <Pressable 
               style={styles.importButton} 
               onPress={() => setShowImportTutorial(true)}
-              onLongPress={() => {
-                // TEST: Simulate a share intent - long press to test without building
-                console.log('🧪 [TEST] Simulating share intent...');
-                router.push({
-                  pathname: '/shared-content',
-                  params: { 
-                    url: 'https://www.instagram.com/reel/DOgjcxnEw8h/?igsh=MXVtZzNrdnhrMmFnZQ==', 
-                    text: ''
-                  }
-                });
-              }}
-              delayLongPress={1000}
             >
               <Image 
                 source={require('@/assets/images/icons.png')} 
@@ -729,8 +717,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center' as const,
   },
   importButtonIcon: {
-    width: 30,
-    height: 30,
+    width: 55,
+    height: 55,
+    right: -3,
+    bottom:-3
   },
   filterIconButton: {
     width: 40,

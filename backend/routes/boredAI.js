@@ -170,7 +170,7 @@ router.post('/match', async (req, res) => {
     // Step 4: Call Gemini AI for matching
     console.log('🤖 Calling Gemini AI...');
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
     const experiencesSummary = experiences.map(exp => ({
       id: exp.id, 
