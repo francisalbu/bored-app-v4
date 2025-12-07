@@ -40,46 +40,73 @@ async function extractTikTokMetadata(url) {
   }
 }
 
-// Extract Instagram metadata - CORRECT ENDPOINT from RapidAPI docs
+// Extract Instagram metadata - Using Media Data V2 endpoint (recommended by RapidAPI support)
 async function extractInstagramMetadata(url) {
   try {
     let cleanUrl = url.split('?')[0];
     if (!cleanUrl.endsWith('/')) cleanUrl += '/';
     
-    console.log('📸 Calling RapidAPI with URL:', cleanUrl);
-    console.log('📸 Using key:', RAPIDAPI_KEY.substring(0, 10) + '...');
+    // Extract shortcode from URL
+    const shortcodeMatch = cleanUrl.match(/\/(p|reel|reels)\/([^\/]+)/);
+    const mediaCode = shortcodeMatch ? shortcodeMatch[2] : null;
     
-    // CORRECT ENDPOINT: GET request with query params
-    const apiUrl = `https://instagram-scraper-stable-api.p.rapidapi.com/get_reel_title.php?reel_post_code_or_url=${encodeURIComponent(cleanUrl)}&type=reel`;
+    console.log('📸 Extracting Instagram metadata for:', mediaCode);
     
-    const response = await fetch(apiUrl, {
+    if (!mediaCode) {
+      throw new Error('Could not extract media code from URL');
+    }
+    
+    // Use get_media_data_v2.php endpoint (stable and recommended by support)
+    const response = await fetch('https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php?media_code=' + encodeURIComponent(mediaCode), {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY,
-      },
+        'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com'
+      }
     });
     
     console.log('📸 RapidAPI response status:', response.status);
-    const data = await response.json();
-    console.log('📸 RapidAPI response data:', JSON.stringify(data).substring(0, 500));
     
-    // Extract caption from response - field is "post_caption"
-    const caption = data.post_caption || data.description || data.caption || '';
-    if (caption) {
-      const hashtags = caption.match(/#[\w\u00C0-\u024F]+/g) || [];
-      const description = caption.replace(/#[\w\u00C0-\u024F]+/g, '').trim();
+    if (response.ok) {
+      const data = await response.json();
       
+      // Check for error responses
+      if (data.message) {
+        console.log('⚠️ RapidAPI error:', data.message);
+        return { platform: 'instagram', success: false, error: data.message, originalUrl: url };
+      }
+      
+      // Extract caption from edge_media_to_caption
+      const captionEdges = data.edge_media_to_caption?.edges || [];
+      const caption = captionEdges.length > 0 ? captionEdges[0]?.node?.text || '' : '';
+      
+      // Extract hashtags from caption
+      const hashtagRegex = /#[\w\u00C0-\u024F]+/g;
+      const hashtags = caption.match(hashtagRegex) || [];
+      const description = caption.replace(hashtagRegex, '').trim();
+      
+      // If no description/hashtags, get top 5 comments as fallback
+      let topComments = [];
+      if (!description && hashtags.length === 0) {
+        const commentEdges = data.edge_media_to_parent_comment?.edges || [];
+        topComments = commentEdges.slice(0, 5).map(edge => edge.node?.text || '').filter(text => text.length > 0);
+        console.log('📸 No caption found, using top comments as fallback');
+      }
+      
+      console.log('📸 Extracted - Description:', description.substring(0, 100) + '...');
+      console.log('📸 Extracted - Hashtags:', hashtags);
+
       return {
         platform: 'instagram',
         success: true,
-        description,
-        fullTitle: caption,
-        hashtags,
-        username: data.username || data.owner?.username || null,
+        description: description,
+        hashtags: hashtags,
+        topComments: topComments,
+        username: data.owner?.username || null,
+        originalUrl: url
       };
     }
-    throw new Error('RapidAPI failed: ' + JSON.stringify(data).substring(0, 200));
+    throw new Error('RapidAPI failed: ' + response.status);
   } catch (error) {
     console.error('📸 Instagram extraction error:', error.message);
     return { platform: 'instagram', success: false, error: error.message };

@@ -295,8 +295,7 @@ If nothing matches well, return [].`;
         duration: exp.duration,
         rating: exp.rating,
         reviewCount: exp.review_count,
-        image: exp.image_url,
-        provider: exp.operator_name,
+        image: exp.image_url
       }));
     
     console.log('\n✅ TOP 3 MATCHED EXPERIENCES:');
