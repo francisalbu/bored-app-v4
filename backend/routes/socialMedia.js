@@ -1,5 +1,6 @@
 /**
  * Social Media Routes - Using OpenAI GPT-4o-mini
+ * With in-memory caching to prevent rate limit issues
  */
 
 const express = require('express');
@@ -16,6 +17,47 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p1
 // Initialize clients
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const openai = new OpenAI({ apiKey: OPENAI_KEY });
+
+// ============================================
+// IN-MEMORY CACHE - Prevents duplicate API calls
+// ============================================
+const smartMatchCache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour cache
+const MAX_CACHE_SIZE = 500; // Max entries
+
+// Generate cache key from URL
+function getCacheKey(url) {
+  // Normalize URL (remove query params, trailing slashes)
+  return url.split('?')[0].replace(/\/+$/, '').toLowerCase();
+}
+
+// Get from cache
+function getFromCache(url) {
+  const key = getCacheKey(url);
+  const cached = smartMatchCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log('📦 CACHE HIT for:', key);
+    return cached.data;
+  }
+  if (cached) {
+    smartMatchCache.delete(key); // Remove expired
+  }
+  return null;
+}
+
+// Set in cache
+function setInCache(url, data) {
+  const key = getCacheKey(url);
+  
+  // Cleanup if cache too large
+  if (smartMatchCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = smartMatchCache.keys().next().value;
+    smartMatchCache.delete(oldestKey);
+  }
+  
+  smartMatchCache.set(key, { data, timestamp: Date.now() });
+  console.log('💾 CACHED result for:', key, '(cache size:', smartMatchCache.size, ')');
+}
 
 // Extract TikTok metadata
 async function extractTikTokMetadata(url) {
@@ -128,6 +170,15 @@ router.post('/smart-match', async (req, res) => {
     
     if (!url) {
       return res.status(400).json({ success: false, error: 'URL is required' });
+    }
+    
+    // ============================================
+    // CHECK CACHE FIRST - Avoid duplicate API calls!
+    // ============================================
+    const cachedResult = getFromCache(url);
+    if (cachedResult) {
+      console.log('✅ Returning cached result (no API call needed)');
+      return res.json(cachedResult);
     }
     
     const platform = detectPlatform(url);
@@ -266,12 +317,20 @@ IMPORTANT: It's better to return 1-2 perfect matches than 3+ mediocre ones.`;
     
     console.log('✅ Returning', matchedExperiences.length, 'experiences');
     
-    res.json({
+    // Build response
+    const response = {
       success: true,
       metadata,
       matchedExperiences,
       matchMethod,
-    });
+    };
+    
+    // ============================================
+    // CACHE THE RESULT - Prevents future API calls for same URL
+    // ============================================
+    setInCache(url, response);
+    
+    res.json(response);
     
   } catch (error) {
     console.error('❌ Smart match error:', error);
@@ -282,6 +341,23 @@ IMPORTANT: It's better to return 1-2 perfect matches than 3+ mediocre ones.`;
 // Test endpoint
 router.get('/test', (req, res) => {
   res.json({ success: true, message: 'Social media API is working!' });
+});
+
+// Cache stats endpoint
+router.get('/cache-stats', (req, res) => {
+  res.json({
+    success: true,
+    cacheSize: smartMatchCache.size,
+    maxCacheSize: MAX_CACHE_SIZE,
+    cacheTTL: CACHE_TTL / 1000 / 60 + ' minutes',
+    message: 'Cache is active and preventing duplicate OpenAI calls'
+  });
+});
+
+// Clear cache endpoint (for debugging)
+router.post('/clear-cache', (req, res) => {
+  smartMatchCache.clear();
+  res.json({ success: true, message: 'Cache cleared' });
 });
 
 // Extract only (no matching)

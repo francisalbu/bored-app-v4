@@ -36,6 +36,15 @@ export interface ConciergeExperience {
   longitude?: number;
 }
 
+export interface ConciergePlace {
+  name: string;
+  rating: number;
+  totalRatings: number;
+  address: string;
+  priceLevel?: number;
+  isOpen?: boolean;
+}
+
 export interface ChatContext {
   currentExperience?: {
     id: string;
@@ -53,6 +62,7 @@ export interface ChatResponse {
   success: boolean;
   response: string;
   experiences: ConciergeExperience[];
+  places?: ConciergePlace[];
   sessionId: string;
   error?: string;
 }
