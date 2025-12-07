@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Search, Ticket, User } from 'lucide-react-native';
+import { Home, Search, Ticket, User, Sparkles } from 'lucide-react-native';
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -8,14 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const TAB_BAR_WIDTH = 240;
+const TAB_BAR_WIDTH = 280;
 
 // Custom Tab Bar Component
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   
-  // Define the visible tabs in order
-  const visibleTabNames = ['index', 'explore', 'bookings', 'profile'];
+  // Define the visible tabs in order (AI in the middle!)
+  const visibleTabNames = ['index', 'explore', 'ai', 'bookings', 'profile'];
   
   // Filter and sort routes to match our order
   const visibleRoutes = visibleTabNames
@@ -46,8 +46,12 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           };
 
           // Cor cinzenta escura para ativo, cinzenta clara para inativo
-          const color = isFocused ? '#1a1a1a' : '#999999';
-          const fill = isFocused ? '#1a1a1a' : 'none';
+          // AI tab gets special green color when active
+          const isAI = route.name === 'ai';
+          const color = isAI && isFocused 
+            ? colors.dark.primary 
+            : isFocused ? '#1a1a1a' : '#999999';
+          const fill = isFocused ? (isAI ? colors.dark.primary : '#1a1a1a') : 'none';
 
           let IconComponent;
           switch (route.name) {
@@ -56,6 +60,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               break;
             case 'explore':
               IconComponent = <Search size={24} color={color} strokeWidth={isFocused ? 2.5 : 1.5} />;
+              break;
+            case 'ai':
+              IconComponent = <Sparkles size={24} color={color} fill={isFocused ? color : 'none'} strokeWidth={1.5} />;
               break;
             case 'bookings':
               IconComponent = <Ticket size={24} color={color} fill={fill} strokeWidth={1.5} />;
@@ -135,6 +142,12 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: 'Explore',
+        }}
+      />
+      <Tabs.Screen
+        name="ai"
+        options={{
+          title: 'AI Concierge',
         }}
       />
       <Tabs.Screen

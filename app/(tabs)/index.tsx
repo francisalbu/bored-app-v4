@@ -2,7 +2,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Search, SlidersHorizontal, Sparkles, Share as ShareIcon } from 'lucide-react-native';
+import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Search, SlidersHorizontal, Share as ShareIcon } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
@@ -35,7 +35,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useExperiences } from '@/hooks/useExperiences';
 import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
-import { BoredAIModal } from '@/components/BoredAIModal';
 import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OnboardingScreen from '@/components/OnboardingScreen';
@@ -69,7 +68,6 @@ export default function FeedScreen() {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [showReviews, setShowReviews] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [showBoredAI, setShowBoredAI] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [showImportTutorial, setShowImportTutorial] = useState<boolean>(false);
   const [filters, setFiltersState] = useState<FilterOptions>({ categories: [], priceRange: null });
@@ -340,9 +338,6 @@ export default function FeedScreen() {
           <Text style={styles.headerTitle}>NEAR ME</Text>
           
           <View style={styles.headerRight}>
-            <Pressable style={styles.aiButton} onPress={() => setShowBoredAI(true)}>
-              <Sparkles size={20} color={colors.dark.primary} />
-            </Pressable>
             <Pressable 
               style={styles.importButton} 
               onPress={() => setShowImportTutorial(true)}
@@ -398,11 +393,6 @@ export default function FeedScreen() {
           onClose={() => setShowReviews(false)}
         />
       )}
-
-      <BoredAIModal
-        visible={showBoredAI}
-        onClose={() => setShowBoredAI(false)}
-      />
 
       <FiltersModal
         visible={showFilters}
