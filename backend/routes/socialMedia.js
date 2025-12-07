@@ -1,22 +1,21 @@
 /**
- * Social Media Routes - CLEAN VERSION
- * Based on test-gemini-match.js that WORKS!
+ * Social Media Routes - Using OpenAI GPT-4o-mini
  */
 
 const express = require('express');
 const router = express.Router();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const { createClient } = require('@supabase/supabase-js');
 
-// HARDCODED credentials (same as test-gemini-match.js)
+// Credentials (use environment variables in production)
 const SUPABASE_URL = 'https://hnivuisqktlrusyqywaz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
-const GOOGLE_AI_KEY = 'AIzaSyAlvnCcn8ndC6avTq2BlW7LJ-H3VgCEAk4';
+const OPENAI_KEY = process.env.OPENAI_KEY; // Set in Render dashboard
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p11d71ejsn0d42966b3d99';
 
 // Initialize clients
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const genAI = new GoogleGenerativeAI(GOOGLE_AI_KEY);
+const openai = new OpenAI({ apiKey: OPENAI_KEY });
 
 // Extract TikTok metadata
 async function extractTikTokMetadata(url) {
@@ -156,9 +155,7 @@ router.post('/smart-match', async (req, res) => {
     }
     console.log('📦 Found', experiences.length, 'experiences');
     
-    // Call Gemini AI
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    
+    // Prepare data for OpenAI
     const experiencesSummary = experiences.map(exp => ({
       id: exp.id, title: exp.title, category: exp.category, tags: exp.tags, location: exp.location
     }));
@@ -203,20 +200,22 @@ Example: [26, 18] or [5] or []
 
 IMPORTANT: It's better to return 1-2 perfect matches than 3+ mediocre ones.`;
 
-    console.log('🤖 Calling Gemini AI...');
+    console.log('🤖 Calling OpenAI GPT-4o-mini...');
     console.log('🤖 Content context:', contentContext);
     
     let matchedIds = [];
     let matchMethod = 'none';
     
     try {
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 100 },
+      const result = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 100,
       });
 
-      let text = result.response.text().trim();
-      console.log('🤖 Gemini Response (raw):', text);
+      let text = result.choices[0].message.content.trim();
+      console.log('🤖 OpenAI Response (raw):', text);
       
       // Clean markdown wrapper
       text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -225,8 +224,8 @@ IMPORTANT: It's better to return 1-2 perfect matches than 3+ mediocre ones.`;
       matchedIds = JSON.parse(text);
       matchMethod = 'ai';
       console.log('✅ Parsed IDs:', matchedIds);
-    } catch (geminiError) {
-      console.error('❌ Gemini error:', geminiError.message);
+    } catch (aiError) {
+      console.error('❌ OpenAI error:', aiError.message);
       // Fallback: return empty but don't crash
       matchedIds = [];
       matchMethod = 'none';
