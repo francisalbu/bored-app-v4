@@ -18,9 +18,14 @@
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.bored-explorer",
       "config": {
-        "googleMapsApiKey": "YOUR_IOS_API_KEY"
+        "googleMapsApiKey": "YOUR_IOS_API_KEY",
+        "usesNonExemptEncryption": false
       },
       "infoPlist": {
+        "NSCameraUsageDescription": "Bored Tourist uses your camera for two purposes: 1) To let you take and update your profile photo so other users can recognize you when joining group experiences, and 2) To scan your credit card details securely when making payments through Stripe for booking experiences. Your camera is never accessed without your explicit action.",
+        "NSPhotoLibraryUsageDescription": "Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. This helps other users recognize you when you join group experiences.",
+        "NSLocationWhenInUseUsageDescription": "Bored Tourist uses your location to show you experiences and activities happening near you. For example, if you're in Lisbon, we'll show you surf lessons in Costa da Caparica or wine tastings in Sintra that are close to your current location.",
+        "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
             "CFBundleURLName": "com.rork.boredtourist.oauth",
@@ -67,9 +72,17 @@
       "expo-font",
       "expo-web-browser",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. This helps other users recognize you when you join group experiences.",
+          "cameraPermission": "Bored Tourist uses your camera for two purposes: 1) To let you take and update your profile photo so other users can recognize you when joining group experiences, and 2) To scan your credit card details securely when making payments through Stripe for booking experiences."
+        }
+      ],
+      [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to show experiences near you."
+          "locationAlwaysAndWhenInUsePermission": "Bored Tourist uses your location to show you experiences and activities happening near you. For example, if you're in Lisbon, we'll show you surf lessons in Costa da Caparica or wine tastings in Sintra that are close to your current location.",
+          "locationWhenInUsePermission": "Bored Tourist uses your location to show you experiences and activities happening near you. For example, if you're in Lisbon, we'll show you surf lessons in Costa da Caparica or wine tastings in Sintra that are close to your current location."
         }
       ],
       [

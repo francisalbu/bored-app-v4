@@ -404,6 +404,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Step 3: Clear API token
       api.clearAuthToken();
+      
+      // Step 4: Clear AI chat session
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.removeItem('@bored_ai_session_id');
+      
       setUser(null);
       
       console.log('✅ Logout complete!');

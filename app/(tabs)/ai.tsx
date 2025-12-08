@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Sparkles, Send, Trash2, Plus, ChevronRight, Calendar, Compass, Map } from 'lucide-react-native';
@@ -20,15 +21,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import colors from '@/constants/colors';
 import typography from '@/constants/typography';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthBottomSheet from '@/components/AuthBottomSheet';
 import {
   sendMessage,
   getSuggestions,
   clearConversation,
   formatResponseText,
+  loadChatHistory,
   type ConciergeSuggestion,
   type ConciergeExperience,
   type ChatResponse,
 } from '@/services/aiConcierge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -38,6 +43,7 @@ interface Message {
   isUser: boolean;
   experiences?: ConciergeExperience[];
   timestamp: Date;
+  isLoginPrompt?: boolean;
 }
 
 // Quick action buttons config
@@ -49,12 +55,55 @@ const quickActions = [
 
 export default function AIScreen() {
   const { t } = useLanguage();
+  const { user, isAuthenticated } = useAuth();
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [previousUserId, setPreviousUserId] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Tab bar height (approximately 80-90 on iOS with safe area)
+  const TAB_BAR_HEIGHT = 100;
+
+  // Clear messages when user logs out or changes
+  useEffect(() => {
+    const currentUserId = user?.id || null;
+    
+    // If user logged out (was logged in, now not)
+    if (previousUserId && !currentUserId) {
+      console.log('🧹 User logged out - clearing AI chat history');
+      setMessages([]);
+    }
+    
+    // If user changed (different user logged in)
+    if (previousUserId && currentUserId && previousUserId !== currentUserId) {
+      console.log('🔄 User changed - clearing AI chat history');
+      setMessages([]);
+    }
+    
+    setPreviousUserId(currentUserId);
+  }, [user?.id]);
+
+  // Listen for keyboard show/hide
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -76,6 +125,20 @@ export default function AIScreen() {
     };
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
+
+    // If user is not authenticated, prompt them to login to see the response
+    if (!isAuthenticated) {
+      const loginPromptMessage: Message = {
+        id: `login_${Date.now()}`,
+        text: "hey! to get personalized recommendations and save our chat, you'll need to sign in first 🔐",
+        isUser: false,
+        timestamp: new Date(),
+        isLoginPrompt: true,
+      };
+      setMessages(prev => [...prev, loginPromptMessage]);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -102,7 +165,7 @@ export default function AIScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading]);
+  }, [inputText, isLoading, isAuthenticated]);
 
   const handleClearChat = async () => {
     await clearConversation();
@@ -179,6 +242,16 @@ export default function AIScreen() {
           {message.text}
         </Text>
         
+        {/* Login prompt button */}
+        {message.isLoginPrompt && (
+          <Pressable 
+            style={styles.signInButton}
+            onPress={() => setShowAuthModal(true)}
+          >
+            <Text style={styles.signInButtonText}>Sign in</Text>
+          </Pressable>
+        )}
+        
         {/* Experience cards */}
         {message.experiences && message.experiences.length > 0 && (
           <View style={styles.experiencesContainer}>
@@ -240,8 +313,8 @@ export default function AIScreen() {
       {/* Chat area */}
       <KeyboardAvoidingView
         style={styles.chatContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? -insets.bottom : 0}
       >
         <ScrollView
           ref={scrollViewRef}
@@ -252,6 +325,7 @@ export default function AIScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {messages.length === 0 ? renderWelcome() : messages.map(renderMessage)}
           
@@ -269,8 +343,11 @@ export default function AIScreen() {
           )}
         </ScrollView>
 
-        {/* Input area */}
-        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 16) + 70 }]}>
+        {/* Input area - positioned at bottom like Mindtrip */}
+        <View style={[
+          styles.inputContainer, 
+          { paddingBottom: isKeyboardVisible ? (insets.bottom || 8) : TAB_BAR_HEIGHT }
+        ]}>
           <View style={styles.inputWrapper}>
             <Pressable style={styles.inputPlusButton}>
               <Plus size={20} color={colors.dark.textSecondary} />
@@ -295,11 +372,22 @@ export default function AIScreen() {
               onPress={() => handleSend()}
               disabled={!inputText.trim() || isLoading}
             >
-              <Send size={18} color={inputText.trim() && !isLoading ? '#fff' : colors.dark.textSecondary} />
+              <Send size={18} color={inputText.trim() && !isLoading ? '#000' : colors.dark.textSecondary} />
             </Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Auth Modal */}
+      <AuthBottomSheet
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          setShowAuthModal(false);
+          // Remove login prompt messages after successful auth
+          setMessages(prev => prev.filter(m => !m.isLoginPrompt));
+        }}
+      />
     </View>
   );
 }
@@ -348,7 +436,7 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   centeredContent: {
     flex: 1,
@@ -440,7 +528,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   userText: {
-    color: '#fff',
+    color: '#000',
   },
   aiText: {
     color: colors.dark.text,
@@ -538,5 +626,20 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: 'transparent',
+  },
+  
+  // Sign in button for login prompt
+  signInButton: {
+    backgroundColor: colors.dark.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 12,
+    alignSelf: 'flex-start',
+  },
+  signInButtonText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
