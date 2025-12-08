@@ -35,6 +35,12 @@ const slides = [
     title: 'Tap to see details\n& book instantly',
     subtitle: 'Quick and easy booking process',
   },
+  {
+    id: '3',
+    emoji: '🔗',
+    title: 'Paste Instagram or\nTikTok links',
+    subtitle: 'Transform social media into real experiences',
+  },
 ];
 
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
@@ -75,7 +81,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
           }),
         ])
       );
-    } else {
+    } else if (currentIndex === 1) {
       // Tap animation - scale
       animRef.current = Animated.loop(
         Animated.sequence([
@@ -87,6 +93,22 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
           Animated.timing(handAnim, {
             toValue: 0,
             duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    } else {
+      // Link/Pulse animation - scale pulse
+      animRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(handAnim, {
+            toValue: 1.2,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(handAnim, {
+            toValue: 1,
+            duration: 500,
             useNativeDriver: true,
           }),
         ])
@@ -113,6 +135,38 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
   const renderSlide = ({ item, index }: { item: typeof slides[0]; index: number }) => {
     const isSwipe = index === 0;
+    const isTap = index === 1;
+    const isLink = index === 2;
+    
+    // Determine animation style based on slide type
+    const getAnimationStyle = () => {
+      if (currentIndex !== index) {
+        return {};
+      }
+      
+      if (isSwipe) {
+        return { transform: [{ translateY: handAnim }] };
+      } else if (isTap) {
+        return { 
+          transform: [{ 
+            scale: handAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0.85],
+            })
+          }] 
+        };
+      } else if (isLink) {
+        return { 
+          transform: [{ 
+            scale: handAnim.interpolate({
+              inputRange: [1, 1.2],
+              outputRange: [1, 1.15],
+            })
+          }] 
+        };
+      }
+      return {};
+    };
     
     return (
       <View style={styles.slide}>
@@ -120,18 +174,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
           <Animated.Text 
             style={[
               styles.emoji,
-              isSwipe 
-                ? { transform: [{ translateY: currentIndex === index ? handAnim : 0 }] }
-                : { 
-                    transform: [{ 
-                      scale: currentIndex === index 
-                        ? handAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 0.85],
-                          })
-                        : 1 
-                    }] 
-                  }
+              getAnimationStyle(),
             ]}
           >
             {item.emoji}
