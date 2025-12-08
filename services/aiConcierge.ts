@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/lib/supabase';
 
 const API_URL = 'https://bored-tourist-api.onrender.com';
 const SESSION_KEY = '@bored_ai_session_id';
@@ -81,6 +82,74 @@ async function getSessionId(): Promise<string> {
   }
 }
 
+// Save message to Supabase
+async function saveMessageToSupabase(
+  role: 'user' | 'assistant',
+  content: string,
+  sessionId: string,
+  metadata: Record<string, unknown> = {}
+): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.log('⚠️ User not logged in, skipping message save');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('ai_chat_history')
+      .insert({
+        user_id: user.id,
+        session_id: sessionId,
+        role,
+        content,
+        metadata,
+      });
+
+    if (error) {
+      console.error('❌ Error saving message to Supabase:', error);
+    } else {
+      console.log('✅ Message saved to Supabase');
+    }
+  } catch (error) {
+    console.error('❌ Error saving message:', error);
+  }
+}
+
+// Load chat history from Supabase for current session
+export async function loadChatHistory(sessionId: string): Promise<Array<{
+  role: 'user' | 'assistant';
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}>> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('ai_chat_history')
+      .select('role, content, metadata, created_at')
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('❌ Error loading chat history:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Error loading history:', error);
+    return [];
+  }
+}
+
 // Send a message to the AI Concierge
 export async function sendMessage(
   message: string,
@@ -90,6 +159,9 @@ export async function sendMessage(
     const sessionId = await getSessionId();
     
     console.log('🤖 AI Concierge: Sending message:', message);
+    
+    // Save user message to Supabase
+    await saveMessageToSupabase('user', message, sessionId, { context });
     
     const response = await fetch(`${API_URL}/api/ai-concierge/chat`, {
       method: 'POST',
@@ -109,6 +181,12 @@ export async function sendMessage(
     
     const data = await response.json();
     console.log('✅ AI Concierge: Response received');
+    
+    // Save assistant response to Supabase
+    await saveMessageToSupabase('assistant', data.response, sessionId, {
+      experiences: data.experiences || [],
+      places: data.places || [],
+    });
     
     return data;
   } catch (error) {
