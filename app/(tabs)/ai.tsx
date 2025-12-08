@@ -192,17 +192,6 @@ export default function AIScreen() {
   // Welcome screen - Mindtrip style
   const renderWelcome = () => (
     <View style={styles.welcomeContainer}>
-      {/* Logo/Icon */}
-      <View style={styles.welcomeIconContainer}>
-        <LinearGradient
-          colors={[colors.dark.primary, '#8BC34A']}
-          style={styles.welcomeIcon}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Sparkles size={36} color="#fff" />
-        </LinearGradient>
-      </View>
       
       {/* Main Title */}
       <Text style={styles.welcomeTitle}>What's the plan?</Text>

@@ -46,12 +46,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           };
 
           // Cor cinzenta escura para ativo, cinzenta clara para inativo
-          // AI tab gets special green color when active
-          const isAI = route.name === 'ai';
-          const color = isAI && isFocused 
-            ? colors.dark.primary 
-            : isFocused ? '#1a1a1a' : '#999999';
-          const fill = isFocused ? (isAI ? colors.dark.primary : '#1a1a1a') : 'none';
+          // All tabs use the same colors now
+          const color = isFocused ? '#1a1a1a' : '#999999';
+          const fill = isFocused ? '#1a1a1a' : 'none';
 
           let IconComponent;
           switch (route.name) {
