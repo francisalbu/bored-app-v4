@@ -66,6 +66,7 @@ export default function ImportTutorialModal({ visible, onClose }: ImportTutorial
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const videoSlideAnim = useRef(new Animated.Value(0)).current;
+  const setupVideoRef = useRef<Video>(null);
 
   useEffect(() => {
     if (visible) {
@@ -230,14 +231,25 @@ export default function ImportTutorialModal({ visible, onClose }: ImportTutorial
               styles.setupVideoContainer,
               { transform: [{ translateY: videoTranslateY }] }
             ]}>
-              <Video
-                source={{ uri: item.videoUrl }}
-                style={styles.setupVideo}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-                isMuted
-              />
+              {currentIndex === 1 && (
+                <Video
+                  ref={setupVideoRef}
+                  source={{ uri: item.videoUrl }}
+                  style={styles.setupVideo}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={false}
+                  isLooping
+                  isMuted
+                  onLoad={() => {
+                    // Garantir que começa do início e play após delay
+                    setupVideoRef.current?.setPositionAsync(0).then(() => {
+                      setTimeout(() => {
+                        setupVideoRef.current?.playAsync();
+                      }, 800);
+                    });
+                  }}
+                />
+              )}
               {/* X button on share modal */}
               {shareModalOpen && (
                 <Pressable 
