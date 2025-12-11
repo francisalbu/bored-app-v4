@@ -53,17 +53,17 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your camera</string>
+    <string>Bored Tourist uses your camera to take a profile photo so other users can recognize you when joining group experiences. For example, when you book a group surf lesson, your photo helps the instructor identify you. Your camera is never accessed without your explicit action.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to use your location to show experiences near you.</string>
+    <string>Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes.</string>
     <key>NSLocationAlwaysUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>Bored Tourist may use your microphone if you choose to record a video review of an experience you have completed. This is optional and only accessed when you explicitly tap the record button.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
+    <string>Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. For example, you can select a photo to help other users recognize you when you join group experiences like surf lessons or wine tastings.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
