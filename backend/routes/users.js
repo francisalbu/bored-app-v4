@@ -151,14 +151,18 @@ router.delete('/delete-account',
   authenticateSupabase,
   async (req, res, next) => {
     try {
-      const userId = req.user.id; // supabase_uid from auth
-      console.log('🗑️ [DELETE-ACCOUNT] Starting account deletion for user:', userId);
+      const localUserId = req.user.id; // Local DB user ID (integer)
+      const supabaseUid = req.user.supabase_uid; // Supabase Auth UUID
+      
+      console.log('🗑️ [DELETE-ACCOUNT] Starting account deletion');
+      console.log('🗑️ [DELETE-ACCOUNT] Local User ID:', localUserId);
+      console.log('🗑️ [DELETE-ACCOUNT] Supabase UID:', supabaseUid);
 
-      // 1. Delete user's bookings
+      // 1. Delete user's bookings (use local user ID)
       const { error: bookingsError } = await supabase
         .from('bookings')
         .delete()
-        .eq('user_id', userId);
+        .eq('user_id', localUserId);
       
       if (bookingsError) {
         console.error('⚠️ [DELETE-ACCOUNT] Error deleting bookings:', bookingsError);
@@ -170,7 +174,7 @@ router.delete('/delete-account',
       const { error: reviewsError } = await supabase
         .from('reviews')
         .delete()
-        .eq('user_id', userId);
+        .eq('user_id', localUserId);
       
       if (reviewsError) {
         console.error('⚠️ [DELETE-ACCOUNT] Error deleting reviews:', reviewsError);
@@ -182,7 +186,7 @@ router.delete('/delete-account',
       const { error: savedError } = await supabase
         .from('saved_experiences')
         .delete()
-        .eq('user_id', userId);
+        .eq('user_id', localUserId);
       
       if (savedError) {
         console.error('⚠️ [DELETE-ACCOUNT] Error deleting saved experiences:', savedError);
@@ -194,7 +198,7 @@ router.delete('/delete-account',
       const { error: usersError } = await supabase
         .from('users')
         .delete()
-        .eq('supabase_uid', userId);
+        .eq('id', localUserId);
       
       if (usersError) {
         console.error('⚠️ [DELETE-ACCOUNT] Error deleting from users table:', usersError);
@@ -202,8 +206,8 @@ router.delete('/delete-account',
         console.log('✅ [DELETE-ACCOUNT] User record deleted');
       }
 
-      // 5. Delete from auth.users using Admin API
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      // 5. Delete from auth.users using Admin API (use supabase_uid - the UUID)
+      const { error: authError } = await supabase.auth.admin.deleteUser(supabaseUid);
       
       if (authError) {
         console.error('❌ [DELETE-ACCOUNT] Error deleting auth user:', authError);
