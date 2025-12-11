@@ -17,6 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   register: (name: string, email: string, password: string, phone?: string) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean; email?: string }>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   refreshUser: () => Promise<void>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
 }
@@ -417,6 +418,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteAccount = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log('🗑️ Deleting account...');
+      
+      // Get current user
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        return { success: false, error: 'No user logged in' };
+      }
+
+      // Call the backend API to delete the account
+      // This uses the service_role key to delete from auth.users
+      const response = await api.deleteAccount();
+      
+      console.log('🗑️ Delete account response:', response);
+      
+      if (!response.success) {
+        console.error('❌ Delete account failed:', response.error);
+        return { success: false, error: response.error || 'Failed to delete account' };
+      }
+      
+      // Sign out from Supabase (may already be invalidated)
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.log('Note: signOut after delete:', e);
+      }
+      
+      // Clear local storage
+      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await SecureStore.deleteItemAsync(USER_KEY);
+      
+      // Clear API token
+      api.clearAuthToken();
+      
+      // Clear AI chat session and other local data
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.removeItem('@bored_ai_session_id');
+      await AsyncStorage.removeItem('@bored_tourist_onboarding_shown');
+      
+      setUser(null);
+      
+      console.log('✅ Account deleted successfully!');
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ Error deleting account:', error);
+      return { success: false, error: error.message || 'Failed to delete account' };
+    }
+  };
+
   const refreshUser = async () => {
     try {
       console.log('🔄 Refreshing user data...');
@@ -504,6 +556,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        deleteAccount,
         refreshUser,
         signInWithGoogle,
       }}

@@ -263,6 +263,13 @@ class ApiService {
   async getUserStats() {
     return this.request('/users/stats');
   }
+
+  // Delete Account
+  async deleteAccount() {
+    return this.request('/users/delete-account', {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiService();

@@ -143,4 +143,88 @@ router.put('/update-phone',
   }
 );
 
+/**
+ * DELETE /api/users/delete-account
+ * Permanently delete user account and all associated data
+ */
+router.delete('/delete-account',
+  authenticateSupabase,
+  async (req, res, next) => {
+    try {
+      const userId = req.user.id; // supabase_uid from auth
+      console.log('🗑️ [DELETE-ACCOUNT] Starting account deletion for user:', userId);
+
+      // 1. Delete user's bookings
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (bookingsError) {
+        console.error('⚠️ [DELETE-ACCOUNT] Error deleting bookings:', bookingsError);
+      } else {
+        console.log('✅ [DELETE-ACCOUNT] Bookings deleted');
+      }
+
+      // 2. Delete user's reviews
+      const { error: reviewsError } = await supabase
+        .from('reviews')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (reviewsError) {
+        console.error('⚠️ [DELETE-ACCOUNT] Error deleting reviews:', reviewsError);
+      } else {
+        console.log('✅ [DELETE-ACCOUNT] Reviews deleted');
+      }
+
+      // 3. Delete user's saved experiences
+      const { error: savedError } = await supabase
+        .from('saved_experiences')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (savedError) {
+        console.error('⚠️ [DELETE-ACCOUNT] Error deleting saved experiences:', savedError);
+      } else {
+        console.log('✅ [DELETE-ACCOUNT] Saved experiences deleted');
+      }
+
+      // 4. Delete from public.users table
+      const { error: usersError } = await supabase
+        .from('users')
+        .delete()
+        .eq('supabase_uid', userId);
+      
+      if (usersError) {
+        console.error('⚠️ [DELETE-ACCOUNT] Error deleting from users table:', usersError);
+      } else {
+        console.log('✅ [DELETE-ACCOUNT] User record deleted');
+      }
+
+      // 5. Delete from auth.users using Admin API
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (authError) {
+        console.error('❌ [DELETE-ACCOUNT] Error deleting auth user:', authError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to delete authentication account',
+          details: authError.message
+        });
+      }
+
+      console.log('✅ [DELETE-ACCOUNT] Auth user deleted successfully');
+
+      res.json({
+        success: true,
+        message: 'Account deleted successfully'
+      });
+    } catch (error) {
+      console.error('❌ [DELETE-ACCOUNT] Error:', error);
+      next(error);
+    }
+  }
+);
+
 module.exports = router;

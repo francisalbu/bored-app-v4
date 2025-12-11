@@ -24,7 +24,7 @@ import { useExperiences } from '@/hooks/useExperiences';
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, deleteAccount } = useAuth();
   const { savedExperiences: savedExperienceIds } = useFavorites();
   const { experiences } = useExperiences();
   const [showAuthSheet, setShowAuthSheet] = useState(false);
@@ -106,14 +106,23 @@ export default function ProfileScreen() {
     setShowMenu(false);
     Alert.alert(
       'Delete Account',
-      'This action is permanent and cannot be undone. All your data will be deleted.',
+      'Are you sure you want to delete your account? This action is permanent and cannot be undone. All your data will be deleted.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'No', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Yes, Delete',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Contact Support', 'Please email support@boredtourist.com to delete your account.');
+          onPress: async () => {
+            try {
+              const result = await deleteAccount();
+              if (result.success) {
+                Alert.alert('Account Deleted', 'Your account has been successfully deleted.');
+              } else {
+                Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            }
           },
         },
       ]
