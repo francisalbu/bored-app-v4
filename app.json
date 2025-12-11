@@ -41,7 +41,7 @@
         },
         "NSCameraUsageDescription": "Bored Tourist uses your camera for two purposes: 1) To let you take and update your profile photo so other users can recognize you when joining group experiences, and 2) To scan your credit card details securely when making payments through Stripe for booking experiences. Your camera is never accessed without your explicit action.",
         "NSPhotoLibraryUsageDescription": "Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. This helps other users recognize you when you join group experiences.",
-        "NSLocationWhenInUseUsageDescription": "Bored Tourist uses your location to show you experiences and activities happening near you. For example, if you're in Lisbon, we'll show you surf lessons in Costa da Caparica or wine tastings in Sintra that are close to your current location. Your location is never shared with other users or used for advertising.",
+        "NSLocationWhenInUseUsageDescription": "Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
@@ -98,8 +98,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Bored Tourist uses your location to show you experiences and activities happening near you. For example, if you're in Lisbon, we'll show you surf lessons in Costa da Caparica or wine tastings in Sintra that are close to your current location.",
-          "locationWhenInUsePermission": "Bored Tourist uses your location to show you experiences and activities happening near you. For example, if you're in Lisbon, we'll show you surf lessons in Costa da Caparica or wine tastings in Sintra that are close to your current location."
+          "locationAlwaysAndWhenInUsePermission": "Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes.",
+          "locationWhenInUsePermission": "Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes."
         }
       ],
       [
