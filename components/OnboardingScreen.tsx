@@ -8,6 +8,7 @@ import {
   Animated,
   Pressable,
   ViewToken,
+  Image,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
@@ -20,6 +21,7 @@ const BACKGROUND_VIDEO = 'https://xjwlmofgfwlrwwlrudda.supabase.co/storage/v1/ob
 
 interface OnboardingScreenProps {
   onComplete: () => void;
+  onShowImportTutorial?: () => void;
 }
 
 const slides = [
@@ -43,7 +45,7 @@ const slides = [
   },
 ];
 
-export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+export default function OnboardingScreen({ onComplete, onShowImportTutorial }: OnboardingScreenProps) {
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -171,18 +173,35 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
     return (
       <View style={styles.slide}>
         <View style={styles.emojiContainer}>
-          <Animated.Text 
-            style={[
-              styles.emoji,
-              getAnimationStyle(),
-            ]}
-          >
-            {item.emoji}
-          </Animated.Text>
+          {isLink ? (
+            <Animated.View style={[styles.iconContainer, getAnimationStyle()]}>
+              <Image 
+                source={require('@/assets/images/icons.png')} 
+                style={styles.importIcon}
+                resizeMode="contain"
+              />
+            </Animated.View>
+          ) : (
+            <Animated.Text 
+              style={[
+                styles.emoji,
+                getAnimationStyle(),
+              ]}
+            >
+              {item.emoji}
+            </Animated.Text>
+          )}
         </View>
         
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.subtitle}>{item.subtitle}</Text>
+        
+        {/* Show "See How" button only on the third slide */}
+        {isLink && onShowImportTutorial && (
+          <Pressable style={styles.seeHowButton} onPress={onShowImportTutorial}>
+            <Text style={styles.seeHowButtonText}>See How</Text>
+          </Pressable>
+        )}
       </View>
     );
   };
@@ -275,6 +294,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 50,
   },
+  iconContainer: {
+    width: 120,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  importIcon: {
+    width: 120,
+    height: 120,
+  },
   emoji: {
     fontSize: 80,
   },
@@ -296,6 +325,21 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  seeHowButton: {
+    marginTop: 30,
+    backgroundColor: 'rgba(191, 255, 0, 0.2)',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#BFFF00',
+  },
+  seeHowButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#BFFF00',
+    textAlign: 'center',
   },
   bottomSection: {
     paddingHorizontal: 40,

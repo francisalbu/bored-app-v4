@@ -38,13 +38,11 @@ import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
-import FeedTutorialOverlay from '@/components/FeedTutorialOverlay';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OnboardingScreen from '@/components/OnboardingScreen';
 import ImportTutorialModal from '@/components/ImportTutorialModal';
 
 const ONBOARDING_SHOWN_KEY = '@bored_tourist_onboarding_shown';
-const FEED_TUTORIAL_SHOWN_KEY = '@bored_tourist_feed_tutorial_shown';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -74,7 +72,6 @@ export default function FeedScreen() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [showImportTutorial, setShowImportTutorial] = useState<boolean>(false);
-  const [showFeedTutorial, setShowFeedTutorial] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [selectedLocation, setSelectedLocation] = useState<string>('Lisbon');
   const [filters, setFiltersState] = useState<FilterOptions>({ categories: [], priceRange: null, availability: null });
@@ -120,40 +117,34 @@ export default function FeedScreen() {
     try {
       await AsyncStorage.setItem(ONBOARDING_SHOWN_KEY, 'true');
       setShowOnboarding(false);
-      
-      // Check if user has seen feed tutorial
-      const hasSeenFeedTutorial = await AsyncStorage.getItem(FEED_TUTORIAL_SHOWN_KEY);
-      if (!hasSeenFeedTutorial) {
-        // Show feed tutorial after a short delay
-        setTimeout(() => {
-          setShowFeedTutorial(true);
-        }, 500);
-      }
     } catch (error) {
       console.error('Error saving onboarding status:', error);
       setShowOnboarding(false);
     }
   };
 
-  // Complete feed tutorial
-  const handleFeedTutorialComplete = async () => {
+  // Complete onboarding and show import tutorial
+  const handleOnboardingCompleteWithTutorial = async () => {
     try {
-      await AsyncStorage.setItem(FEED_TUTORIAL_SHOWN_KEY, 'true');
-      setShowFeedTutorial(false);
+      await AsyncStorage.setItem(ONBOARDING_SHOWN_KEY, 'true');
+      setShowOnboarding(false);
+      // Show import tutorial after a short delay to allow modal to close
+      setTimeout(() => {
+        setShowImportTutorial(true);
+      }, 300);
     } catch (error) {
-      console.error('Error saving feed tutorial status:', error);
-      setShowFeedTutorial(false);
+      console.error('Error saving onboarding status:', error);
+      setShowOnboarding(false);
     }
   };
 
   // DEV ONLY: Reset tutorial (remove this in production)
   const handleResetTutorial = async () => {
     try {
-      await AsyncStorage.removeItem(FEED_TUTORIAL_SHOWN_KEY);
       await AsyncStorage.removeItem(ONBOARDING_SHOWN_KEY);
       Alert.alert(
         'Tutorials Reset',
-        'Onboarding and feed tutorial have been reset. Close and reopen the app to see them again.',
+        'Onboarding has been reset. Close and reopen the app to see it again.',
         [{ text: 'OK' }]
       );
     } catch (error) {
@@ -647,14 +638,11 @@ export default function FeedScreen() {
         statusBarTranslucent
         presentationStyle="fullScreen"
       >
-        <OnboardingScreen onComplete={handleOnboardingComplete} />
+        <OnboardingScreen 
+          onComplete={handleOnboardingComplete}
+          onShowImportTutorial={handleOnboardingCompleteWithTutorial}
+        />
       </Modal>
-
-      {/* Feed Tutorial Overlay */}
-      <FeedTutorialOverlay 
-        visible={showFeedTutorial} 
-        onSkip={handleFeedTutorialComplete}
-      />
     </View>
   );
 }
