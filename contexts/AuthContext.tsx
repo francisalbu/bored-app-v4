@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { usePostHog } from 'posthog-react-native';
 import { api } from '@/services/api';
 import { supabase } from '@/lib/supabase';
 
@@ -30,6 +31,7 @@ const USER_KEY = 'user_data';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const posthog = usePostHog();
 
   useEffect(() => {
     loadStoredAuth();
@@ -222,6 +224,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         api.setAuthToken(supabaseToken);
         setUser(userData);
 
+        // Track successful login
+        if (posthog) {
+          posthog.identify(userData.id, {
+            email: userData.email,
+            name: userData.name,
+          });
+          posthog.capture('user_logged_in', {
+            method: 'email',
+          });
+        }
+
         console.log('✅ Login complete! User synced with backend.');
 
         return { success: true };
@@ -363,6 +376,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         api.setAuthToken(supabaseToken);
         setUser(userData);
 
+        // Track successful registration
+        if (posthog) {
+          posthog.identify(userData.id, {
+            email: userData.email,
+            name: userData.name,
+          });
+          posthog.capture('user_registered', {
+            method: 'email',
+          });
+        }
+
         console.log('✅ Registration complete!');
 
         return { success: true };
@@ -395,6 +419,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       console.log('👋 Logging out...');
+      
+      // Track logout before clearing data
+      if (posthog) {
+        posthog.capture('user_logged_out');
+        posthog.reset();
+      }
       
       // Step 1: Logout from Supabase
       await supabase.auth.signOut();

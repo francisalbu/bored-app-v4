@@ -34,6 +34,7 @@ import { type Experience } from '@/constants/experiences';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExperiences } from '@/hooks/useExperiences';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
@@ -65,6 +66,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export default function FeedScreen() {
   const { t } = useLanguage();
+  const { trackEvent, trackScreen } = useAnalytics();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -85,14 +87,35 @@ export default function FeedScreen() {
   const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
-  // Wrapper for setFilters with logging
+  // Wrapper for setFilters with logging and tracking
   const setFilters = React.useCallback((newFilters: FilterOptions) => {
     console.log('🎯 setFilters called with:', JSON.stringify(newFilters));
+    
+    // Track filter usage
+    trackEvent('feed_filters_applied', {
+      categories: newFilters.categories,
+      has_price_filter: !!newFilters.priceRange,
+      price_range: newFilters.priceRange,
+      availability: newFilters.availability,
+      total_filters: newFilters.categories.length + (newFilters.priceRange ? 1 : 0) + (newFilters.availability ? 1 : 0),
+    });
+    
     setFiltersState(newFilters);
-  }, []);
+  }, [trackEvent]);
   
   // Check if we're on the home tab (feed screen is active)
   const isTabFocused = pathname === '/' || pathname === '/index';
+
+  // Track feed screen view
+  useEffect(() => {
+    if (isTabFocused) {
+      trackScreen('Feed', {
+        total_experiences: EXPERIENCES.length,
+        filtered_experiences: filteredExperiences.length,
+        active_filters: filters.categories.length + (filters.priceRange ? 1 : 0) + (filters.availability ? 1 : 0),
+      });
+    }
+  }, [isTabFocused]);
 
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading: loadingExperiences, error: experiencesError } = useExperiences();
@@ -385,8 +408,25 @@ export default function FeedScreen() {
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-      setCurrentIndex(viewableItems[0].index);
-      console.log('📍 Current Experience Index:', viewableItems[0].index);
+      const newIndex = viewableItems[0].index;
+      const experience = filteredExperiences[newIndex];
+      
+      if (experience) {
+        // Track experience view in feed
+        trackEvent('feed_experience_viewed', {
+          experience_id: experience.id,
+          experience_name: experience.title,
+          category: experience.category,
+          price: experience.price,
+          position_in_feed: newIndex,
+          has_video: !!experience.video,
+          rating: experience.rating,
+          provider: experience.provider,
+        });
+      }
+      
+      setCurrentIndex(newIndex);
+      console.log('📍 Current Experience Index:', newIndex);
     }
   }).current;
 
@@ -409,9 +449,22 @@ export default function FeedScreen() {
   const handleSave = async (experienceId: string) => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
+      trackEvent('feed_save_attempted_unauthenticated', { experience_id: experienceId });
       return;
     }
+    
+    const experience = EXPERIENCES.find(exp => exp.id === experienceId);
+    const wasSaved = isSaved(experienceId);
+    
     await toggleSave(experienceId);
+    
+    // Track save/unsave action
+    trackEvent(wasSaved ? 'feed_experience_unsaved' : 'feed_experience_saved', {
+      experience_id: experienceId,
+      experience_name: experience?.title,
+      category: experience?.category,
+      price: experience?.price,
+    });
   };
 
   const renderItem = ({ item, index }: { item: Experience; index: number }) => {
@@ -425,6 +478,7 @@ export default function FeedScreen() {
           isGlobalMuted={isGlobalMuted}
           onReviewsPress={() => setShowReviews(true)}
           onSavePress={() => handleSave(item.id)}
+          onTrackEvent={trackEvent}
         />
       </View>
     );
@@ -655,9 +709,10 @@ interface ExperienceCardProps {
   isGlobalMuted: boolean;
   onReviewsPress: () => void;
   onSavePress: () => void;
+  onTrackEvent: (eventName: string, properties?: Record<string, any>) => void;
 }
 
-function ExperienceCard({ experience, isActive, isSaved, isTabFocused, isGlobalMuted, onReviewsPress, onSavePress }: ExperienceCardProps) {
+function ExperienceCard({ experience, isActive, isSaved, isTabFocused, isGlobalMuted, onReviewsPress, onSavePress, onTrackEvent }: ExperienceCardProps) {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
@@ -685,11 +740,28 @@ Book this amazing experience on BoredTourist!`;
       if (result.action === Share.sharedAction) {
         if (result.activityType) {
           console.log('Shared via:', result.activityType);
+          onTrackEvent('feed_experience_shared', {
+            experience_id: experience.id,
+            experience_name: experience.title,
+            share_method: result.activityType,
+            category: experience.category,
+            price: experience.price,
+          });
         } else {
           console.log('Content shared successfully');
+          onTrackEvent('feed_experience_shared', {
+            experience_id: experience.id,
+            experience_name: experience.title,
+            share_method: 'unknown',
+            category: experience.category,
+            price: experience.price,
+          });
         }
       } else if (result.action === Share.dismissedAction) {
         console.log('Share dismissed');
+        onTrackEvent('feed_share_dismissed', {
+          experience_id: experience.id,
+        });
       }
     } catch (error: any) {
       console.error('Error sharing:', error.message);
@@ -712,7 +784,19 @@ Book this amazing experience on BoredTourist!`;
       {/* Main card container with video */}
       <Pressable 
         style={[styles.mainCard, { marginTop: 0, marginBottom: 0 }]}
-        onPress={() => router.push(`/experience/${experience.id}`)}
+        onPress={() => {
+          // Track when user taps to view experience details
+          onTrackEvent('feed_experience_tapped', {
+            experience_id: experience.id,
+            experience_name: experience.title,
+            category: experience.category,
+            price: experience.price,
+            provider: experience.provider,
+            rating: experience.rating,
+            source: 'feed_video_tap',
+          });
+          router.push(`/experience/${experience.id}`);
+        }}
       >
         {/* Video/Image content */}
         <View style={styles.videoWrapper}>

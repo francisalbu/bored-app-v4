@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { useFonts, Inter_300Light, Inter_400Regular, Inter_600SemiBold, Inter_800ExtraBold, Inter_900Black } from '@expo-google-fonts/inter';
+import { PostHogProvider } from 'posthog-react-native';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { BookingsProvider } from '@/contexts/BookingsContext';
@@ -18,6 +19,10 @@ import AnimatedSplash from '@/components/AnimatedSplash';
 // Stripe publishable key - LIVE MODE 💰
 // ⚠️ IMPORTANT: This is a LIVE key - real money will be charged!
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51Qe0O1JwIDoL5bobJjmXtc84YbeYprPx35DcRALLIlqumUqrUxGY86bsxdq8xTEf7hgzjVRDAOAnlHFQkC1YW2Sx00JRhjovcc';
+
+// PostHog configuration
+const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY || '';
+const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -199,27 +204,29 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <StripeProvider
-          publishableKey={STRIPE_PUBLISHABLE_KEY}
-          urlScheme="boredtourist"
-          merchantIdentifier="merchant.app.rork.bored-explorer"
-        >
-          <AuthProvider>
-            <BookingsProvider>
-              <FavoritesProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <RootLayoutNav />
-                  {showSplash && (
-                    <AnimatedSplash onFinish={() => setShowSplash(false)} />
-                  )}
-                </GestureHandlerRootView>
-              </FavoritesProvider>
-            </BookingsProvider>
-          </AuthProvider>
-        </StripeProvider>
-      </LanguageProvider>
-    </QueryClientProvider>
+    <PostHogProvider apiKey={POSTHOG_API_KEY} options={{ host: POSTHOG_HOST }}>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <StripeProvider
+            publishableKey={STRIPE_PUBLISHABLE_KEY}
+            urlScheme="boredtourist"
+            merchantIdentifier="merchant.app.rork.bored-explorer"
+          >
+            <AuthProvider>
+              <BookingsProvider>
+                <FavoritesProvider>
+                  <GestureHandlerRootView style={{ flex: 1 }}>
+                    <RootLayoutNav />
+                    {showSplash && (
+                      <AnimatedSplash onFinish={() => setShowSplash(false)} />
+                    )}
+                  </GestureHandlerRootView>
+                </FavoritesProvider>
+              </BookingsProvider>
+            </AuthProvider>
+          </StripeProvider>
+        </LanguageProvider>
+      </QueryClientProvider>
+    </PostHogProvider>
   );
 }
