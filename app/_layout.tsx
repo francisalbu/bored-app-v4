@@ -24,6 +24,26 @@ const STRIPE_PUBLISHABLE_KEY = 'pk_live_51Qe0O1JwIDoL5bobJjmXtc84YbeYprPx35DcRAL
 const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY || '';
 const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
 
+// PostHog options with Session Replay
+const POSTHOG_OPTIONS = {
+  host: POSTHOG_HOST,
+  // Enable Session Replay to record user sessions
+  enableSessionReplay: true,
+  sessionReplayConfig: {
+    // Mask text inputs for privacy (passwords always masked)
+    maskAllTextInputs: true,
+    // Mask images for privacy
+    maskAllImages: false, // Set to false to see experience images in replays
+    // Capture logs automatically (Android only - Native Logcat)
+    captureLog: true,
+    // Capture network telemetry (iOS only - metrics like speed, size, response code)
+    captureNetworkTelemetry: true,
+    // Throttling delay to reduce snapshots and performance impact
+    // Lower = more snapshots but higher performance impact
+    throttleDelayMs: 1000, // 1 second between snapshots
+  },
+};
+
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
@@ -204,7 +224,7 @@ export default function RootLayout() {
   }
 
   return (
-    <PostHogProvider apiKey={POSTHOG_API_KEY} options={{ host: POSTHOG_HOST }}>
+    <PostHogProvider apiKey={POSTHOG_API_KEY} options={POSTHOG_OPTIONS}>
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
           <StripeProvider

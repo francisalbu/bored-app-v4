@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { useExperience } from '@/hooks/useApi';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 // Check if running in Expo Go (Stripe doesn't work in Expo Go)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -72,6 +73,7 @@ const COUNTRIES = [
 
 export default function PaymentScreen() {
   const { t } = useLanguage();
+  const { trackEvent, trackScreen } = useAnalytics();
   const { experienceId, slotId, date, time, adults, price } = useLocalSearchParams<{
     experienceId: string;
     slotId: string;
@@ -238,6 +240,19 @@ export default function PaymentScreen() {
   const pricePerGuest = parseFloat(price || '0');
   const totalPrice = pricePerGuest * adultsCount;
   
+  // Track screen view when payment page loads
+  useEffect(() => {
+    if (experience) {
+      trackScreen('Payment', {
+        experience_id: experienceId,
+        experience_name: experience.title,
+        category: experience.category,
+        num_adults: adultsCount,
+        total_price: totalPrice,
+      });
+    }
+  }, [experience, experienceId, adultsCount, totalPrice, trackScreen]);
+  
   // Check if form is valid - ALWAYS validate all fields (even for authenticated users)
   const isFormValid = 
     guestName.trim().length > 0 &&
@@ -330,6 +345,21 @@ export default function PaymentScreen() {
     }
   };
 
+  // Handle back navigation with tracking
+  const handleBackPress = () => {
+    trackEvent('payment_abandoned', {
+      experience_id: experienceId,
+      experience_name: experience?.title,
+      category: experience?.category,
+      num_adults: adultsCount,
+      total_price: totalPrice,
+      had_filled_form: isFormValid,
+      abandoned_at: 'payment_page',
+    });
+    
+    router.back();
+  };
+
   // Show early access confirmation modal before payment
   const handlePayButtonPress = () => {
     if (isProcessing || isProcessingRef.current) return;
@@ -350,6 +380,15 @@ export default function PaymentScreen() {
       console.log('⚠️ [PAYMENT] Already processing, ignoring...');
       return;
     }
+    
+    // Track that user proceeded from Early Access modal
+    trackEvent('early_access_modal_proceeded', {
+      experience_id: experienceId,
+      experience_name: experience?.title,
+      category: experience?.category,
+      num_adults: adultsCount,
+      total_price: totalPrice,
+    });
     
     // Close the modal first
     setShowEarlyAccessModal(false);
@@ -544,6 +583,16 @@ export default function PaymentScreen() {
       if (presentError) {
         console.log('❌ [PAYMENT] presentPaymentSheet error:', presentError);
         
+        trackEvent('booking_failed', {
+          experience_id: experienceId,
+          experience_name: experience?.title,
+          error_code: presentError.code,
+          error_message: presentError.message,
+          was_cancelled: presentError.code === 'Canceled',
+          num_adults: adultsCount,
+          total_price: totalPrice,
+        });
+        
         if (presentError.code !== 'Canceled') {
           Alert.alert('Payment Failed', presentError.message);
         } else {
@@ -587,6 +636,21 @@ export default function PaymentScreen() {
 
       // Payment and booking complete - stop processing and show success UI
       console.log('🎉 [PAYMENT] Setting payment complete state...');
+      
+      trackEvent('booking_completed', {
+        experience_id: experienceId,
+        experience_name: experience?.title,
+        category: experience?.category,
+        booking_id: newBookingId,
+        selected_date: date,
+        selected_time: time,
+        num_adults: adultsCount,
+        price_per_person: pricePerGuest,
+        total_price: totalPrice,
+        customer_email: customerEmail,
+        is_guest: isGuest,
+      });
+      
       isProcessingRef.current = false;
       setIsProcessing(false);
       setPaymentComplete(true);
@@ -650,7 +714,7 @@ export default function PaymentScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={handleBackPress} style={styles.backButton}>
           <ArrowLeft size={24} color={colors.dark.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Confirm and pay</Text>
@@ -894,7 +958,16 @@ export default function PaymentScreen() {
             <View style={styles.earlyAccessButtons}>
               <Pressable 
                 style={styles.earlyAccessBackButton}
-                onPress={() => setShowEarlyAccessModal(false)}
+                onPress={() => {
+                  trackEvent('early_access_modal_back', {
+                    experience_id: experienceId,
+                    experience_name: experience?.title,
+                    category: experience?.category,
+                    num_adults: adultsCount,
+                    total_price: totalPrice,
+                  });
+                  setShowEarlyAccessModal(false);
+                }}
               >
                 <Text style={styles.earlyAccessBackButtonText}>Back</Text>
               </Pressable>

@@ -18,6 +18,7 @@ import { Image } from 'expo-image';
 import colors from '@/constants/colors';
 import { api } from '@/services/api';
 import { useExperience } from '@/hooks/useApi';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -53,6 +54,7 @@ const formatTimeRange = (startTime: string, endTime: string): string => {
 export default function BookingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const { trackEvent, trackScreen } = useAnalytics();
   const [adults, setAdults] = useState(1);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -66,8 +68,29 @@ export default function BookingScreen() {
   // Always fetch from API
   const { experience, loading: isLoadingExperience, error } = useExperience(id || '');
 
+  // Track screen view when booking page loads
+  useEffect(() => {
+    if (experience) {
+      trackScreen('Booking', {
+        experience_id: experience.id,
+        experience_name: experience.title,
+        category: experience.category,
+        price: experience.price,
+      });
+    }
+  }, [experience, trackScreen]);
+
   // Handle back navigation safely
   const handleBack = () => {
+    if (experience) {
+      trackEvent('booking_abandoned', {
+        experience_id: experience.id,
+        experience_name: experience.title,
+        had_selected_slot: selectedSlot !== null,
+        num_adults: adults,
+      });
+    }
+    
     if (router.canGoBack()) {
       router.back();
     } else {
@@ -240,6 +263,15 @@ export default function BookingScreen() {
       return;
     }
     setSelectedSlot({ schedule, slot });
+    
+    trackEvent('booking_time_selected', {
+      experience_id: experience.id,
+      experience_name: experience.title,
+      selected_date: schedule.date.toISOString(),
+      selected_time: slot.time,
+      num_adults: adults,
+      total_price: slot.price * adults,
+    });
   };
 
   const handleBook = () => {
@@ -255,6 +287,17 @@ export default function BookingScreen() {
         );
         return;
       }
+
+      trackEvent('booking_payment_initiated', {
+        experience_id: experience.id,
+        experience_name: experience.title,
+        category: experience.category,
+        selected_date: selectedSlot.schedule.date.toISOString(),
+        selected_time: selectedSlot.slot.time,
+        num_adults: adults,
+        price_per_person: selectedSlot.slot.price,
+        total_price: selectedSlot.slot.price * adults,
+      });
 
       router.push({
         pathname: '/booking/payment' as any,

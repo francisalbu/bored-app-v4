@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import AIChatModal from '@/components/AIChatModal';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 export default function ExperienceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,6 +40,7 @@ export default function ExperienceDetailScreen() {
   
   const { toggleSave, isSaved } = useFavorites();
   const { isAuthenticated } = useAuth();
+  const { trackEvent, trackScreen } = useAnalytics();
 
   // Fetch experience from API
   React.useEffect(() => {
@@ -107,6 +109,19 @@ export default function ExperienceDetailScreen() {
     }
   }, [id]);
 
+  // Track screen view when experience loads
+  useEffect(() => {
+    if (experience) {
+      trackScreen('Experience Details', {
+        experience_id: experience.id,
+        experience_name: experience.title,
+        category: experience.category,
+        price: experience.price,
+        provider: experience.provider,
+      });
+    }
+  }, [experience, trackScreen]);
+
   // Fetch reviews when experience is loaded
   React.useEffect(() => {
     const fetchReviews = async () => {
@@ -165,7 +180,19 @@ export default function ExperienceDetailScreen() {
       setShowAuthModal(true);
       return;
     }
+    
+    const willBeSaved = !isSaved(experience.id);
     await toggleSave(experience.id);
+    
+    trackEvent(willBeSaved ? 'detail_experience_saved' : 'detail_experience_unsaved', {
+      experience_id: experience.id,
+      experience_name: experience.title,
+      category: experience.category,
+      price: experience.price,
+      provider: experience.provider,
+      rating: experience.rating,
+      source: 'experience_details',
+    });
   };
 
   const handleShare = async () => {
@@ -186,6 +213,15 @@ Book this amazing experience on BoredTourist!`;
         message: shareMessage,
         title: experience.title,
       });
+      
+      trackEvent('detail_experience_shared', {
+        experience_id: experience.id,
+        experience_name: experience.title,
+        category: experience.category,
+        price: experience.price,
+        provider: experience.provider,
+        source: 'experience_details',
+      });
     } catch (error: any) {
       console.error('Error sharing:', error.message);
     }
@@ -194,6 +230,15 @@ Book this amazing experience on BoredTourist!`;
   const handleAIChat = () => {
     console.log('🤖 AI Chat button pressed! Experience:', experience?.title);
     setShowAIChat(true);
+    
+    if (experience) {
+      trackEvent('ai_chat_opened', {
+        experience_id: experience.id,
+        experience_name: experience.title,
+        category: experience.category,
+        source: 'experience_details',
+      });
+    }
   };
 
   const handleOpenMap = async () => {
@@ -503,7 +548,20 @@ Book this amazing experience on BoredTourist!`;
               onPress={() => {
                 console.log('🔍 Experience ID:', experience.id, 'Type:', typeof experience.id);
                 
-                if (['12', '19', '33', '38', '40'].includes(experience.id)) {
+                const isInterestPage = ['12', '19', '33', '38', '40'].includes(experience.id);
+                
+                trackEvent('booking_started', {
+                  experience_id: experience.id,
+                  experience_name: experience.title,
+                  category: experience.category,
+                  price: experience.price,
+                  provider: experience.provider,
+                  rating: experience.rating,
+                  source: 'experience_details',
+                  button_type: isInterestPage ? 'interest' : 'book',
+                });
+                
+                if (isInterestPage) {
                   console.log('✅ Navigating to interest page');
                   router.push(`/experience/interest/${experience.id}`);
                 } else {
