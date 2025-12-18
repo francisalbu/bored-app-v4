@@ -37,9 +37,17 @@ const PRICE_RANGES = [
   { id: 'luxury', label: '€100+', min: 100, max: 9999 },
 ];
 
+// Availability options
+const AVAILABILITY_OPTIONS = [
+  { id: 'today', label: 'Today' },
+  { id: 'tomorrow', label: 'Tomorrow' },
+  { id: 'this-week', label: 'This Week' },
+];
+
 export interface FilterOptions {
   categories: string[];
   priceRange: string | null;
+  availability: string | null;
 }
 
 interface FiltersModalProps {
@@ -55,6 +63,7 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
   const insets = useSafeAreaInsets();
   const [selectedCategories, setSelectedCategories] = useState<string[]>(currentFilters.categories);
   const [selectedPriceRange, setSelectedPriceRange] = useState<string | null>(currentFilters.priceRange);
+  const [selectedAvailability, setSelectedAvailability] = useState<string | null>(currentFilters.availability);
   
   const slideAnim = useRef(new Animated.Value(PANEL_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -85,6 +94,7 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
     if (visible) {
       setSelectedCategories(currentFilters.categories);
       setSelectedPriceRange(currentFilters.priceRange);
+      setSelectedAvailability(currentFilters.availability);
       // Animate in
       Animated.parallel([
         Animated.timing(slideAnim, {
@@ -134,10 +144,12 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
     console.log('🎯 Applying filters:', {
       categories: selectedCategories,
       priceRange: selectedPriceRange,
+      availability: selectedAvailability,
     });
     onApply({
       categories: selectedCategories,
       priceRange: selectedPriceRange,
+      availability: selectedAvailability,
     });
     handleClose();
   };
@@ -145,9 +157,10 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
   const handleReset = () => {
     setSelectedCategories([]);
     setSelectedPriceRange(null);
+    setSelectedAvailability(null);
   };
 
-  const hasFilters = selectedCategories.length > 0 || selectedPriceRange !== null;
+  const hasFilters = selectedCategories.length > 0 || selectedPriceRange !== null || selectedAvailability !== null;
 
   if (!visible) return null;
 
@@ -185,6 +198,35 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Availability Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Availability</Text>
+              {AVAILABILITY_OPTIONS.map((option) => {
+                const isSelected = selectedAvailability === option.id;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={styles.menuItem}
+                    onPress={() => {
+                      console.log('Availability pressed:', option.id);
+                      setSelectedAvailability(isSelected ? null : option.id);
+                    }}
+                    activeOpacity={0.6}
+                  >
+                    <Text style={styles.menuItemLabel}>{option.label}</Text>
+                    {isSelected && (
+                      <View style={styles.checkmark}>
+                        <Check size={18} color="#1C1C1E" strokeWidth={3} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Divider */}
+            <View style={styles.divider} />
+
             {/* Categories Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Categories</Text>
@@ -246,7 +288,7 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
             {/* Divider */}
             <View style={styles.divider} />
 
-            {/* Actions */}
+            {/* Reset Action */}
             <View style={styles.section}>
               <TouchableOpacity 
                 style={styles.menuItem} 
@@ -258,12 +300,15 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
                   Reset Filters
                 </Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.applyButton} onPress={handleApply} activeOpacity={0.8}>
-                <Text style={styles.applyButtonText}>Apply</Text>
-              </TouchableOpacity>
             </View>
           </ScrollView>
+
+          {/* Apply Button - Fixed at bottom */}
+          <View style={styles.applyButtonContainer}>
+            <TouchableOpacity style={styles.applyButton} onPress={handleApply} activeOpacity={0.8}>
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -361,12 +406,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     marginVertical: 8,
   },
+  applyButtonContainer: {
+    padding: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+    backgroundColor: '#FFFFFF',
+  },
   applyButton: {
     backgroundColor: colors.dark.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 20,
   },
   applyButtonText: {
     fontSize: 17,

@@ -135,7 +135,7 @@ function generateBookingConfirmationHTML(booking) {
                       </tr>
                       <tr>
                         <td width="50%" style="padding: 12px 0;">
-                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Guests</p>
+                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">People</p>
                           <p style="color: #FFFFFF; font-size: 15px; margin: 0; font-weight: 600;">👥 ${booking.participants} ${booking.participants === 1 ? 'person' : 'people'}</p>
                         </td>
                         <td width="50%" style="padding: 12px 0;">
@@ -166,13 +166,13 @@ function generateBookingConfirmationHTML(booking) {
             </td>
           </tr>
           
-          <!-- Guest Information -->
+          <!-- Contact Information -->
           <tr>
             <td style="padding-top: 24px;">
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #333333;">
                 <tr>
                   <td style="padding: 24px;">
-                    <h3 style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">👤 Guest Information</h3>
+                    <h3 style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">👤 Contact Information</h3>
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="padding: 6px 0;">

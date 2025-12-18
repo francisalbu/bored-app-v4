@@ -698,8 +698,8 @@ export default function PaymentScreen() {
             <Text style={styles.summaryValue}>{time}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Guests</Text>
-            <Text style={styles.summaryValue}>{adultsCount} adult{adultsCount > 1 ? 's' : ''}</Text>
+            <Text style={styles.summaryLabel}>People</Text>
+            <Text style={styles.summaryValue}>{adultsCount} {adultsCount > 1 ? 'people' : 'person'}</Text>
           </View>
         </View>
 
@@ -708,7 +708,7 @@ export default function PaymentScreen() {
           <Text style={styles.sectionTitle}>Price details</Text>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>
-              €{pricePerGuest} x {adultsCount} adult{adultsCount > 1 ? 's' : ''}
+              €{pricePerGuest} x {adultsCount} {adultsCount > 1 ? 'people' : 'person'}
             </Text>
             <Text style={styles.priceValue}>€{totalPrice.toFixed(2)}</Text>
           </View>

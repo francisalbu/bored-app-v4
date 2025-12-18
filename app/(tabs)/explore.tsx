@@ -1,4 +1,5 @@
-import { Search } from 'lucide-react-native';
+import { Search, SlidersHorizontal } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   Pressable,
@@ -8,6 +9,7 @@ import {
   TextInput,
   View,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -17,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import colors from '@/constants/colors';
 import { CATEGORIES, type Experience } from '@/constants/experiences';
 import { useExperiences } from '@/hooks/useExperiences';
+import LocationSelectorModal from '@/components/LocationSelectorModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
@@ -28,6 +31,9 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'none' | 'price-low' | 'price-high'>('none');
+  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
+  const [selectedLocation, setSelectedLocation] = useState<string>('Lisbon');
   
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading, error } = useExperiences();
@@ -65,6 +71,16 @@ export default function ExploreScreen() {
     return matchesSearch && (matchesCategory || matchesTag);
   });
 
+  // Sort experiences by price
+  const sortedExperiences = [...filteredExperiences].sort((a, b) => {
+    if (sortBy === 'price-low') {
+      return (a.price || 0) - (b.price || 0);
+    } else if (sortBy === 'price-high') {
+      return (b.price || 0) - (a.price || 0);
+    }
+    return 0; // no sorting
+  });
+
   const trendingExperiences = EXPERIENCES.filter(exp => exp.rating >= 4.8);
 
   // Filter categories to only show those with at least 1 experience
@@ -91,7 +107,22 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.searchContainer, { paddingTop: insets.top + 16 }]}>
+      {/* Location Header */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 16 }]}>
+        <TouchableOpacity 
+          style={styles.headerLocation}
+          onPress={() => setShowLocationModal(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.headerLocationLabel}>Experiences in</Text>
+          <View style={styles.headerLocationSelector}>
+            <Text style={styles.headerLocationText}>{selectedLocation}</Text>
+            <Ionicons name="chevron-down" size={16} color="#fff" />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.searchContainer, { paddingTop: 12 }]}>
         <View style={styles.searchBar}>
           <Search size={20} color={colors.dark.textTertiary} />
           <TextInput
@@ -162,16 +193,50 @@ export default function ExploreScreen() {
         )}
 
         {/* All Experiences Grid */}
-        <Text style={styles.sectionTitle}>
-          {selectedCategory === 'all' ? 'ALL EXPERIENCES' : CATEGORIES.find(c => c.id === selectedCategory)?.name.toUpperCase()}
-        </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {selectedCategory === 'all' ? 'ALL EXPERIENCES' : CATEGORIES.find(c => c.id === selectedCategory)?.name.toUpperCase()}
+          </Text>
+          
+          {/* Price Sort Pills */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sortContainer}
+          >
+            <Pressable
+              style={[styles.sortPill, sortBy === 'price-low' && styles.sortPillActive]}
+              onPress={() => setSortBy(sortBy === 'price-low' ? 'none' : 'price-low')}
+            >
+              <Text style={[styles.sortText, sortBy === 'price-low' && styles.sortTextActive]}>
+                Price: Low to High
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.sortPill, sortBy === 'price-high' && styles.sortPillActive]}
+              onPress={() => setSortBy(sortBy === 'price-high' ? 'none' : 'price-high')}
+            >
+              <Text style={[styles.sortText, sortBy === 'price-high' && styles.sortTextActive]}>
+                Price: High to Low
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+        
         <View style={styles.grid}>
-          {filteredExperiences.map((experience) => (
+          {sortedExperiences.map((experience) => (
             <ExperienceCard key={experience.id} experience={experience} />
           ))}
         </View>
       </ScrollView>
       )}
+
+      <LocationSelectorModal
+        visible={showLocationModal}
+        selectedLocation={selectedLocation}
+        onClose={() => setShowLocationModal(false)}
+        onSelectLocation={setSelectedLocation}
+      />
     </View>
   );
 }
@@ -255,6 +320,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.dark.background,
   },
+  headerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  headerLocation: {
+    flexDirection: 'column' as const,
+    gap: 2,
+  },
+  headerLocationLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    fontWeight: '500' as const,
+    letterSpacing: 0.5,
+  },
+  headerLocationSelector: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+  },
+  headerLocationText: {
+    color: colors.dark.text,
+    fontSize: 20,
+    fontWeight: '700' as const,
+    letterSpacing: 0.3,
+  },
   searchContainer: {
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -274,15 +364,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.dark.text,
   },
+  sortContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    gap: 8,
+  },
+  sortPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.dark.backgroundTertiary,
+    marginRight: 8,
+  },
+  sortPillActive: {
+    backgroundColor: colors.dark.primary,
+  },
+  sortText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: colors.dark.textSecondary,
+  },
+  sortTextActive: {
+    color: colors.dark.background,
+  },
   content: {
     flex: 1,
+  },
+  sectionHeader: {
+    marginTop: 16,
+    marginBottom: 4,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '900' as const,
     color: colors.dark.text,
-    marginTop: 20,
-    marginBottom: 14,
+    marginTop: 24,
+    marginBottom: 12,
     paddingHorizontal: 16,
     letterSpacing: 1,
   },
@@ -290,6 +407,7 @@ const styles = StyleSheet.create({
   categoriesContainer: {
     paddingHorizontal: 16,
     gap: 10,
+    marginBottom: 4,
   },
   categoryPill: {
     flexDirection: 'row',
@@ -321,6 +439,7 @@ const styles = StyleSheet.create({
   trendingContainer: {
     paddingHorizontal: 16,
     gap: 14,
+    marginBottom: 8,
   },
   trendingCard: {
     width: TRENDING_CARD_WIDTH,
@@ -368,6 +487,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     gap: 14,
+    marginTop: 8,
   },
   card: {
     width: CARD_WIDTH,

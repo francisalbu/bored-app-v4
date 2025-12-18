@@ -45,11 +45,11 @@ class ApiService {
       console.log('⚠️ No auth token set!');
     }
 
-    const maxRetries = 2;
-    const timeoutMs = 90000; // 90 seconds for Render cold starts
+    const maxRetries = 3;
+    const timeoutMs = 120000; // 120 seconds for Render cold starts
 
     try {
-      console.log(`API Request (attempt ${retryCount + 1}/${maxRetries + 1}):`, `${this.baseURL}${endpoint}`, options.method || 'GET');
+      console.log(`🌐 API Request (attempt ${retryCount + 1}/${maxRetries + 1}):`, `${this.baseURL}${endpoint}`, options.method || 'GET');
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -81,22 +81,22 @@ class ApiService {
       
       // Retry logic for timeouts (Render cold start)
       if (error instanceof Error && error.name === 'AbortError' && retryCount < maxRetries) {
-        console.log(`⏳ Request timed out, retrying (${retryCount + 1}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        console.log(`⏳ Request timed out, retrying (${retryCount + 1}/${maxRetries})... Server may be waking up.`);
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
         return this.request<T>(endpoint, options, retryCount + 1);
       }
       
       if (error instanceof Error && error.name === 'AbortError') {
         return {
           success: false,
-          error: 'Server is taking too long to respond. The server might be starting up (cold start). Please try again in a minute.',
+          error: 'The server is taking too long to respond. It may be starting up (this can take 1-2 minutes on first request). Please wait a moment and pull down to refresh.',
         };
       }
       
       // Retry for network errors
       if (error instanceof Error && error.message.includes('Network request failed') && retryCount < maxRetries) {
         console.log(`🔄 Network error, retrying (${retryCount + 1}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
         return this.request<T>(endpoint, options, retryCount + 1);
       }
       
@@ -166,6 +166,10 @@ class ApiService {
 
   async getExperience(id: string) {
     return this.request(`/experiences/${id}`);
+  }
+
+  async getExperienceAvailability(id: string, date: string) {
+    return this.request(`/experiences/${id}/availability?date=${date}`);
   }
 
   async getTrendingExperiences() {

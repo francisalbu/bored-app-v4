@@ -2,7 +2,8 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Search, SlidersHorizontal, Share as ShareIcon } from 'lucide-react-native';
+import { Star, MapPin, Clock, Bookmark, Share2, MessageCircle, MessageSquare, Search, SlidersHorizontal, Share as ShareIcon, Volume2, VolumeX } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
@@ -36,11 +37,14 @@ import { useExperiences } from '@/hooks/useExperiences';
 import apiService from '@/services/api';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { FiltersModal, FilterOptions, PRICE_RANGES } from '@/components/FiltersModal';
+import LocationSelectorModal from '@/components/LocationSelectorModal';
+import FeedTutorialOverlay from '@/components/FeedTutorialOverlay';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OnboardingScreen from '@/components/OnboardingScreen';
 import ImportTutorialModal from '@/components/ImportTutorialModal';
 
 const ONBOARDING_SHOWN_KEY = '@bored_tourist_onboarding_shown';
+const FEED_TUTORIAL_SHOWN_KEY = '@bored_tourist_feed_tutorial_shown';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -70,12 +74,18 @@ export default function FeedScreen() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [showImportTutorial, setShowImportTutorial] = useState<boolean>(false);
-  const [filters, setFiltersState] = useState<FilterOptions>({ categories: [], priceRange: null });
+  const [showFeedTutorial, setShowFeedTutorial] = useState<boolean>(false);
+  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
+  const [selectedLocation, setSelectedLocation] = useState<string>('Lisbon');
+  const [filters, setFiltersState] = useState<FilterOptions>({ categories: [], priceRange: null, availability: null });
   const [selectedFilter, setSelectedFilter] = useState<'nearMe' | 'availableToday'>('nearMe');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [showNoActivitiesMessage, setShowNoActivitiesMessage] = useState<boolean>(false);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [isGlobalMuted, setIsGlobalMuted] = useState<boolean>(true);
+  const [availableExperienceIds, setAvailableExperienceIds] = useState<Set<string>>(new Set());
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Wrapper for setFilters with logging
@@ -110,9 +120,44 @@ export default function FeedScreen() {
     try {
       await AsyncStorage.setItem(ONBOARDING_SHOWN_KEY, 'true');
       setShowOnboarding(false);
+      
+      // Check if user has seen feed tutorial
+      const hasSeenFeedTutorial = await AsyncStorage.getItem(FEED_TUTORIAL_SHOWN_KEY);
+      if (!hasSeenFeedTutorial) {
+        // Show feed tutorial after a short delay
+        setTimeout(() => {
+          setShowFeedTutorial(true);
+        }, 500);
+      }
     } catch (error) {
       console.error('Error saving onboarding status:', error);
       setShowOnboarding(false);
+    }
+  };
+
+  // Complete feed tutorial
+  const handleFeedTutorialComplete = async () => {
+    try {
+      await AsyncStorage.setItem(FEED_TUTORIAL_SHOWN_KEY, 'true');
+      setShowFeedTutorial(false);
+    } catch (error) {
+      console.error('Error saving feed tutorial status:', error);
+      setShowFeedTutorial(false);
+    }
+  };
+
+  // DEV ONLY: Reset tutorial (remove this in production)
+  const handleResetTutorial = async () => {
+    try {
+      await AsyncStorage.removeItem(FEED_TUTORIAL_SHOWN_KEY);
+      await AsyncStorage.removeItem(ONBOARDING_SHOWN_KEY);
+      Alert.alert(
+        'Tutorials Reset',
+        'Onboarding and feed tutorial have been reset. Close and reopen the app to see them again.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error resetting tutorials:', error);
     }
   };
 
@@ -141,6 +186,123 @@ export default function FeedScreen() {
       }
     })();
   }, []);
+
+  // Check real availability from API when availability filter changes
+  useEffect(() => {
+    if (!filters.availability) {
+      setAvailableExperienceIds(new Set());
+      return;
+    }
+
+    const checkRealAvailability = async () => {
+      setIsCheckingAvailability(true);
+      const now = new Date();
+      const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      
+      let targetDate = new Date();
+      let endDate = new Date();
+      
+      // Set date range based on filter
+      if (filters.availability === 'today') {
+        targetDate = now;
+        endDate = new Date(now);
+        endDate.setHours(23, 59, 59, 999);
+      } else if (filters.availability === 'tomorrow') {
+        targetDate = new Date(now);
+        targetDate.setDate(targetDate.getDate() + 1);
+        endDate = new Date(targetDate);
+        endDate.setHours(23, 59, 59, 999);
+      } else if (filters.availability === 'this-week') {
+        targetDate = now;
+        endDate = new Date(now);
+        const dayOfWeek = endDate.getDay();
+        const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        endDate.setDate(endDate.getDate() + daysUntilSunday);
+        endDate.setHours(23, 59, 59, 999);
+      }
+
+      console.log('🔍 Checking real availability for:', filters.availability);
+      console.log('📅 Date range:', targetDate.toISOString(), 'to', endDate.toISOString());
+      
+      const availableIds = new Set<string>();
+      
+      // Check each experience
+      const checkPromises = EXPERIENCES.map(async (exp) => {
+        try {
+          const dateStr = targetDate.toISOString().split('T')[0];
+          const response = await apiService.getExperienceAvailability(exp.id, dateStr);
+          
+          if (response.success && response.data) {
+            const slots = response.data as any[];
+            
+            // Check if there are available slots in the time range
+            const hasAvailableSlots = slots.some(slot => {
+              const slotDateTime = new Date(`${slot.date}T${slot.start_time}`);
+              const spotsAvailable = (slot.spots_available || 0) > 0;
+              
+              // For "today", must be at least 2 hours from now
+              if (filters.availability === 'today') {
+                return spotsAvailable && 
+                       slotDateTime >= twoHoursFromNow && 
+                       slotDateTime <= endDate;
+              }
+              
+              // For tomorrow and this week
+              return spotsAvailable && 
+                     slotDateTime >= targetDate && 
+                     slotDateTime <= endDate;
+            });
+            
+            if (hasAvailableSlots) {
+              availableIds.add(exp.id);
+              console.log('✅', exp.title, '- HAS AVAILABLE SLOTS');
+            } else {
+              console.log('❌', exp.title, '- NO AVAILABLE SLOTS');
+            }
+          }
+        } catch (error) {
+          console.error(`Error checking availability for ${exp.title}:`, error);
+        }
+      });
+      
+      await Promise.all(checkPromises);
+      
+      console.log('📊 Total experiences with real availability:', availableIds.size);
+      setAvailableExperienceIds(availableIds);
+      setIsCheckingAvailability(false);
+    };
+
+    checkRealAvailability();
+  }, [filters.availability, EXPERIENCES]);
+
+  // Helper function to check if experience is available based on filter
+  const isAvailableForFilter = (experience: Experience, availabilityFilter: string): boolean => {
+    // If we're checking availability with real API data, use that
+    if (availabilityFilter && availableExperienceIds.size > 0) {
+      const isAvailable = availableExperienceIds.has(experience.id);
+      console.log(`🎯 Real availability check for ${experience.title}:`, isAvailable);
+      return isAvailable;
+    }
+    
+    // Fallback to basic time-based logic if API hasn't loaded yet
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeInHours = currentHour + (currentMinute / 60);
+    const minimumStartTime = currentTimeInHours + 2;
+    
+    if (availabilityFilter === 'today') {
+      const isAvailableToday = experience.availableToday || experience.instantBooking;
+      const hasTimeBuffer = minimumStartTime < 24;
+      return isAvailableToday && hasTimeBuffer;
+    } else if (availabilityFilter === 'tomorrow') {
+      return experience.instantBooking || experience.availableToday;
+    } else if (availabilityFilter === 'this-week') {
+      return true;
+    }
+    
+    return true;
+  };
 
   // Filter experiences based on selected filter AND user filters
   // Using the same logic as explore.tsx for category matching
@@ -185,6 +347,13 @@ export default function FeedScreen() {
           return price >= selectedRange.min && price <= selectedRange.max;
         });
       }
+    }
+
+    // Apply availability filter (TODAY, TOMORROW, THIS WEEK)
+    if (filters.availability) {
+      console.log('🗓️ Applying availability filter:', filters.availability);
+      result = result.filter(exp => isAvailableForFilter(exp, filters.availability!));
+      console.log('📊 Experiences after availability filter:', result.length);
     }
 
     // Now apply location/availability filter
@@ -262,6 +431,7 @@ export default function FeedScreen() {
           isActive={index === currentIndex && !showNoActivitiesMessage}
           isSaved={isSaved(item.id)}
           isTabFocused={isTabFocused && !showNoActivitiesMessage}
+          isGlobalMuted={isGlobalMuted}
           onReviewsPress={() => setShowReviews(true)}
           onSavePress={() => handleSave(item.id)}
         />
@@ -271,11 +441,23 @@ export default function FeedScreen() {
 
   const experience = filteredExperiences[currentIndex];
 
-  // Show loading state
+  // Show loading state for experiences
   if (loadingExperiences) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Text style={styles.loadingText}>{t('feed.loading')}</Text>
+      </View>
+    );
+  }
+
+  // Show loading state when checking real availability
+  if (isCheckingAvailability && filters.availability) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.loadingText}>Checking availability...</Text>
+        <Text style={[styles.loadingText, { fontSize: 14, marginTop: 8, opacity: 0.7 }]}>
+          Finding experiences with real-time slots
+        </Text>
       </View>
     );
   }
@@ -327,6 +509,15 @@ export default function FeedScreen() {
           offset: SCREEN_HEIGHT * index,
           index,
         })}
+        ListFooterComponent={
+          <View style={styles.endOfFeedContainer}>
+            <Text style={styles.endOfFeedTitle}>That's all for now! 🔥</Text>
+            <Text style={styles.endOfFeedSubtitle}>
+              We're constantly hunting for more epic adventures to add to your feed.{'\n\n'}
+              In the meantime, dive into the amazing experiences we've curated just for you! 😎
+            </Text>
+          </View>
+        }
       />
 
       {/* New Clyx-style Header */}
@@ -335,9 +526,28 @@ export default function FeedScreen() {
         pointerEvents="box-none"
       >
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>NEAR ME</Text>
+          <TouchableOpacity 
+            style={styles.headerLocation}
+            onPress={() => setShowLocationModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.headerLocationLabel}>Experiences in</Text>
+            <View style={styles.headerLocationSelector}>
+              <Text style={styles.headerLocationText}>{selectedLocation}</Text>
+              <Ionicons name="chevron-down" size={16} color="#fff" />
+            </View>
+          </TouchableOpacity>
           
           <View style={styles.headerRight}>
+            {/* DEV ONLY: Remove this button in production */}
+            <Pressable 
+              style={[styles.importButton, { backgroundColor: 'rgba(191, 255, 0, 0.3)' }]} 
+              onPress={handleResetTutorial}
+              onLongPress={handleResetTutorial}
+            >
+              <Ionicons name="refresh" size={20} color="#BFFF00" />
+            </Pressable>
+            
             <Pressable 
               style={styles.importButton} 
               onPress={() => setShowImportTutorial(true)}
@@ -347,6 +557,16 @@ export default function FeedScreen() {
                 style={styles.importButtonIcon}
                 resizeMode="contain"
               />
+            </Pressable>
+            <Pressable 
+              style={styles.muteButton} 
+              onPress={() => setIsGlobalMuted(!isGlobalMuted)}
+            >
+              {isGlobalMuted ? (
+                <VolumeX size={20} color={colors.dark.text} />
+              ) : (
+                <Volume2 size={20} color={colors.dark.text} />
+              )}
             </Pressable>
             <Pressable style={styles.filterIconButton} onPress={() => setShowFilters(true)}>
               <SlidersHorizontal size={20} color={colors.dark.text} />
@@ -402,6 +622,13 @@ export default function FeedScreen() {
         experiences={EXPERIENCES}
       />
 
+      <LocationSelectorModal
+        visible={showLocationModal}
+        selectedLocation={selectedLocation}
+        onClose={() => setShowLocationModal(false)}
+        onSelectLocation={setSelectedLocation}
+      />
+
       <AuthBottomSheet
         visible={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -422,6 +649,12 @@ export default function FeedScreen() {
       >
         <OnboardingScreen onComplete={handleOnboardingComplete} />
       </Modal>
+
+      {/* Feed Tutorial Overlay */}
+      <FeedTutorialOverlay 
+        visible={showFeedTutorial} 
+        onSkip={handleFeedTutorialComplete}
+      />
     </View>
   );
 }
@@ -431,15 +664,17 @@ interface ExperienceCardProps {
   isActive: boolean;
   isSaved: boolean;
   isTabFocused: boolean;
+  isGlobalMuted: boolean;
   onReviewsPress: () => void;
   onSavePress: () => void;
 }
 
-function ExperienceCard({ experience, isActive, isSaved, isTabFocused, onReviewsPress, onSavePress }: ExperienceCardProps) {
+function ExperienceCard({ experience, isActive, isSaved, isTabFocused, isGlobalMuted, onReviewsPress, onSavePress }: ExperienceCardProps) {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
   const [videoReady, setVideoReady] = useState<boolean>(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState<boolean>(false);
 
   const handleShare = async () => {
     try {
@@ -509,7 +744,7 @@ Book this amazing experience on BoredTourist!`;
                 resizeMode={ResizeMode.COVER}
                 shouldPlay={isActive && videoReady && isTabFocused}
                 isLooping
-                isMuted={!isTabFocused || !isActive}
+                isMuted={isGlobalMuted}
                 useNativeControls={false}
                 onError={(error) => console.log('❌ Video Error:', error)}
                 onLoad={() => {
@@ -547,18 +782,42 @@ Book this amazing experience on BoredTourist!`;
           <View style={styles.cardContentOverlay}>
             <View style={styles.cardContentRow}>
               {/* Left side - Info */}
-              <View style={styles.cardInfoSection}>
-                {/* Title with price */}
-                <Text style={styles.clyxTitle}>
-                  {experience.title.toUpperCase()}{' '}
-                  <Text style={styles.priceInline}>{experience.price}€/person</Text>
+              <View style={[
+                styles.cardInfoSection,
+                isDescriptionExpanded && styles.cardInfoSectionExpanded
+              ]}>
+                {/* Title - max 1 line */}
+                <Text 
+                  style={styles.clyxTitle}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {experience.title.toUpperCase()}
                 </Text>
+                {/* Price - separate line below */}
+                <Text style={styles.priceInline}>{experience.price}€/person</Text>
+                
+                {/* Description - expandable (Instagram style) */}
+                {experience.description && (
+                  <Pressable onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                    <Text style={styles.descriptionText}>
+                      {isDescriptionExpanded 
+                        ? experience.description 
+                        : `${experience.description.substring(0, 60)}${experience.description.length > 60 ? '...' : ''}`}
+                      {experience.description.length > 60 && (
+                        <Text style={styles.descriptionMore}>
+                          {isDescriptionExpanded ? ' less' : ' more'}
+                        </Text>
+                      )}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
 
               {/* Right side - Actions */}
               <View style={styles.clyxSideActions}>
                 <Pressable style={styles.clyxSideActionButton} onPress={onReviewsPress}>
-                  <MessageCircle size={24} color={colors.dark.text} />
+                  <Star size={24} color={colors.dark.text} fill={colors.dark.text} />
                   <Text style={styles.clyxSideActionLabel}>{experience.rating}</Text>
                 </Pressable>
                 <Pressable style={styles.clyxSideActionButton} onPress={handleShare}>
@@ -685,6 +944,33 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  headerLocation: {
+    flexDirection: 'column' as const,
+    gap: 2,
+  },
+  headerLocationLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    fontWeight: '500' as const,
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  headerLocationSelector: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+  },
+  headerLocationText: {
+    color: colors.dark.text,
+    fontSize: 18,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
   headerRight: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -711,6 +997,14 @@ const styles = StyleSheet.create({
     height: 55,
     right: -3,
     bottom:-3
+  },
+  muteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   filterIconButton: {
     width: 40,
@@ -863,6 +1157,12 @@ const styles = StyleSheet.create({
   },
   cardInfoSection: {
     flex: 1,
+  },
+  cardInfoSectionExpanded: {
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   cardImage: {
     width: '100%',
@@ -1473,7 +1773,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: colors.dark.text,
-    marginBottom: 0,
+    marginBottom: 4,
     lineHeight: 20,
     letterSpacing: 0.2,
     textShadowColor: 'rgba(0, 0, 0, 0.7)',
@@ -1482,8 +1782,24 @@ const styles = StyleSheet.create({
   },
   priceInline: {
     color: '#BFFF00',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700' as const,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginBottom: 6,
+  },
+  descriptionText: {
+    color: colors.dark.text,
+    fontSize: 13,
+    lineHeight: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  descriptionMore: {
+    color: colors.dark.textSecondary,
+    fontWeight: '600' as const,
   },
   priceTag: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -1536,6 +1852,29 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  // End of feed message
+  endOfFeedContainer: {
+    height: SCREEN_HEIGHT,
+    width: SCREEN_WIDTH,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 40,
+    backgroundColor: colors.dark.background,
+  },
+  endOfFeedTitle: {
+    fontSize: 32,
+    fontWeight: '900' as const,
+    color: colors.dark.text,
+    textAlign: 'center' as const,
+    marginBottom: 20,
+    fontStyle: 'italic' as const,
+  },
+  endOfFeedSubtitle: {
+    fontSize: 16,
+    color: colors.dark.textSecondary,
+    textAlign: 'center' as const,
+    lineHeight: 24,
   },
 });
 

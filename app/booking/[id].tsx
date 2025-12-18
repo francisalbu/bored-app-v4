@@ -228,16 +228,30 @@ export default function BookingScreen() {
   };
 
   const handleSelectSlot = (schedule: DaySchedule, slot: TimeSlot) => {
+    // Validate that adults doesn't exceed available spots BEFORE selecting
+    if (adults > slot.spotsAvailable) {
+      Alert.alert(
+        'Not Enough Spots Available',
+        `Sorry, we only have ${slot.spotsAvailable} spot${slot.spotsAvailable > 1 ? 's' : ''} available for this time slot.\n\nPlease select ${slot.spotsAvailable} ${slot.spotsAvailable > 1 ? 'people' : 'person'} or choose a different time.`,
+        [
+          { text: 'OK', style: 'default' }
+        ]
+      );
+      return;
+    }
     setSelectedSlot({ schedule, slot });
   };
 
   const handleBook = () => {
     if (selectedSlot) {
-      // Validate that adults doesn't exceed available spots
+      // Double-check validation before proceeding to payment
       if (adults > selectedSlot.slot.spotsAvailable) {
         Alert.alert(
-          'Not Enough Spots',
-          `Sorry, only ${selectedSlot.slot.spotsAvailable} spot${selectedSlot.slot.spotsAvailable > 1 ? 's are' : ' is'} available for this time slot. Please select fewer guests or choose a different time.`
+          'Not Enough Spots Available',
+          `Sorry, we only have ${selectedSlot.slot.spotsAvailable} spot${selectedSlot.slot.spotsAvailable > 1 ? 's' : ''} available for this time slot.\n\nPlease select ${selectedSlot.slot.spotsAvailable} ${selectedSlot.slot.spotsAvailable > 1 ? 'people' : 'person'} or choose a different time.`,
+          [
+            { text: 'OK', style: 'default' }
+          ]
         );
         return;
       }
@@ -412,7 +426,7 @@ export default function BookingScreen() {
                     <View style={styles.slotInfo}>
                       <Text style={styles.slotTime}>{slot.time}</Text>
                       <Text style={styles.slotPrice}>
-                        €{slot.price} / guest
+                        €{slot.price} / person
                       </Text>
                     </View>
                     <Text style={styles.slotSpots}>

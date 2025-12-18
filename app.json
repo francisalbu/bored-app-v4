@@ -39,9 +39,9 @@
             }
           }
         },
-        "NSCameraUsageDescription": "Bored Tourist uses your camera for two purposes: 1) To let you take and update your profile photo so other users can recognize you when joining group experiences, and 2) To scan your credit card details securely when making payments through Stripe for booking experiences. Your camera is never accessed without your explicit action.",
-        "NSPhotoLibraryUsageDescription": "Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. This helps other users recognize you when you join group experiences.",
-        "NSLocationWhenInUseUsageDescription": "Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes.",
+        "NSCameraUsageDescription": "Bored Tourist uses your camera to scan your credit or debit card when making a payment for booking an experience. For example, when you book a Sunset Kayak Tour in Cascais for €45, you can point your camera at your card to automatically fill in the card number, expiry date, and cardholder name instead of typing manually. This is powered by Stripe's secure payment system and your card details are never stored on our servers.",
+        "NSPhotoLibraryUsageDescription": "Bored Tourist needs access to your photo library so you can select an existing photo for your profile picture. For example, you can choose a vacation photo to help activity hosts and other participants recognize you when meeting for group experiences like surf lessons or food tours. Photos are only accessed when you tap Choose from Library.",
+        "NSLocationWhenInUseUsageDescription": "Bored Tourist needs your location to show you nearby activities and experiences sorted by distance from your current position. For example, if you are in Lisbon, you will see Sunset Kayak Tour in Cascais - 25km away so you can easily find activities close to you. Your location data is processed locally on your device to calculate distances and is never shared with third parties, other users, or used for advertising.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
@@ -91,8 +91,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. This helps other users recognize you when you join group experiences.",
-          "cameraPermission": "Bored Tourist uses your camera for two purposes: 1) To let you take and update your profile photo so other users can recognize you when joining group experiences, and 2) To scan your credit card details securely when making payments through Stripe for booking experiences."
+          "photosPermission": "Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. This helps activity hosts recognize you when you join group experiences.",
+          "cameraPermission": "Bored Tourist uses your camera to scan your credit or debit card when making a payment for booking an experience. For example, when you book a Sunset Kayak Tour for €45, you can scan your card to automatically fill in the payment details. This is powered by Stripe's secure payment system."
         }
       ],
       [
