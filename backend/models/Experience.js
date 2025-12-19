@@ -37,6 +37,7 @@ async function getAllExperiences(limit = 50, offset = 0) {
       id: exp.id,
       title: exp.title,
       description: exp.description,
+      short_description: exp.short_description,
       location: exp.location,
       address: exp.address,
       meeting_point: exp.meeting_point,
@@ -120,7 +121,7 @@ async function getExperienceById(id) {
 async function searchExperiences(searchQuery, limit = 50) {
   const { data: experiences, error } = await from('experiences')
     .select(`
-      id, title, description, location, price, duration,
+      id, title, description, short_description, location, price, duration,
       video_url, image_url, images, category,
       latitude, longitude, created_at,
       operators(company_name),
@@ -161,7 +162,7 @@ async function searchExperiences(searchQuery, limit = 50) {
 async function getExperiencesByCategory(category, limit = 50) {
   const { data: experiences, error } = await from('experiences')
     .select(`
-      id, title, description, location, price, duration,
+      id, title, description, short_description, location, price, duration,
       video_url, image_url, images, category,
       latitude, longitude, created_at,
       operators(company_name),
@@ -199,7 +200,7 @@ async function getExperiencesByCategory(category, limit = 50) {
 async function getTrendingExperiences(limit = 20) {
   const { data: experiences, error } = await from('experiences')
     .select(`
-      id, title, description, location, price, duration,
+      id, title, description, short_description, location, price, duration,
       video_url, image_url, images, category,
       latitude, longitude, created_at,
       operators(company_name),

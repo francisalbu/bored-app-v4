@@ -21,6 +21,7 @@ export interface Experience {
   category: string;
   tags: string[];
   description: string;
+  short_description?: string;
   highlights: string[];
   included: string[];
   meetingPoint: string;

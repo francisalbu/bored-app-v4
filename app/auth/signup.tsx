@@ -12,7 +12,11 @@ import {
   Alert,
 } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
+
+const ONBOARDING_SHOWN_KEY = '@bored_tourist_onboarding_shown';
+
 // Google Icon Component (Official Google "G" logo)
 const GoogleIcon = ({ size = 20 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
@@ -138,6 +142,15 @@ export default function SignupScreen() {
         }
         
         setShowSigningIn(false);
+        
+        // Mark that user should see onboarding (first time OAuth user)
+        try {
+          await AsyncStorage.removeItem(ONBOARDING_SHOWN_KEY);
+          console.log('🎯 Onboarding will be shown for new Google user');
+        } catch (err) {
+          console.error('Error setting onboarding flag:', err);
+        }
+        
         router.replace('/(tabs)');
       }
     } catch (error: any) {
@@ -263,6 +276,15 @@ export default function SignupScreen() {
                     const fullName = [credential.fullName.givenName, credential.fullName.familyName].filter(Boolean).join(' ');
                     if (fullName) await supabase.auth.updateUser({ data: { name: fullName } });
                   }
+                  
+                  // Mark that user should see onboarding (first time Apple user)
+                  try {
+                    await AsyncStorage.removeItem(ONBOARDING_SHOWN_KEY);
+                    console.log('🎯 Onboarding will be shown for new Apple user');
+                  } catch (err) {
+                    console.error('Error setting onboarding flag:', err);
+                  }
+                  
                   router.replace('/(tabs)');
                 } catch (error: any) {
                   Alert.alert('Sign-Up Failed', error.message || 'Unable to sign up with Apple. Please try again or use another method.');

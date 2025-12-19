@@ -12,8 +12,11 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import colors from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
+
+const ONBOARDING_SHOWN_KEY = '@bored_tourist_onboarding_shown';
 
 const OTP_LENGTH = 6;
 
@@ -131,6 +134,14 @@ export default function VerifyEmailScreen() {
       } else if (data.session) {
         console.log('✅ Email verified successfully!');
         setIsVerified(true);
+        
+        // Mark that user should see onboarding (first time user)
+        try {
+          await AsyncStorage.removeItem(ONBOARDING_SHOWN_KEY);
+          console.log('🎯 Onboarding will be shown on first app open');
+        } catch (err) {
+          console.error('Error setting onboarding flag:', err);
+        }
         
         // Wait a moment to show success state, then navigate
         setTimeout(() => {

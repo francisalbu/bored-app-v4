@@ -870,13 +870,13 @@ Book this amazing experience on BoredTourist!`;
                 <Text style={styles.priceInline}>{experience.price}€/person</Text>
                 
                 {/* Description - expandable (Instagram style) */}
-                {experience.description && (
+                {experience.short_description && (
                   <Pressable onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
                     <Text style={styles.descriptionText}>
                       {isDescriptionExpanded 
-                        ? experience.description 
-                        : `${experience.description.substring(0, 60)}${experience.description.length > 60 ? '...' : ''}`}
-                      {experience.description.length > 60 && (
+                        ? experience.short_description
+                        : `${experience.short_description.substring(0, 60)}${experience.short_description.length > 60 ? '...' : ''}`}
+                      {experience.short_description.length > 60 && (
                         <Text style={styles.descriptionMore}>
                           {isDescriptionExpanded ? ' less' : ' more'}
                         </Text>

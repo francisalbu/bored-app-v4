@@ -125,6 +125,11 @@ async function syncUserToLocalDB(supabaseUser, rawPassword = null) {
       
       if (insertError) {
         console.error('❌ [SYNC ERROR] Error creating user:', insertError);
+        console.error('❌ [SYNC ERROR] Error code:', insertError.code);
+        console.error('❌ [SYNC ERROR] Error message:', insertError.message);
+        console.error('❌ [SYNC ERROR] Error details:', insertError.details);
+        console.error('❌ [SYNC ERROR] Error hint:', insertError.hint);
+        console.error('❌ [SYNC ERROR] Full error object:', JSON.stringify(insertError, null, 2));
         throw insertError;
       }
       
