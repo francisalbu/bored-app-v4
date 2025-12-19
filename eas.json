@@ -23,17 +23,13 @@
     "production": {
       "node": "22.11.0",
       "env": {
-        "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EAS_SKIP_AUTO_FINGERPRINT": "1"
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "ios": {
         "resourceClass": "m-medium",
         "cocoapods": "1.15.2"
       },
       "autoIncrement": true,
-      "cache": {
-        "key": "production-cache-v2"
-      },
       "channel": "production"
     }
   },
