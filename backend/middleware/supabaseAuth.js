@@ -46,6 +46,7 @@ async function syncUserToLocalDB(supabaseUser, rawPassword = null) {
   
   try {
     // Check if user exists by supabase_uid
+    // Note: supabaseUser.id is a string representation of UUID from Supabase Auth
     const { data: existingUser, error: fetchError } = await from('users')
       .select('*')
       .eq('supabase_uid', supabaseUser.id)
@@ -103,16 +104,22 @@ async function syncUserToLocalDB(supabaseUser, rawPassword = null) {
         throw err;
       }
 
+      // LOG EXATO DO QUE ESTAMOS A TENTAR INSERIR
+      const insertData = {
+        supabase_uid: supabaseUser.id,
+        email,
+        name,
+        phone,
+        password: passwordToStore,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log('🔍 [INSERT DATA]:', JSON.stringify(insertData, null, 2));
+      console.log('🔍 [UUID TYPE]:', typeof supabaseUser.id, '| VALUE:', supabaseUser.id);
+      
       const { data: newUser, error: insertError } = await from('users')
-        .insert({
-          supabase_uid: supabaseUser.id,
-          email,
-          name,
-          phone,
-          password: passwordToStore,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .insert(insertData)
         .select()
         .single();
       
