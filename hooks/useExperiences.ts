@@ -57,6 +57,7 @@ export function useExperiences() {
         images: Array.isArray(exp.images) ? exp.images : (exp.images ? JSON.parse(exp.images) : []),
         highlights: Array.isArray(exp.highlights) ? exp.highlights : (exp.highlights ? JSON.parse(exp.highlights) : []),
         description: exp.description,
+        short_description: exp.short_description,
         included: Array.isArray(exp.included) ? exp.included : (exp.included ? JSON.parse(exp.included) : []),
         whatToBring: Array.isArray(exp.what_to_bring) ? exp.what_to_bring : (exp.what_to_bring ? JSON.parse(exp.what_to_bring) : []),
         meetingPoint: exp.meeting_point || exp.location,

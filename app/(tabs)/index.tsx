@@ -584,15 +584,6 @@ export default function FeedScreen() {
           </TouchableOpacity>
           
           <View style={styles.headerRight}>
-            {/* DEV ONLY: Remove this button in production */}
-            <Pressable 
-              style={[styles.importButton, { backgroundColor: 'rgba(191, 255, 0, 0.3)' }]} 
-              onPress={handleResetTutorial}
-              onLongPress={handleResetTutorial}
-            >
-              <Ionicons name="refresh" size={20} color="#BFFF00" />
-            </Pressable>
-            
             <Pressable 
               style={styles.importButton} 
               onPress={() => setShowImportTutorial(true)}
