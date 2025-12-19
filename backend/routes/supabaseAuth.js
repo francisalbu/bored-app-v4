@@ -99,9 +99,28 @@ router.post('/register', async (req, res) => {
     console.log(`✅ User created in Supabase: ${authData.user.id}`);
 
     // Sync to local database
-    const localUser = await syncUserToLocalDB(authData.user);
-
-    console.log(`✅ User synced to local DB: ID ${localUser.id}`);
+    let localUser;
+    try {
+      // Pass raw password so the sync function can hash & store it securely
+      localUser = await syncUserToLocalDB(authData.user, password);
+      console.log(`✅ User synced to local DB: ID ${localUser.id}`);
+    } catch (syncError) {
+      console.error('❌ Database sync error:', syncError);
+      console.error('❌ Error code:', syncError.code);
+      console.error('❌ Error message:', syncError.message);
+      console.error('❌ Error details:', syncError.details);
+      console.error('❌ Error hint:', syncError.hint);
+      
+      return res.status(400).json({
+        success: false,
+        error: 'Database error saving new user',
+        details: {
+          code: syncError.code,
+          message: syncError.message,
+          hint: syncError.hint
+        }
+      });
+    }
 
     res.status(201).json({
       success: true,

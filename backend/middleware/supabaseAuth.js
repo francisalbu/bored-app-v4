@@ -5,6 +5,10 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { from } = require('../config/database');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+
+const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS, 10) || 10;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://hnivuisqktlrusyqywaz.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
@@ -34,7 +38,7 @@ async function verifySupabaseToken(token) {
  * Sync Supabase user with Supabase database
  * Creates or updates user in users table
  */
-async function syncUserToLocalDB(supabaseUser) {
+async function syncUserToLocalDB(supabaseUser, rawPassword = null) {
   console.log('🔄 [SYNC START] Syncing user to Supabase DB');
   console.log('🔄 [SYNC] Supabase User ID:', supabaseUser.id);
   console.log('🔄 [SYNC] Email:', supabaseUser.email);
@@ -84,13 +88,28 @@ async function syncUserToLocalDB(supabaseUser) {
         supabase_uid: supabaseUser.id 
       });
       
+      // Ensure we store a secure hashed password locally to satisfy NOT NULL column
+      let passwordToStore;
+      try {
+        if (rawPassword) {
+          passwordToStore = await bcrypt.hash(String(rawPassword), SALT_ROUNDS);
+        } else {
+          // For OAuth users (no plain password), generate a strong random secret and hash it
+          const randomSecret = crypto.randomBytes(48).toString('hex');
+          passwordToStore = await bcrypt.hash(randomSecret, SALT_ROUNDS);
+        }
+      } catch (err) {
+        console.error('❌ [SYNC ERROR] Error hashing password:', err);
+        throw err;
+      }
+
       const { data: newUser, error: insertError } = await from('users')
         .insert({
           supabase_uid: supabaseUser.id,
           email,
           name,
           phone,
-          password: 'SUPABASE_AUTH',
+          password: passwordToStore,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
