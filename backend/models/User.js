@@ -28,7 +28,7 @@ async function findByEmail(email) {
  */
 async function findById(id) {
   const { data, error } = await from('users')
-    .select('id, email, name, created_at')
+    .select('id, email, name, birthdate, location, avatar_icon, created_at')
     .eq('id', id)
     .single();
   
@@ -89,7 +89,7 @@ async function verifyPassword(email, password) {
  * Update user profile
  */
 async function updateProfile(userId, updates) {
-  const allowedFields = ['name', 'bio', 'avatar_url'];
+  const allowedFields = ['name', 'bio', 'avatar_url', 'birthdate', 'location', 'avatar_icon'];
   
   const updateData = {};
   
@@ -106,7 +106,7 @@ async function updateProfile(userId, updates) {
   const { data, error } = await from('users')
     .update(updateData)
     .eq('id', userId)
-    .select('id, email, name, created_at')
+    .select('id, email, name, birthdate, location, avatar_icon, created_at')
     .single();
   
   if (error) throw error;

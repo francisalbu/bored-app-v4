@@ -259,7 +259,10 @@ router.get('/me', authenticateSupabase, async (req, res) => {
           supabase_uid: req.user.supabase_uid,
           email: req.user.email,
           name: req.user.name,
-          phone: req.user.phone
+          phone: req.user.phone,
+          avatar_icon: req.user.avatar_icon,
+          birthdate: req.user.birthdate,
+          location: req.user.location
         },
         supabaseUser: req.supabaseUser
       }

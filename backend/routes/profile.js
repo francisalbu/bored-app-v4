@@ -60,6 +60,9 @@ router.put('/',
       if (req.body.name) updates.name = req.body.name;
       if (req.body.bio !== undefined) updates.bio = req.body.bio;
       if (req.body.avatar_url) updates.avatar_url = req.body.avatar_url;
+      if (req.body.birthdate) updates.birthdate = req.body.birthdate;
+      if (req.body.location) updates.location = req.body.location;
+      if (req.body.avatarIcon) updates.avatar_icon = req.body.avatarIcon;
       
       const user = User.updateProfile(req.user.id, updates);
       
