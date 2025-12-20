@@ -368,6 +368,7 @@ export default function FeedScreen() {
     // only show experiences that can be instantly booked (not "interested" ones)
     // Because "interested" experiences require manual coordination and can't be booked quickly
     if (availabilityFilter && !experience.instantBooking) {
+      console.log(`🚫 Experience ${experience.id} excluded: not instant booking`);
       return false;
     }
     
@@ -378,13 +379,17 @@ export default function FeedScreen() {
     
     // If API returned results, use only those IDs
     if (availabilityFilter && availableExperienceIds.size > 0) {
-      return availableExperienceIds.has(experience.id);
+      const expId = experience.id.toString();
+      const isAvailable = availableExperienceIds.has(expId);
+      console.log(`🔍 Experience ${expId} (${experience.title}): ${isAvailable ? '✅ available' : '❌ not in list'}`);
+      return isAvailable;
     }
     
     // If API finished but returned no results (no slots in database),
     // show all instant booking experiences as fallback
     // (user will see actual availability when they try to book)
     if (availabilityFilter && !isCheckingAvailability && availableExperienceIds.size === 0) {
+      console.log(`⚠️ No API results, showing all instant booking as fallback`);
       return experience.instantBooking;
     }
     
@@ -471,7 +476,7 @@ export default function FeedScreen() {
       // Filter only experiences available today
       return result.filter(exp => exp.availableToday);
     }
-  }, [selectedFilter, EXPERIENCES, userLocation, filters]);
+  }, [selectedFilter, EXPERIENCES, userLocation, filters, availableExperienceIds, isCheckingAvailability]);
 
   // Update no activities message based on filtered results
   // Only show "Lisbon Exclusive" for nearMe filter with no nearby experiences
