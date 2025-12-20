@@ -1,6 +1,6 @@
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import colors from '@/constants/colors';
 import { CATEGORIES, type Experience } from '@/constants/experiences';
 import { useExperiences } from '@/hooks/useExperiences';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -37,6 +38,9 @@ export default function ExploreScreen() {
   
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading, error } = useExperiences();
+  
+  // Get user preferences for sorting categories
+  const { getSortedCategories } = usePreferences();
 
   const filteredExperiences = EXPERIENCES.filter((exp) => {
     const query = searchQuery.toLowerCase().trim();
@@ -84,26 +88,31 @@ export default function ExploreScreen() {
   const trendingExperiences = EXPERIENCES.filter(exp => exp.rating >= 4.8);
 
   // Filter categories to only show those with at least 1 experience
-  const categoriesWithExperiences = CATEGORIES.filter(category => {
-    if (category.id === 'all') return true; // Always show "All"
-    
-    // Normalize category name for matching (e.g., "Mind & Body" -> "mind-body")
-    const normalizedCategoryName = category.name.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
-    
-    return EXPERIENCES.some(exp => {
-      // Check if experience category matches
-      const expCategory = exp.category.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
-      if (expCategory === normalizedCategoryName || expCategory.includes(category.id)) {
-        return true;
-      }
+  const categoriesWithExperiences = useMemo(() => {
+    const filtered = CATEGORIES.filter(category => {
+      if (category.id === 'all') return true; // Always show "All"
       
-      // Check if any tag matches the category name
-      return exp.tags.some(tag => {
-        const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
-        return normalizedTag === normalizedCategoryName || tag.toLowerCase().includes(category.name.toLowerCase());
+      // Normalize category name for matching (e.g., "Mind & Body" -> "mind-body")
+      const normalizedCategoryName = category.name.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+      
+      return EXPERIENCES.some(exp => {
+        // Check if experience category matches
+        const expCategory = exp.category.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+        if (expCategory === normalizedCategoryName || expCategory.includes(category.id)) {
+          return true;
+        }
+        
+        // Check if any tag matches the category name
+        return exp.tags.some(tag => {
+          const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+          return normalizedTag === normalizedCategoryName || tag.toLowerCase().includes(category.name.toLowerCase());
+        });
       });
     });
-  });
+    
+    // Sort categories based on user preferences (favorites first)
+    return getSortedCategories(filtered);
+  }, [EXPERIENCES, getSortedCategories]);
 
   return (
     <View style={styles.container}>

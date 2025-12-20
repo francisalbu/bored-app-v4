@@ -65,6 +65,93 @@ router.get('/trending', async (req, res, next) => {
 });
 
 /**
+ * GET /api/experiences/available
+ * Get experiences that have available slots for a date/period
+ * Query params:
+ * - date: specific date (YYYY-MM-DD) - for "today" or "tomorrow"
+ * - from: start date (YYYY-MM-DD) - for "this week"
+ * - to: end date (YYYY-MM-DD) - for "this week"
+ * - minBuffer: minimum minutes from now for "today" filter (default: 120 = 2 hours)
+ * 
+ * Returns: List of experience IDs with available slots
+ */
+router.get('/available', async (req, res, next) => {
+  try {
+    const { date, from: fromDate, to: toDate, minBuffer = 120 } = req.query;
+    const { from: supabaseFrom } = require('../config/database');
+    
+    console.log('🔍 Checking available experiences:', { date, fromDate, toDate, minBuffer });
+    
+    const now = new Date();
+    const bufferMs = parseInt(minBuffer) * 60 * 1000; // Convert minutes to ms
+    const minBookingTime = new Date(now.getTime() + bufferMs);
+    
+    // Build query to find experiences with available slots
+    let query = supabaseFrom('availability_slots')
+      .select('experience_id, date, start_time, max_participants, booked_participants')
+      .eq('is_available', true)
+      .gt('max_participants', supabaseFrom.raw('booked_participants')); // Has spots
+    
+    // Filter by date
+    if (date) {
+      query = query.eq('date', date);
+    } else if (fromDate && toDate) {
+      query = query.gte('date', fromDate).lte('date', toDate);
+    } else {
+      // Default to today
+      const today = now.toISOString().split('T')[0];
+      query = query.eq('date', today);
+    }
+    
+    const { data: slots, error } = await query;
+    
+    if (error) {
+      console.error('❌ Supabase error:', error);
+      throw error;
+    }
+    
+    console.log(`📋 Found ${slots?.length || 0} slots total`);
+    
+    // Filter slots based on time buffer for today's bookings
+    const today = now.toISOString().split('T')[0];
+    const availableExperienceIds = new Set();
+    
+    for (const slot of (slots || [])) {
+      const slotDateTime = new Date(`${slot.date}T${slot.start_time}`);
+      const hasSpots = slot.max_participants > slot.booked_participants;
+      
+      // For today's slots, check if there's enough time buffer
+      if (slot.date === today) {
+        if (slotDateTime > minBookingTime && hasSpots) {
+          availableExperienceIds.add(slot.experience_id.toString());
+          console.log(`✅ Experience ${slot.experience_id}: ${slot.date} ${slot.start_time} - available (${slot.max_participants - slot.booked_participants} spots)`);
+        }
+      } else if (hasSpots) {
+        // Future dates just need spots
+        availableExperienceIds.add(slot.experience_id.toString());
+        console.log(`✅ Experience ${slot.experience_id}: ${slot.date} ${slot.start_time} - available (${slot.max_participants - slot.booked_participants} spots)`);
+      }
+    }
+    
+    const experienceIds = Array.from(availableExperienceIds);
+    console.log(`📊 Total available experiences: ${experienceIds.length}`);
+    
+    res.json({
+      success: true,
+      count: experienceIds.length,
+      data: {
+        experienceIds,
+        checkedDate: date || `${fromDate} to ${toDate}` || today,
+        totalSlots: slots?.length || 0
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error checking availability:', error);
+    next(error);
+  }
+});
+
+/**
  * GET /api/experiences/:id
  * Get single experience details
  * Includes all media URLs (video_url, images array from Google Cloud Storage)

@@ -1,0 +1,17 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Animated,
+  Dimensions,
+  Image,
+  Alert,
+  PanResponder,
+} from 'react-native';
+import { ArrowLeft, ArrowRight, X } from 'lucide-react-native';
+import colors from '@/constants/colors';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;

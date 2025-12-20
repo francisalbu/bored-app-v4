@@ -18,8 +18,10 @@ import { useRouter } from 'expo-router';
 import colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import PreferencesQuiz from '@/components/PreferencesQuiz';
+import QuizSuggestionModal from '@/components/QuizSuggestionModal';
 import { api } from '@/services/api';
 import { useExperiences } from '@/hooks/useExperiences';
 import EditProfileModal from '../../components/EditProfileModal';
@@ -27,14 +29,26 @@ import EditProfileModal from '../../components/EditProfileModal';
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, isAuthenticated, logout, deleteAccount, refreshUser } = useAuth();
+  const { user, isAuthenticated, isNewSignup, clearNewSignupFlag, logout, deleteAccount, refreshUser } = useAuth();
   const { savedExperiences: savedExperienceIds } = useFavorites();
+  const { hasCompletedQuiz, savePreferences, refreshPreferences } = usePreferences();
   const { experiences } = useExperiences();
   const [showAuthSheet, setShowAuthSheet] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
-  const [hasCompletedQuiz, setHasCompletedQuiz] = useState(false);
+  const [showQuizSuggestion, setShowQuizSuggestion] = useState(false);
+  
+  // Show quiz suggestion for new signups
+  useEffect(() => {
+    if (isNewSignup && isAuthenticated && !hasCompletedQuiz) {
+      // Small delay to ensure the UI has loaded
+      const timer = setTimeout(() => {
+        setShowQuizSuggestion(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isNewSignup, isAuthenticated, hasCompletedQuiz]);
   
   // Edit profile states
   const [editName, setEditName] = useState('');
@@ -95,25 +109,6 @@ export default function ProfileScreen() {
 
     fetchStats();
   }, [isAuthenticated]);
-
-  // Check if user has completed quiz
-  useEffect(() => {
-    const checkQuizStatus = async () => {
-      if (!isAuthenticated) return;
-      
-      try {
-        const response = await api.getPreferences();
-        if (response.success && response.data) {
-          const data = response.data as { quiz_completed?: boolean };
-          setHasCompletedQuiz(data.quiz_completed || false);
-        }
-      } catch (error) {
-        console.log('Failed to check quiz status:', error);
-      }
-    };
-
-    checkQuizStatus();
-  }, [isAuthenticated]);
   
   // Initialize edit states when modal opens
   useEffect(() => {
@@ -164,21 +159,13 @@ export default function ProfileScreen() {
       console.log('📊 Quiz Data to save:', JSON.stringify(quizData, null, 2));
       console.log('📦 Categories:', quizData.favorite_categories);
       console.log('📦 Preferences count:', Object.keys(quizData.preferences).length);
-      
-      // Show loading alert
-      const savingAlert = Alert.alert(
-        'Saving...',
-        'Please wait while we save your preferences.',
-        [],
-        { cancelable: false }
-      );
 
-      const response = await api.savePreferences(quizData);
-      console.log('✅ Save response received:', JSON.stringify(response, null, 2));
+      const result = await savePreferences(quizData);
+      console.log('✅ Save response received:', JSON.stringify(result, null, 2));
       
-      if (response.success) {
+      if (result.success) {
         console.log('🎉 Successfully saved preferences to database!');
-        setHasCompletedQuiz(true);
+        await refreshPreferences(); // Refresh preferences in context
         setShowQuiz(false);
         Alert.alert(
           '🎉 Success!', 
@@ -186,10 +173,10 @@ export default function ProfileScreen() {
           [{ text: 'OK' }]
         );
       } else {
-        console.error('❌ Save failed with error:', response.error);
+        console.error('❌ Save failed with error:', result.error);
         Alert.alert(
           '⚠️ Error', 
-          `Failed to save preferences: ${response.error || 'Unknown error'}. Please try again.`,
+          `Failed to save preferences: ${result.error || 'Unknown error'}. Please try again.`,
           [{ text: 'OK' }]
         );
       }
@@ -705,17 +692,20 @@ export default function ProfileScreen() {
         />
       </Modal>
 
-      {/* Preferences Quiz Modal */}
-      <Modal
-        visible={showQuiz}
-        animationType="slide"
-        presentationStyle="fullScreen"
-      >
-        <PreferencesQuiz
-          onComplete={handleQuizComplete}
-          onClose={() => setShowQuiz(false)}
-        />
-      </Modal>
+      {/* Quiz Suggestion Modal (for new signups) */}
+      <QuizSuggestionModal
+        visible={showQuizSuggestion}
+        onClose={() => {
+          setShowQuizSuggestion(false);
+          clearNewSignupFlag();
+        }}
+        onStartQuiz={() => {
+          setShowQuizSuggestion(false);
+          clearNewSignupFlag();
+          setShowQuiz(true);
+        }}
+        userName={user?.name}
+      />
 
       {/* TODO: Fix EditProfileModal import issue */}
       {/* <EditProfileModal

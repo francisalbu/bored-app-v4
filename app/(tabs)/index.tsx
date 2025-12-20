@@ -33,6 +33,7 @@ import typography from '@/constants/typography';
 import { type Experience } from '@/constants/experiences';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import { useExperiences } from '@/hooks/useExperiences';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import apiService from '@/services/api';
@@ -42,8 +43,11 @@ import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OnboardingScreen from '@/components/OnboardingScreen';
 import ImportTutorialModal from '@/components/ImportTutorialModal';
+import FeedQuizPrompt from '@/components/FeedQuizPrompt';
+import PreferencesQuiz from '@/components/PreferencesQuiz';
 
 const ONBOARDING_SHOWN_KEY = '@bored_tourist_onboarding_shown';
+const QUIZ_PROMPT_DISMISSED_KEY = '@bored_tourist_quiz_prompt_dismissed';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -86,6 +90,16 @@ export default function FeedScreen() {
   const [availableExperienceIds, setAvailableExperienceIds] = useState<Set<string>>(new Set());
   const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
+  
+  // Quiz prompt state
+  const [showQuizPrompt, setShowQuizPrompt] = useState<boolean>(false);
+  const [showQuizModal, setShowQuizModal] = useState<boolean>(false);
+  const [swipeCount, setSwipeCount] = useState<number>(0);
+  const [quizPromptDismissed, setQuizPromptDismissed] = useState<boolean>(false);
+  
+  // Get auth and preferences
+  const { isAuthenticated } = useAuth();
+  const { hasCompletedQuiz, savePreferences, refreshPreferences } = usePreferences();
 
   // Wrapper for setFilters with logging and tracking
   const setFilters = React.useCallback((newFilters: FilterOptions) => {
@@ -143,6 +157,83 @@ export default function FeedScreen() {
     } catch (error) {
       console.error('Error saving onboarding status:', error);
       setShowOnboarding(false);
+    }
+  };
+
+  // Check if quiz prompt was previously dismissed
+  useEffect(() => {
+    const checkQuizPromptDismissed = async () => {
+      try {
+        const dismissed = await AsyncStorage.getItem(QUIZ_PROMPT_DISMISSED_KEY);
+        if (dismissed) {
+          setQuizPromptDismissed(true);
+        }
+      } catch (error) {
+        console.error('Error checking quiz prompt status:', error);
+      }
+    };
+    checkQuizPromptDismissed();
+  }, []);
+
+  // Show quiz prompt after 5 swipes if user is authenticated and hasn't completed quiz
+  useEffect(() => {
+    if (
+      swipeCount >= 5 && 
+      isAuthenticated && 
+      !hasCompletedQuiz && 
+      !quizPromptDismissed && 
+      !showQuizPrompt &&
+      !showQuizModal
+    ) {
+      setShowQuizPrompt(true);
+      trackEvent('feed_quiz_prompt_shown', { swipe_count: swipeCount });
+    }
+  }, [swipeCount, isAuthenticated, hasCompletedQuiz, quizPromptDismissed, showQuizPrompt, showQuizModal]);
+
+  // Handle quiz prompt dismiss
+  const handleQuizPromptDismiss = async () => {
+    setShowQuizPrompt(false);
+    setQuizPromptDismissed(true);
+    try {
+      await AsyncStorage.setItem(QUIZ_PROMPT_DISMISSED_KEY, 'true');
+      trackEvent('feed_quiz_prompt_dismissed', { swipe_count: swipeCount });
+    } catch (error) {
+      console.error('Error saving quiz prompt dismiss:', error);
+    }
+  };
+
+  // Handle starting quiz from feed prompt
+  const handleStartQuizFromFeed = () => {
+    setShowQuizPrompt(false);
+    setShowQuizModal(true);
+    trackEvent('feed_quiz_started_from_prompt', { swipe_count: swipeCount });
+  };
+
+  // Handle quiz completion from feed
+  const handleQuizCompleteFromFeed = async (quizData: {
+    favorite_categories: string[];
+    preferences: Record<string, boolean>;
+  }) => {
+    try {
+      const result = await savePreferences(quizData);
+      if (result.success) {
+        await refreshPreferences();
+        setShowQuizModal(false);
+        trackEvent('feed_quiz_completed', { 
+          categories: quizData.favorite_categories,
+          swipe_count: swipeCount 
+        });
+        Alert.alert(
+          '🎉 Perfect!',
+          'Your feed is now personalized! Your favorite categories will appear first.',
+          [{ text: 'Awesome!' }]
+        );
+      } else {
+        Alert.alert('Error', result.error || 'Failed to save preferences');
+      }
+    } catch (error) {
+      console.error('Error saving quiz:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   };
 
@@ -205,114 +296,96 @@ export default function FeedScreen() {
   useEffect(() => {
     if (!filters.availability) {
       setAvailableExperienceIds(new Set());
+      setIsCheckingAvailability(false);
       return;
     }
 
     const checkRealAvailability = async () => {
       setIsCheckingAvailability(true);
-      const now = new Date();
-      const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
       
-      let targetDate = new Date();
-      let endDate = new Date();
-      
-      // Set date range based on filter
-      if (filters.availability === 'today') {
-        targetDate = now;
-        endDate = new Date(now);
-        endDate.setHours(23, 59, 59, 999);
-      } else if (filters.availability === 'tomorrow') {
-        targetDate = new Date(now);
-        targetDate.setDate(targetDate.getDate() + 1);
-        endDate = new Date(targetDate);
-        endDate.setHours(23, 59, 59, 999);
-      } else if (filters.availability === 'this-week') {
-        targetDate = now;
-        endDate = new Date(now);
-        const dayOfWeek = endDate.getDay();
-        const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-        endDate.setDate(endDate.getDate() + daysUntilSunday);
-        endDate.setHours(23, 59, 59, 999);
-      }
-
-      console.log('🔍 Checking real availability for:', filters.availability);
-      console.log('📅 Date range:', targetDate.toISOString(), 'to', endDate.toISOString());
-      
-      const availableIds = new Set<string>();
-      
-      // Check each experience
-      const checkPromises = EXPERIENCES.map(async (exp) => {
-        try {
-          const dateStr = targetDate.toISOString().split('T')[0];
-          const response = await apiService.getExperienceAvailability(exp.id, dateStr);
+      try {
+        const now = new Date();
+        let apiParams: { date?: string; from?: string; to?: string; minBuffer?: number } = {};
+        
+        if (filters.availability === 'today') {
+          // Today: specific date with 2 hour buffer
+          apiParams = {
+            date: now.toISOString().split('T')[0],
+            minBuffer: 120, // 2 hours
+          };
+        } else if (filters.availability === 'tomorrow') {
+          // Tomorrow: specific date
+          const tomorrow = new Date(now);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          apiParams = {
+            date: tomorrow.toISOString().split('T')[0],
+          };
+        } else if (filters.availability === 'this-week') {
+          // This week: from today until Sunday
+          const dayOfWeek = now.getDay();
+          const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+          const endOfWeek = new Date(now);
+          endOfWeek.setDate(endOfWeek.getDate() + daysUntilSunday);
           
-          if (response.success && response.data) {
-            const slots = response.data as any[];
-            
-            // Check if there are available slots in the time range
-            const hasAvailableSlots = slots.some(slot => {
-              const slotDateTime = new Date(`${slot.date}T${slot.start_time}`);
-              const spotsAvailable = (slot.spots_available || 0) > 0;
-              
-              // For "today", must be at least 2 hours from now
-              if (filters.availability === 'today') {
-                return spotsAvailable && 
-                       slotDateTime >= twoHoursFromNow && 
-                       slotDateTime <= endDate;
-              }
-              
-              // For tomorrow and this week
-              return spotsAvailable && 
-                     slotDateTime >= targetDate && 
-                     slotDateTime <= endDate;
-            });
-            
-            if (hasAvailableSlots) {
-              availableIds.add(exp.id);
-              console.log('✅', exp.title, '- HAS AVAILABLE SLOTS');
-            } else {
-              console.log('❌', exp.title, '- NO AVAILABLE SLOTS');
-            }
-          }
-        } catch (error) {
-          console.error(`Error checking availability for ${exp.title}:`, error);
+          apiParams = {
+            from: now.toISOString().split('T')[0],
+            to: endOfWeek.toISOString().split('T')[0],
+            minBuffer: 120, // 2 hours for today's slots
+          };
         }
-      });
-      
-      await Promise.all(checkPromises);
-      
-      console.log('📊 Total experiences with real availability:', availableIds.size);
-      setAvailableExperienceIds(availableIds);
-      setIsCheckingAvailability(false);
+
+        console.log('� Checking available experiences:', apiParams);
+        
+        const response = await apiService.getAvailableExperiences(apiParams);
+        
+        if (response.success && response.data) {
+          const data = response.data as { experienceIds: (string | number)[]; totalSlots: number };
+          const { experienceIds, totalSlots } = data;
+          console.log(`✅ Found ${experienceIds.length} experiences with ${totalSlots} total slots`);
+          
+          // Convert to Set for quick lookup
+          const availableSet = new Set<string>(experienceIds.map((id: string | number) => id.toString()));
+          setAvailableExperienceIds(availableSet);
+        } else {
+          console.log('❌ No available experiences found');
+          setAvailableExperienceIds(new Set());
+        }
+      } catch (error) {
+        console.error('❌ Error checking availability:', error);
+        // On error, show all instant booking experiences as fallback
+        setAvailableExperienceIds(new Set());
+      } finally {
+        setIsCheckingAvailability(false);
+      }
     };
 
     checkRealAvailability();
-  }, [filters.availability, EXPERIENCES]);
+  }, [filters.availability]);
 
   // Helper function to check if experience is available based on filter
   const isAvailableForFilter = (experience: Experience, availabilityFilter: string): boolean => {
-    // If we're checking availability with real API data, use that
-    if (availabilityFilter && availableExperienceIds.size > 0) {
-      const isAvailable = availableExperienceIds.has(experience.id);
-      console.log(`🎯 Real availability check for ${experience.title}:`, isAvailable);
-      return isAvailable;
+    // IMPORTANT: When any availability filter is active (today, tomorrow, this-week),
+    // only show experiences that can be instantly booked (not "interested" ones)
+    // Because "interested" experiences require manual coordination and can't be booked quickly
+    if (availabilityFilter && !experience.instantBooking) {
+      return false;
     }
     
-    // Fallback to basic time-based logic if API hasn't loaded yet
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeInHours = currentHour + (currentMinute / 60);
-    const minimumStartTime = currentTimeInHours + 2;
+    // While API is loading, show all instant booking experiences as preview
+    if (availabilityFilter && isCheckingAvailability) {
+      return experience.instantBooking;
+    }
     
-    if (availabilityFilter === 'today') {
-      const isAvailableToday = experience.availableToday || experience.instantBooking;
-      const hasTimeBuffer = minimumStartTime < 24;
-      return isAvailableToday && hasTimeBuffer;
-    } else if (availabilityFilter === 'tomorrow') {
-      return experience.instantBooking || experience.availableToday;
-    } else if (availabilityFilter === 'this-week') {
-      return true;
+    // If API returned results, use only those IDs
+    if (availabilityFilter && availableExperienceIds.size > 0) {
+      return availableExperienceIds.has(experience.id);
+    }
+    
+    // If API finished but returned no results (no slots in database),
+    // show all instant booking experiences as fallback
+    // (user will see actual availability when they try to book)
+    if (availabilityFilter && !isCheckingAvailability && availableExperienceIds.size === 0) {
+      return experience.instantBooking;
     }
     
     return true;
@@ -366,11 +439,16 @@ export default function FeedScreen() {
     // Apply availability filter (TODAY, TOMORROW, THIS WEEK)
     if (filters.availability) {
       console.log('🗓️ Applying availability filter:', filters.availability);
+      console.log('📊 Experiences before availability filter:', result.length);
       result = result.filter(exp => isAvailableForFilter(exp, filters.availability!));
       console.log('📊 Experiences after availability filter:', result.length);
+      
+      // When availability filter is active, return the filtered result directly
+      // Don't apply additional nearMe/availableToday filters
+      return result;
     }
 
-    // Now apply location/availability filter
+    // Now apply location/availability filter (only when no availability filter)
     if (selectedFilter === 'nearMe' && userLocation) {
       // Calculate real distances from user location
       const experiencesWithDistance = result.map(exp => {
@@ -396,15 +474,29 @@ export default function FeedScreen() {
   }, [selectedFilter, EXPERIENCES, userLocation, filters]);
 
   // Update no activities message based on filtered results
+  // Only show "Lisbon Exclusive" for nearMe filter with no nearby experiences
+  // Never show it when availability filter is active (we have specific empty state for that)
   React.useEffect(() => {
-    if (selectedFilter === 'nearMe' && filteredExperiences.length > 0) {
+    console.log('🔄 Updating showNoActivitiesMessage:', {
+      availability: filters.availability,
+      selectedFilter,
+      filteredLength: filteredExperiences.length,
+    });
+    
+    if (filters.availability) {
+      // When availability filter is active, don't show "Lisbon Exclusive"
+      console.log('  → Setting to false (availability filter active)');
+      setShowNoActivitiesMessage(false);
+    } else if (selectedFilter === 'nearMe' && filteredExperiences.length > 0) {
       const firstExp = filteredExperiences[0] as any;
       const hasNearby = firstExp.calculatedDistance ? firstExp.calculatedDistance <= MAX_DISTANCE_KM : true;
+      console.log('  → hasNearby:', hasNearby, 'calculatedDistance:', firstExp.calculatedDistance);
       setShowNoActivitiesMessage(!hasNearby);
     } else {
+      console.log('  → Setting to false (else)');
       setShowNoActivitiesMessage(false);
     }
-  }, [filteredExperiences, selectedFilter]);
+  }, [filteredExperiences, selectedFilter, filters.availability]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -426,6 +518,10 @@ export default function FeedScreen() {
       }
       
       setCurrentIndex(newIndex);
+      
+      // Increment swipe count for quiz prompt
+      setSwipeCount(prev => Math.max(prev, newIndex + 1));
+      
       console.log('📍 Current Experience Index:', newIndex);
     }
   }).current;
@@ -444,7 +540,6 @@ export default function FeedScreen() {
   }, [selectedFilter, filters]);
 
   const { toggleSave, isSaved } = useFavorites();
-  const { isAuthenticated } = useAuth();
 
   const handleSave = async (experienceId: string) => {
     if (!isAuthenticated) {
@@ -497,11 +592,18 @@ export default function FeedScreen() {
 
   // Show loading state when checking real availability
   if (isCheckingAvailability && filters.availability) {
+    const filterLabels: Record<string, string> = {
+      'today': 'today',
+      'tomorrow': 'tomorrow', 
+      'this-week': 'this week'
+    };
+    const filterLabel = filterLabels[filters.availability] || filters.availability;
+    
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.loadingText}>Checking availability...</Text>
+        <Text style={styles.loadingText}>Finding experiences for {filterLabel}...</Text>
         <Text style={[styles.loadingText, { fontSize: 14, marginTop: 8, opacity: 0.7 }]}>
-          Finding experiences with real-time slots
+          Checking real-time availability
         </Text>
       </View>
     );
@@ -518,11 +620,37 @@ export default function FeedScreen() {
   }
 
   // Show empty state (only if no experiences at all, not due to filters)
-  if (filteredExperiences.length === 0 && filters.categories.length === 0 && !filters.priceRange) {
+  if (filteredExperiences.length === 0 && filters.categories.length === 0 && !filters.priceRange && !filters.availability) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Text style={styles.emptyText}>{t('feed.emptyText')}</Text>
         <Text style={styles.emptySubtext}>{t('feed.emptySubtext')}</Text>
+      </View>
+    );
+  }
+
+  // Show specific message when availability filter returns no results
+  if (filteredExperiences.length === 0 && filters.availability) {
+    const filterLabels: Record<string, string> = {
+      'today': 'today',
+      'tomorrow': 'tomorrow', 
+      'this-week': 'this week'
+    };
+    const filterLabel = filterLabels[filters.availability] || filters.availability;
+    
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.emptyText}>No experiences available {filterLabel}</Text>
+        <Text style={styles.emptySubtext}>
+          Try checking back later or select a different time period.{'\n\n'}
+          Only experiences with instant booking are shown for quick reservations.
+        </Text>
+        <Pressable 
+          style={styles.resetFiltersButton}
+          onPress={() => setFiltersState({ ...filters, availability: null })}
+        >
+          <Text style={styles.resetFiltersButtonText}>Clear Date Filter</Text>
+        </Pressable>
       </View>
     );
   }
@@ -686,6 +814,25 @@ export default function FeedScreen() {
         <OnboardingScreen 
           onComplete={handleOnboardingComplete}
           onShowImportTutorial={handleOnboardingCompleteWithTutorial}
+        />
+      </Modal>
+
+      {/* Quiz Prompt - appears after 5 swipes for authenticated users without completed quiz */}
+      <FeedQuizPrompt
+        visible={showQuizPrompt}
+        onStartQuiz={handleStartQuizFromFeed}
+        onDismiss={handleQuizPromptDismiss}
+      />
+
+      {/* Quiz Modal */}
+      <Modal
+        visible={showQuizModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <PreferencesQuiz
+          onComplete={handleQuizCompleteFromFeed}
+          onClose={() => setShowQuizModal(false)}
         />
       </Modal>
     </View>

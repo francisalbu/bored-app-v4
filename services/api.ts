@@ -169,7 +169,26 @@ class ApiService {
   }
 
   async getExperienceAvailability(id: string, date: string) {
-    return this.request(`/experiences/${id}/availability?date=${date}`);
+    return this.request(`/availability/${id}?date=${date}`);
+  }
+
+  /**
+   * Get all experiences that have available slots for a date/period
+   * Used for Today/Tomorrow/This Week filters
+   */
+  async getAvailableExperiences(params: {
+    date?: string;      // For today or tomorrow (YYYY-MM-DD)
+    from?: string;      // For this week range start
+    to?: string;        // For this week range end
+    minBuffer?: number; // Minimum minutes from now (default 120 = 2h)
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params.date) queryParams.append('date', params.date);
+    if (params.from) queryParams.append('from', params.from);
+    if (params.to) queryParams.append('to', params.to);
+    if (params.minBuffer) queryParams.append('minBuffer', params.minBuffer.toString());
+    
+    return this.request(`/experiences/available?${queryParams.toString()}`);
   }
 
   async getTrendingExperiences() {

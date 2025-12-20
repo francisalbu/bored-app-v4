@@ -11,6 +11,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { BookingsProvider } from '@/contexts/BookingsContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 import { useShareIntent } from 'expo-share-intent';
@@ -233,16 +234,18 @@ export default function RootLayout() {
             merchantIdentifier="merchant.app.rork.bored-explorer"
           >
             <AuthProvider>
-              <BookingsProvider>
-                <FavoritesProvider>
-                  <GestureHandlerRootView style={{ flex: 1 }}>
-                    <RootLayoutNav />
-                    {showSplash && (
-                      <AnimatedSplash onFinish={() => setShowSplash(false)} />
-                    )}
-                  </GestureHandlerRootView>
-                </FavoritesProvider>
-              </BookingsProvider>
+              <PreferencesProvider>
+                <BookingsProvider>
+                  <FavoritesProvider>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                      <RootLayoutNav />
+                      {showSplash && (
+                        <AnimatedSplash onFinish={() => setShowSplash(false)} />
+                      )}
+                    </GestureHandlerRootView>
+                  </FavoritesProvider>
+                </BookingsProvider>
+              </PreferencesProvider>
             </AuthProvider>
           </StripeProvider>
         </LanguageProvider>

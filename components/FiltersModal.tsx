@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import { CATEGORIES as APP_CATEGORIES, type Experience } from '@/constants/experiences';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -60,6 +61,7 @@ interface FiltersModalProps {
 
 export function FiltersModal({ visible, onClose, onApply, currentFilters, experiences }: FiltersModalProps) {
   const { t } = useLanguage();
+  const { getSortedCategories } = usePreferences();
   const insets = useSafeAreaInsets();
   const [selectedCategories, setSelectedCategories] = useState<string[]>(currentFilters.categories);
   const [selectedPriceRange, setSelectedPriceRange] = useState<string | null>(currentFilters.priceRange);
@@ -70,7 +72,7 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
 
   // Filter categories to only show those with at least 1 experience (same logic as explore.tsx)
   const availableCategories = useMemo(() => {
-    return ALL_CATEGORIES.filter(category => {
+    const filtered = ALL_CATEGORIES.filter(category => {
       const normalizedCategoryName = category.label.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
       
       return experiences.some(exp => {
@@ -87,7 +89,10 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
         });
       });
     });
-  }, [experiences]);
+    
+    // Sort categories based on user preferences (favorites first)
+    return getSortedCategories(filtered);
+  }, [experiences, getSortedCategories]);
 
   // Sync with current filters when modal opens
   useEffect(() => {
@@ -315,8 +320,8 @@ export function FiltersModal({ visible, onClose, onApply, currentFilters, experi
   );
 }
 
-// Export price ranges and categories for use in filtering
-export { PRICE_RANGES, ALL_CATEGORIES as CATEGORIES };
+// Export price ranges, categories and availability options for use in filtering
+export { PRICE_RANGES, ALL_CATEGORIES as CATEGORIES, AVAILABILITY_OPTIONS };
 
 const styles = StyleSheet.create({
   modalOverlay: {

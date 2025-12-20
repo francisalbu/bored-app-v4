@@ -18,6 +18,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isNewSignup: boolean;
+  clearNewSignupFlag: () => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   register: (name: string, email: string, password: string, phone?: string) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean; email?: string }>;
   logout: () => Promise<void>;
@@ -34,7 +36,12 @@ const USER_KEY = 'user_data';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isNewSignup, setIsNewSignup] = useState(false);
   const posthog = usePostHog();
+
+  const clearNewSignupFlag = () => {
+    setIsNewSignup(false);
+  };
 
   useEffect(() => {
     loadStoredAuth();
@@ -381,6 +388,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         api.setAuthToken(supabaseToken);
         setUser(userData);
+        setIsNewSignup(true); // Mark as new signup to show quiz suggestion
 
         // Track successful registration
         if (posthog) {
@@ -592,6 +600,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        isNewSignup,
+        clearNewSignupFlag,
         login,
         register,
         logout,
