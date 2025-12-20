@@ -35,11 +35,11 @@ router.get('/', authenticateSupabase, async (req, res) => {
  * POST /api/preferences
  * Save or update user preferences from quiz
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticateSupabase, async (req, res) => {
   try {
     console.log('🎯 POST /api/preferences HIT!');
     console.log('Body:', req.body);
-    console.log('Headers:', req.headers);
+    console.log('User:', req.user);
     
     const { favorite_categories, preferences } = req.body;
 
@@ -47,14 +47,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    // TODO: Re-enable auth after testing
-    // For now, use a test user ID
-    const testUserId = 1;
+    // Use the authenticated user's ID
+    const userId = req.user.id;
+    console.log('💾 Saving preferences for user:', userId);
 
     // Check if preferences already exist
     const { data: existing } = await from('user_preferences')
       .select('id')
-      .eq('user_id', testUserId)
+      .eq('user_id', userId)
       .single();
 
     let result;
@@ -69,7 +69,7 @@ router.post('/', async (req, res) => {
           quiz_completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', testUserId)
+        .eq('user_id', userId)
         .select()
         .single();
 
@@ -79,7 +79,7 @@ router.post('/', async (req, res) => {
       // Create new preferences
       const { data, error } = await from('user_preferences')
         .insert({
-          user_id: testUserId,
+          user_id: userId,
           favorite_categories,
           preferences,
           quiz_completed: true,
