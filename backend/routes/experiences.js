@@ -87,10 +87,10 @@ router.get('/available', async (req, res, next) => {
     const minBookingTime = new Date(now.getTime() + bufferMs);
     
     // Build query to find experiences with available slots
+    // We'll filter by booked_participants < max_participants in JS since Supabase doesn't support column comparison directly
     let query = supabaseFrom('availability_slots')
       .select('experience_id, date, start_time, max_participants, booked_participants')
-      .eq('is_available', true)
-      .gt('max_participants', supabaseFrom.raw('booked_participants')); // Has spots
+      .eq('is_available', true);
     
     // Filter by date
     if (date) {
