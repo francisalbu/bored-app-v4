@@ -10,6 +10,9 @@ import {
   Modal,
   Linking,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -576,20 +579,31 @@ export default function ProfileScreen() {
       {/* Edit Profile Modal */}
       <Modal
         visible={showEditProfile}
-        animationType="fade"
-        transparent
+        animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={() => setShowEditProfile(false)}
       >
-        <Pressable style={styles.editModalOverlay} onPress={() => setShowEditProfile(false)}>
-          <Pressable style={styles.editModalContent} onPress={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <View style={styles.editModalHeader}>
-              <Text style={styles.editModalTitle}>Edit Profile</Text>
-              <Pressable onPress={() => setShowEditProfile(false)} style={styles.editCloseButton}>
-                <Text style={styles.editCloseText}>✕</Text>
-              </Pressable>
-            </View>
+        <KeyboardAvoidingView 
+          style={[styles.editModalContainer, { paddingTop: insets.top }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          {/* Header */}
+          <View style={styles.editModalHeader}>
+            <Pressable onPress={() => setShowEditProfile(false)} style={styles.editCloseButton}>
+              <Text style={styles.editCloseText}>✕</Text>
+            </Pressable>
+            <Text style={styles.editModalTitle}>Edit Profile</Text>
+            <View style={{ width: 32 }} />
+          </View>
 
+          <ScrollView 
+            style={styles.editScrollView}
+            contentContainerStyle={[styles.editScrollContent, { paddingBottom: insets.bottom + 40 }]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
+          >
             {/* Avatar Selection */}
             <View style={styles.editSection}>
               <Text style={styles.editSectionLabel}>Avatar</Text>
@@ -619,6 +633,7 @@ export default function ProfileScreen() {
                 placeholder="Enter your name"
                 placeholderTextColor={colors.dark.textSecondary}
                 autoCapitalize="words"
+                returnKeyType="next"
               />
             </View>
 
@@ -632,6 +647,7 @@ export default function ProfileScreen() {
                 placeholderTextColor={colors.dark.textSecondary}
                 keyboardType="numeric"
                 maxLength={10}
+                returnKeyType="next"
               />
             </View>
 
@@ -644,6 +660,8 @@ export default function ProfileScreen() {
                 placeholder="City, Country"
                 placeholderTextColor={colors.dark.textSecondary}
                 autoCapitalize="words"
+                returnKeyType="done"
+                onSubmitEditing={() => Keyboard.dismiss()}
               />
             </View>
 
@@ -666,8 +684,8 @@ export default function ProfileScreen() {
             >
               <Text style={styles.editSaveButtonText}>Save Changes</Text>
             </Pressable>
-          </Pressable>
-        </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Preferences Quiz Modal */}
@@ -1023,6 +1041,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.border,
   },
   // Edit Profile Modal
+  editModalContainer: {
+    flex: 1,
+    backgroundColor: colors.dark.background,
+  },
   editModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -1046,11 +1068,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
   },
   editModalTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.dark.text,
   },
   editCloseButton: {
@@ -1066,14 +1091,20 @@ const styles = StyleSheet.create({
     color: colors.dark.textSecondary,
     fontWeight: '600',
   },
+  editScrollView: {
+    flex: 1,
+  },
+  editScrollContent: {
+    padding: 20,
+  },
   editSection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   editSectionLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.dark.textSecondary,
-    marginBottom: 8,
+    marginBottom: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1100,13 +1131,15 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   editInput: {
-    backgroundColor: colors.dark.backgroundSecondary,
+    backgroundColor: colors.dark.card,
     borderRadius: 12,
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     fontSize: 16,
     color: colors.dark.text,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.dark.border,
+    minHeight: 52,
   },
   editSaveButton: {
     backgroundColor: colors.dark.primary,

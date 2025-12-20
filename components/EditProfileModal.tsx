@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,10 @@ import {
   Modal,
   Pressable,
   TextInput,
-  ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import colors from '@/constants/colors';
@@ -45,7 +47,6 @@ export default function EditProfileModal({
   const [location, setLocation] = useState(currentLocation || '');
   const [selectedIcon, setSelectedIcon] = useState(currentAvatarIcon);
   const [saving, setSaving] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (visible) {
@@ -84,7 +85,11 @@ export default function EditProfileModal({
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView 
+        style={[styles.container, { paddingTop: insets.top }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={10} style={styles.closeBtn}>
@@ -94,29 +99,14 @@ export default function EditProfileModal({
           <View style={{ width: 24 }} />
         </View>
 
-        {/* Content - ScrollView para funcionar com keyboard */}
-        <ScrollView 
-          ref={scrollRef}
+        {/* ScrollView inside KeyboardAvoidingView */}
+        <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 50 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Avatar */}
-          <Text style={styles.label}>AVATAR</Text>
-          <View style={styles.avatarRow}>
-            {AVATAR_ICONS.map((icon) => (
-              <Pressable
-                key={icon}
-                style={[styles.avatarBtn, selectedIcon === icon && styles.avatarBtnActive]}
-                onPress={() => setSelectedIcon(icon)}
-              >
-                <Text style={styles.avatarEmoji}>{icon}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* Name */}
+          {/* Name - moved to top */}
           <Text style={styles.label}>NAME *</Text>
           <TextInput
             style={styles.input}
@@ -147,10 +137,21 @@ export default function EditProfileModal({
             placeholder="City, Country"
             placeholderTextColor="#666"
             autoCorrect={false}
-            onFocus={() => {
-              setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200);
-            }}
           />
+
+          {/* Avatar - moved to bottom */}
+          <Text style={styles.label}>AVATAR</Text>
+          <View style={styles.avatarRow}>
+            {AVATAR_ICONS.map((icon) => (
+              <Pressable
+                key={icon}
+                style={[styles.avatarBtn, selectedIcon === icon && styles.avatarBtnActive]}
+                onPress={() => setSelectedIcon(icon)}
+              >
+                <Text style={styles.avatarEmoji}>{icon}</Text>
+              </Pressable>
+            ))}
+          </View>
 
           {/* Save */}
           <Pressable 
@@ -161,7 +162,7 @@ export default function EditProfileModal({
             <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

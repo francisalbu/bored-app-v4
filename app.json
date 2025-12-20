@@ -2,8 +2,8 @@
   "expo": {
     "name": "Bored Tourist",
     "slug": "bored-tourist",
-    "version": "1.0.2",
-    "runtimeVersion": "1.0.2",
+    "version": "1.0.3",
+    "runtimeVersion": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "app.rork.bored-explorer",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.bored-explorer",
-      "buildNumber": "2",
+      "buildNumber": "1",
       "config": {
         "googleMapsApiKey": "YOUR_IOS_API_KEY",
         "usesNonExemptEncryption": false
