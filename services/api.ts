@@ -256,8 +256,11 @@ class ApiService {
     name?: string;
     phone?: string;
     bio?: string;
+    birthdate?: string;
+    location?: string;
+    avatarIcon?: string;
   }) {
-    return this.request('/users/profile', {
+    return this.request('/profile', {
       method: 'PUT',
       body: JSON.stringify(userData),
     });

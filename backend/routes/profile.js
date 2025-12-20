@@ -47,7 +47,7 @@ router.get('/', authenticateSupabase, async (req, res, next) => {
     next(error);
   }
 });
-
+ 
 /**
  * PUT /api/profile
  * Update user profile

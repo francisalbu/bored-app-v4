@@ -9,6 +9,9 @@ interface User {
   email: string;
   name: string;
   phone?: string;
+  avatarIcon?: string;
+  location?: string;
+  birthdate?: string;
 }
 
 interface AuthContextType {
@@ -105,6 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: publicUser.email,
             name: publicUser.name,
             phone: publicUser.phone || undefined,
+            avatarIcon: publicUser.avatar_icon,
+            birthdate: publicUser.birthdate,
+            location: publicUser.location,
           };
 
           await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
@@ -536,6 +542,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: backendData.data.user.email,
           name: backendData.data.user.name,
           phone: backendData.data.user.phone,
+          avatarIcon: backendData.data.user.avatar_icon,
+          birthdate: backendData.data.user.birthdate,
+          location: backendData.data.user.location,
         };
 
         console.log('💾 Storing user data:', userData.email);

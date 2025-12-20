@@ -1,4 +1,4 @@
-import { ChevronLeft, MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight, Edit2 } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import {
   Pressable,
@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Linking,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -18,17 +19,42 @@ import colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
-import api from '@/services/api';
+import { api } from '@/services/api';
 import { useExperiences } from '@/hooks/useExperiences';
+import EditProfileModal from '../../components/EditProfileModal';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, isAuthenticated, logout, deleteAccount } = useAuth();
+  const { user, isAuthenticated, logout, deleteAccount, refreshUser } = useAuth();
   const { savedExperiences: savedExperienceIds } = useFavorites();
   const { experiences } = useExperiences();
   const [showAuthSheet, setShowAuthSheet] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  
+  // Edit profile states
+  const [editName, setEditName] = useState('');
+  const [editBirthdate, setEditBirthdate] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editAvatarIcon, setEditAvatarIcon] = useState('🧑‍🚀');
+
+  // Auto-format birthdate as user types
+  const handleBirthdateChange = (text: string) => {
+    // Remove all non-numeric characters
+    const numbers = text.replace(/\D/g, '');
+    
+    // Format as DD/MM/YYYY
+    let formatted = numbers;
+    if (numbers.length >= 3) {
+      formatted = numbers.slice(0, 2) + '/' + numbers.slice(2);
+    }
+    if (numbers.length >= 5) {
+      formatted = numbers.slice(0, 2) + '/' + numbers.slice(2, 4) + '/' + numbers.slice(4, 8);
+    }
+    
+    setEditBirthdate(formatted);
+  };
   
   // Get full experience data for saved experiences from API
   const savedExperiences = experiences.filter(exp => savedExperienceIds.includes(exp.id));
@@ -67,22 +93,26 @@ export default function ProfileScreen() {
     fetchStats();
   }, [isAuthenticated]);
   
-  // XP/Level system based on real stats
+  // Initialize edit states when modal opens
+  useEffect(() => {
+    if (showEditProfile && user) {
+      setEditName(user.name || '');
+      
+      // Convert birthdate from YYYY-MM-DD to DD/MM/YYYY
+      if (user.birthdate) {
+        const [year, month, day] = user.birthdate.split('-');
+        setEditBirthdate(`${day}/${month}/${year}`);
+      } else {
+        setEditBirthdate('');
+      }
+      
+      setEditLocation(user.location || '');
+      setEditAvatarIcon(user.avatarIcon || '🧑‍🚀');
+    }
+  }, [showEditProfile, user]);
+  
+  // Extract stats for display
   const { experiencesCompleted, citiesVisited, reviewsWritten } = userStats;
-  
-  // Level calculation: Each level requires more XP
-  const level = Math.floor(experiencesCompleted / 5) + 1;
-  const currentLevelXP = experiencesCompleted % 5;
-  const xpForNextLevel = 5;
-  const progressPercentage = (currentLevelXP / xpForNextLevel) * 100;
-  
-  const getLevelTitle = (lvl: number) => {
-    if (lvl <= 1) return 'Explorer';
-    if (lvl <= 3) return 'Adventurer';
-    if (lvl <= 5) return 'Traveler';
-    if (lvl <= 10) return 'Globetrotter';
-    return 'Legend';
-  };
   
   const handleLogout = () => {
     setShowMenu(false);
@@ -139,6 +169,79 @@ export default function ProfileScreen() {
 
   const handleEmailUs = () => {
     Linking.openURL('mailto:francisco.albuquerque@boredtourist.com');
+  };
+
+  const handleSaveProfile = async (data: {
+    name: string;
+    birthdate?: string;
+    location?: string;
+    avatarIcon: string;
+  }) => {
+    try {
+      // Validate name
+      if (!data.name.trim()) {
+        Alert.alert('Error', 'Name cannot be empty');
+        return;
+      }
+
+      // Validate birthdate if provided
+      if (data.birthdate) {
+        const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+        const match = data.birthdate.match(dateRegex);
+        
+        if (!match) {
+          Alert.alert('Error', 'Invalid date format. Please use DD/MM/YYYY');
+          return;
+        }
+
+        const [, day, month, year] = match;
+        const birthDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        
+        // Check if date is valid
+        if (
+          birthDate.getDate() !== parseInt(day) ||
+          birthDate.getMonth() !== parseInt(month) - 1 ||
+          birthDate.getFullYear() !== parseInt(year)
+        ) {
+          Alert.alert('Error', 'Invalid date');
+          return;
+        }
+
+        // Check if user is at least 16 years old
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+
+        if (age < 16) {
+          Alert.alert('Error', 'You must be at least 16 years old');
+          return;
+        }
+      }
+
+      const response = await api.updateProfile({
+        name: data.name,
+        birthdate: data.birthdate,
+        location: data.location,
+        avatarIcon: data.avatarIcon,
+      });
+
+      if (response.success) {
+        // Refresh user data
+        if (refreshUser) {
+          await refreshUser();
+        }
+        Alert.alert('Success', 'Profile updated successfully!');
+      } else {
+        throw new Error(response.error || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw error;
+    }
   };
 
   // Show login prompt when not authenticated
@@ -238,13 +341,21 @@ export default function ProfileScreen() {
         >
           {/* Profile Header */}
           <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
+            <Pressable style={styles.avatarContainer} onPress={() => setShowEditProfile(true)}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarEmoji}>🧑‍🚀</Text>
+                <Text style={styles.avatarEmoji}>{user?.avatarIcon || '🧑‍🚀'}</Text>
               </View>
-            </View>
+              <View style={styles.editIconBadge}>
+                <Edit2 size={14} color={colors.dark.background} />
+              </View>
+            </Pressable>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{user?.name || 'Explorer'}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.profileName}>{user?.name || 'Explorer'}</Text>
+                <Pressable style={styles.editNameButton} onPress={() => setShowEditProfile(true)}>
+                  <Edit2 size={18} color={colors.dark.textSecondary} />
+                </Pressable>
+              </View>
               <Text style={styles.profileUsername}>@{user?.email?.split('@')[0] || 'username'}</Text>
             </View>
           </View>
@@ -264,19 +375,6 @@ export default function ProfileScreen() {
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{reviewsWritten}</Text>
               <Text style={styles.statLabel}>Reviews</Text>
-            </View>
-          </View>
-
-          {/* Level Progress */}
-          <View style={styles.levelSection}>
-            <View style={styles.levelProgressBar}>
-              <View style={[styles.levelProgressFill, { width: `${Math.max(progressPercentage, 5)}%` }]} />
-            </View>
-            <View style={styles.levelLabels}>
-              <Text style={styles.levelCurrent}>
-                <Text style={styles.levelBold}>Level {level}</Text> {getLevelTitle(level)}
-              </Text>
-              <Text style={styles.levelNext}>Level {level + 1}</Text>
             </View>
           </View>
 
@@ -410,6 +508,114 @@ export default function ProfileScreen() {
         onClose={() => setShowAuthSheet(false)}
         onSuccess={() => setShowAuthSheet(false)}
       />
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={showEditProfile}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowEditProfile(false)}
+      >
+        <Pressable style={styles.editModalOverlay} onPress={() => setShowEditProfile(false)}>
+          <Pressable style={styles.editModalContent} onPress={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <View style={styles.editModalHeader}>
+              <Text style={styles.editModalTitle}>Edit Profile</Text>
+              <Pressable onPress={() => setShowEditProfile(false)} style={styles.editCloseButton}>
+                <Text style={styles.editCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            {/* Avatar Selection */}
+            <View style={styles.editSection}>
+              <Text style={styles.editSectionLabel}>Avatar</Text>
+              <View style={styles.editIconGrid}>
+                {['🧑‍🚀', '🏄‍♂️', '🧗‍♀️', '🚴‍♂️', '🏃‍♀️'].map((icon) => (
+                  <Pressable
+                    key={icon}
+                    style={[
+                      styles.editIconOption,
+                      editAvatarIcon === icon && styles.editIconSelected,
+                    ]}
+                    onPress={() => setEditAvatarIcon(icon)}
+                  >
+                    <Text style={styles.editIconEmoji}>{icon}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Form Fields */}
+            <View style={styles.editSection}>
+              <Text style={styles.editSectionLabel}>Name *</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter your name"
+                placeholderTextColor={colors.dark.textSecondary}
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={styles.editSection}>
+              <Text style={styles.editSectionLabel}>Date of Birth</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editBirthdate}
+                onChangeText={handleBirthdateChange}
+                placeholder="DD/MM/YYYY (16+ years)"
+                placeholderTextColor={colors.dark.textSecondary}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+            </View>
+
+            <View style={styles.editSection}>
+              <Text style={styles.editSectionLabel}>Location</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editLocation}
+                onChangeText={setEditLocation}
+                placeholder="City, Country"
+                placeholderTextColor={colors.dark.textSecondary}
+                autoCapitalize="words"
+              />
+            </View>
+
+            {/* Save Button */}
+            <Pressable 
+              style={styles.editSaveButton}
+              onPress={async () => {
+                try {
+                  await handleSaveProfile({
+                    name: editName,
+                    avatarIcon: editAvatarIcon,
+                    birthdate: editBirthdate,
+                    location: editLocation,
+                  });
+                  setShowEditProfile(false);
+                } catch (error) {
+                  // Error is handled in handleSaveProfile
+                }
+              }}
+            >
+              <Text style={styles.editSaveButtonText}>Save Changes</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* TODO: Fix EditProfileModal import issue */}
+      {/* <EditProfileModal
+        visible={showEditProfile}
+        onClose={() => setShowEditProfile(false)}
+        currentName={user?.name || ''}
+        currentAvatarIcon={user?.avatarIcon || '🧑‍🚀'}
+        currentBirthdate={user?.birthdate}
+        currentLocation={user?.location}
+        onSave={handleSaveProfile}
+      /> */}
     </>
   );
 }
@@ -477,14 +683,35 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 48,
   },
+  editIconBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.dark.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.dark.background,
+  },
   profileInfo: {
     flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  editNameButton: {
+    marginLeft: 8,
+    padding: 4,
   },
   profileName: {
     fontSize: 28,
     fontWeight: '800' as const,
     color: colors.dark.text,
-    marginBottom: 4,
   },
   profileUsername: {
     fontSize: 16,
@@ -515,38 +742,6 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: colors.dark.border,
-  },
-  // Level Progress
-  levelSection: {
-    marginBottom: 24,
-  },
-  levelProgressBar: {
-    height: 8,
-    backgroundColor: colors.dark.backgroundTertiary,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  levelProgressFill: {
-    height: '100%',
-    backgroundColor: colors.dark.text,
-    borderRadius: 4,
-  },
-  levelLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  levelCurrent: {
-    fontSize: 14,
-    color: colors.dark.textSecondary,
-  },
-  levelBold: {
-    fontWeight: '800' as const,
-    color: colors.dark.text,
-  },
-  levelNext: {
-    fontSize: 14,
-    color: colors.dark.textTertiary,
   },
   // Saved Card
   savedCard: {
@@ -714,5 +909,103 @@ const styles = StyleSheet.create({
   menuDropdownDivider: {
     height: 1,
     backgroundColor: colors.dark.border,
+  },
+  // Edit Profile Modal
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  editModalContent: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  editModalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.dark.text,
+  },
+  editCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.dark.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editCloseText: {
+    fontSize: 18,
+    color: colors.dark.textSecondary,
+    fontWeight: '600',
+  },
+  editSection: {
+    marginBottom: 20,
+  },
+  editSectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.dark.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  editIconGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  editIconOption: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.dark.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  editIconSelected: {
+    borderColor: colors.dark.primary,
+    backgroundColor: `${colors.dark.primary}15`,
+  },
+  editIconEmoji: {
+    fontSize: 28,
+  },
+  editInput: {
+    backgroundColor: colors.dark.backgroundSecondary,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: colors.dark.text,
+    borderWidth: 1.5,
+    borderColor: colors.dark.border,
+  },
+  editSaveButton: {
+    backgroundColor: colors.dark.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  editSaveButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.dark.background,
   },
 });
