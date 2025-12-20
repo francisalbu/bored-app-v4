@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { X, Check } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import colors from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -45,13 +45,22 @@ export default function EditProfileModal({
   const [location, setLocation] = useState(currentLocation || '');
   const [selectedIcon, setSelectedIcon] = useState(currentAvatarIcon);
   const [saving, setSaving] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setName(currentName);
+      setBirthdate(currentBirthdate || '');
+      setLocation(currentLocation || '');
+      setSelectedIcon(currentAvatarIcon);
+    }
+  }, [visible, currentName, currentBirthdate, currentLocation, currentAvatarIcon]);
 
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Name cannot be empty');
       return;
     }
-
     setSaving(true);
     try {
       await onSave({
@@ -69,167 +78,148 @@ export default function EditProfileModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={colors.dark.text} />
-            </Pressable>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
-            <Pressable onPress={handleSave} style={styles.saveButton} disabled={saving}>
-              <Check size={24} color={colors.dark.primary} />
-            </Pressable>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable onPress={onClose} hitSlop={10} style={styles.closeBtn}>
+            <X size={24} color={colors.dark.text} />
+          </Pressable>
+          <Text style={styles.title}>Edit Profile</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        {/* Content - ScrollView para funcionar com keyboard */}
+        <ScrollView 
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Avatar */}
+          <Text style={styles.label}>AVATAR</Text>
+          <View style={styles.avatarRow}>
+            {AVATAR_ICONS.map((icon) => (
+              <Pressable
+                key={icon}
+                style={[styles.avatarBtn, selectedIcon === icon && styles.avatarBtnActive]}
+                onPress={() => setSelectedIcon(icon)}
+              >
+                <Text style={styles.avatarEmoji}>{icon}</Text>
+              </Pressable>
+            ))}
           </View>
 
-          <ScrollView 
-            style={styles.modalScroll} 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+          {/* Name */}
+          <Text style={styles.label}>NAME *</Text>
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="Enter your name"
+            placeholderTextColor="#666"
+            autoCorrect={false}
+          />
+
+          {/* Birthdate */}
+          <Text style={styles.label}>DATE OF BIRTH</Text>
+          <TextInput
+            style={styles.input}
+            value={birthdate}
+            onChangeText={setBirthdate}
+            placeholder="DD/MM/YYYY (16+ years)"
+            placeholderTextColor="#666"
+            keyboardType="numbers-and-punctuation"
+          />
+
+          {/* Location */}
+          <Text style={styles.label}>LOCATION</Text>
+          <TextInput
+            style={styles.input}
+            value={location}
+            onChangeText={setLocation}
+            placeholder="City, Country"
+            placeholderTextColor="#666"
+            autoCorrect={false}
+            onFocus={() => {
+              setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200);
+            }}
+          />
+
+          {/* Save */}
+          <Pressable 
+            style={[styles.saveBtn, saving && { opacity: 0.6 }]} 
+            onPress={handleSave} 
+            disabled={saving}
           >
-            {/* Avatar Icon Selection */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Choose Avatar</Text>
-              <View style={styles.iconGrid}>
-                {AVATAR_ICONS.map((icon) => (
-                  <Pressable
-                    key={icon}
-                    style={[
-                      styles.iconOption,
-                      selectedIcon === icon && styles.iconOptionSelected,
-                    ]}
-                    onPress={() => setSelectedIcon(icon)}
-                  >
-                    <Text style={styles.iconEmoji}>{icon}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Name */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your name"
-                placeholderTextColor={colors.dark.textSecondary}
-                autoCapitalize="words"
-              />
-            </View>
-
-            {/* Birthdate */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Date of Birth</Text>
-              <TextInput
-                style={styles.input}
-                value={birthdate}
-                onChangeText={setBirthdate}
-                placeholder="DD/MM/YYYY"
-                placeholderTextColor={colors.dark.textSecondary}
-                keyboardType="numbers-and-punctuation"
-              />
-              <Text style={styles.hint}>Optional</Text>
-            </View>
-
-            {/* Location */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Location</Text>
-              <TextInput
-                style={styles.input}
-                value={location}
-                onChangeText={setLocation}
-                placeholder="City, Country"
-                placeholderTextColor={colors.dark.textSecondary}
-                autoCapitalize="words"
-              />
-              <Text style={styles.hint}>Optional</Text>
-            </View>
-          </ScrollView>
-        </View>
+            <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
+          </Pressable>
+        </ScrollView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
     backgroundColor: colors.dark.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    minHeight: '75%',
-    maxHeight: '90%',
   },
-  modalHeader: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.dark.border,
   },
-  closeButton: {
-    padding: 8,
+  closeBtn: {
+    padding: 4,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.dark.text,
-  },
-  saveButton: {
-    padding: 8,
-  },
-  modalScroll: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  section: {
-    marginTop: 24,
-  },
-  sectionLabel: {
-    fontSize: 14,
+  title: {
+    fontSize: 18,
     fontWeight: '600',
     color: colors.dark.text,
-    marginBottom: 12,
   },
-  iconGrid: {
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    padding: 20,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.dark.textSecondary,
+    marginTop: 24,
+    marginBottom: 10,
+  },
+  avatarRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
   },
-  iconOption: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  avatarBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.dark.card,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  iconOptionSelected: {
+  avatarBtnActive: {
     borderColor: colors.dark.primary,
-    backgroundColor: `${colors.dark.primary}20`,
   },
-  iconEmoji: {
-    fontSize: 32,
+  avatarEmoji: {
+    fontSize: 28,
   },
   input: {
     backgroundColor: colors.dark.card,
@@ -240,9 +230,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.dark.border,
   },
-  hint: {
-    fontSize: 12,
-    color: colors.dark.textSecondary,
-    marginTop: 6,
+  saveBtn: {
+    backgroundColor: colors.dark.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 32,
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.dark.background,
   },
 });

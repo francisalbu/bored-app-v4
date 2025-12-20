@@ -172,7 +172,14 @@ export default function ExploreScreen() {
                 styles.categoryPill,
                 selectedCategory === category.id && styles.categoryPillActive,
               ]}
-              onPress={() => setSelectedCategory(category.id)}
+              onPress={() => {
+                // Toggle: if already selected, go back to 'all', otherwise select this category
+                if (selectedCategory === category.id) {
+                  setSelectedCategory('all');
+                } else {
+                  setSelectedCategory(category.id);
+                }
+              }}
             >
               <Text style={styles.categoryIcon}>{category.icon}</Text>
               <Text style={[

@@ -1,4 +1,4 @@
-import { ChevronLeft, MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight, Edit2 } from 'lucide-react-native';
+import { MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight, Edit2 } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import {
   Pressable,
@@ -309,9 +309,7 @@ export default function ProfileScreen() {
       <>
         <View style={styles.container}>
           <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <ChevronLeft size={28} color={colors.dark.text} />
-            </Pressable>
+            <View style={styles.headerLeft} />
             <Text style={styles.headerTitle}>Profile</Text>
             <View style={styles.headerRight} />
           </View>
@@ -383,9 +381,7 @@ export default function ProfileScreen() {
     <>
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={28} color={colors.dark.text} />
-          </Pressable>
+          <View style={styles.headerLeft} />
           <View style={styles.headerRight}>
             <Pressable style={styles.menuButton} onPress={() => setShowMenu(true)}>
               <MoreVertical size={24} color={colors.dark.text} />
@@ -409,12 +405,7 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
             <View style={styles.profileInfo}>
-              <View style={styles.nameRow}>
-                <Text style={styles.profileName}>{user?.name || 'Explorer'}</Text>
-                <Pressable style={styles.editNameButton} onPress={() => setShowEditProfile(true)}>
-                  <Edit2 size={18} color={colors.dark.textSecondary} />
-                </Pressable>
-              </View>
+              <Text style={styles.profileName}>{user?.name || 'Explorer'}</Text>
               <Text style={styles.profileUsername}>@{user?.email?.split('@')[0] || 'username'}</Text>
             </View>
           </View>
@@ -489,7 +480,6 @@ export default function ProfileScreen() {
                 <Text style={styles.quizTitle}>Help us know you better</Text>
                 <Text style={styles.quizSubtitle}>Take a quick quiz to personalize your feed</Text>
               </View>
-              <ChevronRight size={24} color={colors.dark.primary} />
             </Pressable>
           )}
 
@@ -733,11 +723,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  backButton: {
+  headerLeft: {
     width: 44,
     height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -800,19 +788,11 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  editNameButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
   profileName: {
     fontSize: 28,
     fontWeight: '800' as const,
     color: colors.dark.text,
+    marginBottom: 4,
   },
   profileUsername: {
     fontSize: 16,
