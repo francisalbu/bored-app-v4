@@ -19,6 +19,7 @@ import colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
+import PreferencesQuiz from '@/components/PreferencesQuiz';
 import { api } from '@/services/api';
 import { useExperiences } from '@/hooks/useExperiences';
 import EditProfileModal from '../../components/EditProfileModal';
@@ -32,6 +33,8 @@ export default function ProfileScreen() {
   const [showAuthSheet, setShowAuthSheet] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [hasCompletedQuiz, setHasCompletedQuiz] = useState(false);
   
   // Edit profile states
   const [editName, setEditName] = useState('');
@@ -92,6 +95,25 @@ export default function ProfileScreen() {
 
     fetchStats();
   }, [isAuthenticated]);
+
+  // Check if user has completed quiz
+  useEffect(() => {
+    const checkQuizStatus = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        const response = await api.getPreferences();
+        if (response.success && response.data) {
+          const data = response.data as { quiz_completed?: boolean };
+          setHasCompletedQuiz(data.quiz_completed || false);
+        }
+      } catch (error) {
+        console.log('Failed to check quiz status:', error);
+      }
+    };
+
+    checkQuizStatus();
+  }, [isAuthenticated]);
   
   // Initialize edit states when modal opens
   useEffect(() => {
@@ -130,6 +152,56 @@ export default function ProfileScreen() {
         },
       ]
     );
+  };
+
+  // Handle quiz completion
+  const handleQuizComplete = async (quizData: {
+    favorite_categories: string[];
+    preferences: Record<string, boolean>;
+  }) => {
+    try {
+      console.log('📝 Starting to save quiz data...');
+      console.log('📊 Quiz Data to save:', JSON.stringify(quizData, null, 2));
+      console.log('📦 Categories:', quizData.favorite_categories);
+      console.log('📦 Preferences count:', Object.keys(quizData.preferences).length);
+      
+      // Show loading alert
+      const savingAlert = Alert.alert(
+        'Saving...',
+        'Please wait while we save your preferences.',
+        [],
+        { cancelable: false }
+      );
+
+      const response = await api.savePreferences(quizData);
+      console.log('✅ Save response received:', JSON.stringify(response, null, 2));
+      
+      if (response.success) {
+        console.log('🎉 Successfully saved preferences to database!');
+        setHasCompletedQuiz(true);
+        setShowQuiz(false);
+        Alert.alert(
+          '🎉 Success!', 
+          'Your preferences have been saved! We\'ll use them to personalize your experience.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.error('❌ Save failed with error:', response.error);
+        Alert.alert(
+          '⚠️ Error', 
+          `Failed to save preferences: ${response.error || 'Unknown error'}. Please try again.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('💥 Exception while saving quiz:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      Alert.alert(
+        '💥 Error', 
+        'Something went wrong while saving. Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -419,6 +491,21 @@ export default function ProfileScreen() {
             <ChevronRight size={24} color={colors.dark.textTertiary} />
           </Pressable>
 
+          {/* Preferences Quiz Card */}
+          {!hasCompletedQuiz && (
+            <Pressable 
+              style={styles.quizCard}
+              onPress={() => setShowQuiz(true)}
+            >
+              <Text style={styles.quizEmoji}>🎯</Text>
+              <View style={styles.quizContent}>
+                <Text style={styles.quizTitle}>Help us know you better</Text>
+                <Text style={styles.quizSubtitle}>Take a quick quiz to personalize your feed</Text>
+              </View>
+              <ChevronRight size={24} color={colors.dark.primary} />
+            </Pressable>
+          )}
+
           {/* Contact Section */}
           <View style={styles.sectionCard}>
             <Pressable style={styles.menuItem} onPress={handleTextFounder}>
@@ -606,6 +693,30 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      {/* Preferences Quiz Modal */}
+      <Modal
+        visible={showQuiz}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <PreferencesQuiz
+          onComplete={handleQuizComplete}
+          onClose={() => setShowQuiz(false)}
+        />
+      </Modal>
+
+      {/* Preferences Quiz Modal */}
+      <Modal
+        visible={showQuiz}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <PreferencesQuiz
+          onComplete={handleQuizComplete}
+          onClose={() => setShowQuiz(false)}
+        />
+      </Modal>
+
       {/* TODO: Fix EditProfileModal import issue */}
       {/* <EditProfileModal
         visible={showEditProfile}
@@ -742,6 +853,37 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: colors.dark.border,
+  },
+  // Quiz Card
+  quizCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quizEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  quizContent: {
+    flex: 1,
+  },
+  quizTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 3,
+  },
+  quizSubtitle: {
+    fontSize: 13,
+    color: '#666666',
   },
   // Saved Card
   savedCard: {

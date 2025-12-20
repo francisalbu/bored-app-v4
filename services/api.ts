@@ -277,6 +277,24 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Preferences APIs
+  async getPreferences() {
+    return this.request('/preferences');
+  }
+
+  async savePreferences(data: {
+    favorite_categories: string[];
+    preferences: Record<string, boolean>;
+  }) {
+    return this.request('/preferences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new ApiService();
