@@ -136,7 +136,10 @@
     },
     "owner": "boredtourist",
     "updates": {
-      "url": "https://u.expo.dev/cd4bc13b-fb4a-4d0d-82ed-3faf6e991bba"
+      "url": "https://u.expo.dev/cd4bc13b-fb4a-4d0d-82ed-3faf6e991bba",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }
