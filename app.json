@@ -8,7 +8,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "app.rork.bored-explorer",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-logo.png",
       "resizeMode": "contain",
@@ -48,8 +48,8 @@
           {
             "CFBundleURLName": "com.rork.boredtourist.oauth",
             "CFBundleURLSchemes": [
-               "app.rork.bored-explorer",
-               "boredtourist",
+              "app.rork.bored-explorer",
+              "boredtourist",
               "com.googleusercontent.apps.2440322136358i7hsc8mco161ahd0bc5jgnnnlcsc851"
             ]
           }
@@ -119,7 +119,8 @@
             "NSExtensionActivationSupportsText": true
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
