@@ -77,115 +77,180 @@ function formatTime(timeString) {
  * - Dark theme (#0A0A0A background)
  * - Primary green (#00FF8C)
  * - Secondary yellow (#FFE600)
+ * 
+ * OUTLOOK/GMAIL COMPATIBLE:
+ * - Uses tables instead of divs
+ * - No position:relative/absolute
+ * - No CSS gradients (uses solid colors)
+ * - Explicit cellpadding/cellspacing
+ * - mso- conditional comments for Outlook
  */
 function generateBookingConfirmationHTML(booking) {
   const ticketDate = formatDate(booking.slot_date || booking.booking_date);
   const ticketTime = formatTime(booking.slot_start_time || booking.booking_time);
   
   return `
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Booking Confirmed - Bored Tourist</title>
+  <!--[if mso]>
+  <style type="text/css">
+    table {border-collapse: collapse;}
+    .fallback-font {font-family: Arial, sans-serif !important;}
+  </style>
+  <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0A0A0A;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #0A0A0A; -webkit-font-smoothing: antialiased;">
+  <!-- Wrapper table for full width background -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0A0A0A;">
     <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+      <td align="center" style="padding: 40px 20px;">
+        
+        <!-- Main content table - fixed width for consistency -->
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%;">
           
           <!-- Logo Header -->
           <tr>
-            <td align="center" style="padding-bottom: 30px;">
-              <h1 style="color: #FFFFFF; font-size: 28px; margin: 0; font-weight: 700;">
-                🎫 Bored Tourist
-              </h1>
-              <p style="color: #A0A0A0; font-size: 14px; margin: 8px 0 0 0;">
-                Your adventure awaits!
-              </p>
+            <td align="center" style="padding: 0 0 30px 0; font-family: Arial, Helvetica, sans-serif;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-size: 28px; color: #FFFFFF; font-weight: bold; text-align: center;">
+                    🎫 Bored Tourist
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 14px; color: #A0A0A0; text-align: center; padding-top: 8px;">
+                    Your adventure awaits!
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           
           <!-- Success Badge -->
           <tr>
-            <td align="center" style="padding-bottom: 30px;">
-              <div style="display: inline-block; background: linear-gradient(135deg, #00FF8C 0%, #00CC70 100%); color: #000000; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 16px;">
-                ✓ Booking Confirmed!
-              </div>
+            <td align="center" style="padding: 0 0 30px 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background-color: #00FF8C; color: #000000; padding: 12px 24px; font-size: 16px; font-weight: bold; font-family: Arial, Helvetica, sans-serif; text-align: center;">
+                    ✓ Booking Confirmed!
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           
           <!-- Ticket Card -->
           <tr>
             <td>
-              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%); border-radius: 20px; overflow: hidden; border: 1px solid #333333;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #1A1A1A; border: 1px solid #333333;">
                 
                 <!-- Experience Image -->
                 ${booking.experience_image ? `
                 <tr>
-                  <td>
-                    <img src="${booking.experience_image}" alt="${booking.experience_title}" style="width: 100%; height: 200px; object-fit: cover; display: block;">
+                  <td style="padding: 0; line-height: 0;">
+                    <img src="${booking.experience_image}" alt="${booking.experience_title}" width="598" style="width: 100%; max-width: 598px; height: auto; display: block; border: 0;" />
                   </td>
                 </tr>
                 ` : ''}
                 
                 <!-- Ticket Content -->
                 <tr>
-                  <td style="padding: 30px;">
+                  <td style="padding: 30px; font-family: Arial, Helvetica, sans-serif;">
                     
                     <!-- Experience Title -->
-                    <h2 style="color: #FFFFFF; font-size: 24px; margin: 0 0 8px 0; font-weight: 700;">
-                      ${booking.experience_title}
-                    </h2>
-                    
-                    <!-- Location -->
-                    <p style="color: #A0A0A0; font-size: 14px; margin: 0 0 24px 0;">
-                      📍 ${booking.experience_location || 'Lisbon, Portugal'}
-                    </p>
-                    
-                    <!-- Divider with ticket notch effect -->
-                    <div style="border-top: 2px dashed #444444; margin: 20px -30px; position: relative;">
-                      <div style="position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; background: #0A0A0A; border-radius: 50%;"></div>
-                      <div style="position: absolute; right: -15px; top: -15px; width: 30px; height: 30px; background: #0A0A0A; border-radius: 50%;"></div>
-                    </div>
-                    
-                    <!-- Booking Details Grid -->
-                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       <tr>
-                        <td width="50%" style="padding: 12px 0;">
-                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Date</p>
-                          <p style="color: #FFFFFF; font-size: 15px; margin: 0; font-weight: 600;">📅 ${ticketDate}</p>
-                        </td>
-                        <td width="50%" style="padding: 12px 0;">
-                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Time</p>
-                          <p style="color: #FFFFFF; font-size: 15px; margin: 0; font-weight: 600;">🕐 ${ticketTime}</p>
+                        <td style="font-size: 24px; color: #FFFFFF; font-weight: bold; padding: 0 0 8px 0;">
+                          ${booking.experience_title}
                         </td>
                       </tr>
                       <tr>
-                        <td width="50%" style="padding: 12px 0;">
-                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">People</p>
-                          <p style="color: #FFFFFF; font-size: 15px; margin: 0; font-weight: 600;">👥 ${booking.participants} ${booking.participants === 1 ? 'person' : 'people'}</p>
+                        <td style="font-size: 14px; color: #A0A0A0; padding: 0 0 20px 0;">
+                          📍 ${booking.experience_location || 'Lisbon, Portugal'}
                         </td>
-                        <td width="50%" style="padding: 12px 0;">
-                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px;">Total Paid</p>
-                          <p style="color: #00FF8C; font-size: 15px; margin: 0; font-weight: 700;">${booking.currency || '€'}${booking.total_amount}</p>
+                      </tr>
+                    </table>
+                    
+                    <!-- Divider -->
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="border-top: 2px dashed #444444; padding: 0; height: 1px; line-height: 1px; font-size: 1px;">&nbsp;</td>
+                      </tr>
+                    </table>
+                    
+                    <!-- Booking Details Grid - 2x2 -->
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
+                      <!-- Row 1: Date & Time -->
+                      <tr>
+                        <td width="50%" valign="top" style="padding: 12px 10px 12px 0;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 11px; color: #A0A0A0; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 4px 0;">DATE</td>
+                            </tr>
+                            <tr>
+                              <td style="font-size: 15px; color: #FFFFFF; font-weight: bold;">📅 ${ticketDate}</td>
+                            </tr>
+                          </table>
+                        </td>
+                        <td width="50%" valign="top" style="padding: 12px 0 12px 10px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 11px; color: #A0A0A0; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 4px 0;">TIME</td>
+                            </tr>
+                            <tr>
+                              <td style="font-size: 15px; color: #FFFFFF; font-weight: bold;">🕐 ${ticketTime}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <!-- Row 2: People & Total -->
+                      <tr>
+                        <td width="50%" valign="top" style="padding: 12px 10px 12px 0;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 11px; color: #A0A0A0; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 4px 0;">PEOPLE</td>
+                            </tr>
+                            <tr>
+                              <td style="font-size: 15px; color: #FFFFFF; font-weight: bold;">👥 ${booking.participants} ${booking.participants === 1 ? 'person' : 'people'}</td>
+                            </tr>
+                          </table>
+                        </td>
+                        <td width="50%" valign="top" style="padding: 12px 0 12px 10px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 11px; color: #A0A0A0; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 4px 0;">TOTAL PAID</td>
+                            </tr>
+                            <tr>
+                              <td style="font-size: 15px; color: #00FF8C; font-weight: bold;">${booking.currency || '€'}${booking.total_amount}</td>
+                            </tr>
+                          </table>
                         </td>
                       </tr>
                     </table>
                     
                     <!-- Booking Reference Box -->
-                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; border-radius: 12px; margin-top: 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 24px;">
                       <tr>
-                        <td style="padding: 20px; text-align: center;">
-                          <p style="color: #A0A0A0; font-size: 11px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 1px;">Booking Reference</p>
-                          <p style="color: #FFE600; font-size: 24px; margin: 0; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 3px;">
-                            ${booking.booking_reference}
-                          </p>
-                          <p style="color: #666666; font-size: 12px; margin: 8px 0 0 0;">
-                            Show this code when you arrive
-                          </p>
+                        <td style="background-color: #0A0A0A; padding: 20px; text-align: center;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 11px; color: #A0A0A0; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 8px 0; text-align: center;">BOOKING REFERENCE</td>
+                            </tr>
+                            <tr>
+                              <td style="font-size: 24px; color: #FFE600; font-weight: bold; font-family: 'Courier New', Courier, monospace; letter-spacing: 3px; text-align: center;">
+                                ${booking.booking_reference}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="font-size: 12px; color: #666666; padding-top: 8px; text-align: center;">
+                                Show this code when you arrive
+                              </td>
+                            </tr>
+                          </table>
                         </td>
                       </tr>
                     </table>
@@ -199,28 +264,27 @@ function generateBookingConfirmationHTML(booking) {
           <!-- Contact Information -->
           <tr>
             <td style="padding-top: 24px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #333333;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #1A1A1A; border: 1px solid #333333;">
                 <tr>
-                  <td style="padding: 24px;">
-                    <h3 style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">👤 Contact Information</h3>
-                    <table width="100%" cellpadding="0" cellspacing="0">
+                  <td style="padding: 24px; font-family: Arial, Helvetica, sans-serif;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       <tr>
-                        <td style="padding: 6px 0;">
-                          <span style="color: #A0A0A0; font-size: 14px;">Name:</span>
-                          <span style="color: #FFFFFF; font-size: 14px; font-weight: 500; margin-left: 8px;">${booking.customer_name}</span>
+                        <td style="font-size: 16px; color: #FFFFFF; font-weight: bold; padding: 0 0 16px 0;">👤 Contact Information</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 14px; color: #A0A0A0; padding: 6px 0;">
+                          Name: <span style="color: #FFFFFF; font-weight: 500;">${booking.customer_name}</span>
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding: 6px 0;">
-                          <span style="color: #A0A0A0; font-size: 14px;">Email:</span>
-                          <span style="color: #FFFFFF; font-size: 14px; font-weight: 500; margin-left: 8px;">${booking.customer_email}</span>
+                        <td style="font-size: 14px; color: #A0A0A0; padding: 6px 0;">
+                          Email: <span style="color: #FFFFFF; font-weight: 500;">${booking.customer_email}</span>
                         </td>
                       </tr>
                       ${booking.customer_phone ? `
                       <tr>
-                        <td style="padding: 6px 0;">
-                          <span style="color: #A0A0A0; font-size: 14px;">Phone:</span>
-                          <span style="color: #FFFFFF; font-size: 14px; font-weight: 500; margin-left: 8px;">${booking.customer_phone}</span>
+                        <td style="font-size: 14px; color: #A0A0A0; padding: 6px 0;">
+                          Phone: <span style="color: #FFFFFF; font-weight: 500;">${booking.customer_phone}</span>
                         </td>
                       </tr>
                       ` : ''}
@@ -234,69 +298,49 @@ function generateBookingConfirmationHTML(booking) {
           <!-- Need Help Section -->
           <tr>
             <td style="padding-top: 24px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #333333;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #1A1A1A; border: 1px solid #333333;">
                 <tr>
-                  <td style="padding: 24px;">
-                    <h3 style="color: #FFFFFF; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">🆘 Need Help?</h3>
-                    <p style="color: #A0A0A0; font-size: 14px; margin: 0 0 16px 0;">
-                      Questions about your booking? We're here to help!
-                    </p>
-                    
-                    <table width="100%" cellpadding="0" cellspacing="0">
+                  <td style="padding: 24px; font-family: Arial, Helvetica, sans-serif;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="font-size: 16px; color: #FFFFFF; font-weight: bold; padding: 0 0 16px 0;">🆘 Need Help?</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 14px; color: #A0A0A0; padding: 0 0 16px 0;">
+                          Questions about your booking? We're here to help!
+                        </td>
+                      </tr>
                       <!-- WhatsApp -->
                       <tr>
-                        <td style="padding: 10px 0;">
-                          <a href="${CONTACT.whatsappLink}" style="color: #00FF8C; text-decoration: none; font-size: 14px; display: block;">
-                            <table cellpadding="0" cellspacing="0">
-                              <tr>
-                                <td style="width: 32px; vertical-align: middle;">
-                                  <span style="font-size: 18px;">📱</span>
-                                </td>
-                                <td style="vertical-align: middle;">
-                                  <span style="color: #A0A0A0;">WhatsApp:</span>
-                                  <span style="color: #00FF8C; font-weight: 600; margin-left: 4px;">${CONTACT.whatsapp}</span>
-                                </td>
-                              </tr>
-                            </table>
-                          </a>
+                        <td style="padding: 8px 0;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 14px; color: #A0A0A0; padding-right: 8px;">📱 WhatsApp:</td>
+                              <td style="font-size: 14px;"><a href="${CONTACT.whatsappLink}" style="color: #00FF8C; font-weight: bold; text-decoration: none;">${CONTACT.whatsapp}</a></td>
+                            </tr>
+                          </table>
                         </td>
                       </tr>
-                      
                       <!-- Email -->
                       <tr>
-                        <td style="padding: 10px 0;">
-                          <a href="mailto:${CONTACT.email}" style="color: #00FF8C; text-decoration: none; font-size: 14px; display: block;">
-                            <table cellpadding="0" cellspacing="0">
-                              <tr>
-                                <td style="width: 32px; vertical-align: middle;">
-                                  <span style="font-size: 18px;">✉️</span>
-                                </td>
-                                <td style="vertical-align: middle;">
-                                  <span style="color: #A0A0A0;">Email:</span>
-                                  <span style="color: #00FF8C; font-weight: 600; margin-left: 4px;">${CONTACT.email}</span>
-                                </td>
-                              </tr>
-                            </table>
-                          </a>
+                        <td style="padding: 8px 0;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 14px; color: #A0A0A0; padding-right: 8px;">✉️ Email:</td>
+                              <td style="font-size: 14px;"><a href="mailto:${CONTACT.email}" style="color: #00FF8C; font-weight: bold; text-decoration: none;">${CONTACT.email}</a></td>
+                            </tr>
+                          </table>
                         </td>
                       </tr>
-                      
                       <!-- Meeting Point -->
                       <tr>
-                        <td style="padding: 10px 0;">
-                          <a href="https://maps.google.com/?q=${encodeURIComponent(booking.experience_location || 'Lisbon, Portugal')}" style="color: #00FF8C; text-decoration: none; font-size: 14px; display: block;">
-                            <table cellpadding="0" cellspacing="0">
-                              <tr>
-                                <td style="width: 32px; vertical-align: middle;">
-                                  <span style="font-size: 18px;">📍</span>
-                                </td>
-                                <td style="vertical-align: middle;">
-                                  <span style="color: #A0A0A0;">Meeting Point:</span>
-                                  <span style="color: #00FF8C; font-weight: 600; margin-left: 4px;">View on Maps</span>
-                                </td>
-                              </tr>
-                            </table>
-                          </a>
+                        <td style="padding: 8px 0;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="font-size: 14px; color: #A0A0A0; padding-right: 8px;">📍 Meeting Point:</td>
+                              <td style="font-size: 14px;"><a href="https://maps.google.com/?q=${encodeURIComponent(booking.experience_location || 'Lisbon, Portugal')}" style="color: #00FF8C; font-weight: bold; text-decoration: none;">View on Maps</a></td>
+                            </tr>
+                          </table>
                         </td>
                       </tr>
                     </table>
@@ -309,16 +353,26 @@ function generateBookingConfirmationHTML(booking) {
           <!-- Important Info -->
           <tr>
             <td style="padding-top: 24px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1A1A1A; border-radius: 16px; border: 1px solid #FFE600;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #1A1A1A; border: 2px solid #FFE600;">
                 <tr>
-                  <td style="padding: 20px;">
-                    <h3 style="color: #FFE600; font-size: 14px; margin: 0 0 12px 0; font-weight: 600;">⚡ Important Information</h3>
-                    <ul style="color: #A0A0A0; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
-                      <li>Please arrive <strong style="color: #FFFFFF;">15 minutes before</strong> your scheduled time</li>
-                      <li>Bring a valid <strong style="color: #FFFFFF;">ID document</strong></li>
-                      <li>Show your <strong style="color: #FFE600;">booking reference</strong> when you arrive</li>
-                      <li>Check the weather and dress appropriately</li>
-                    </ul>
+                  <td style="padding: 20px; font-family: Arial, Helvetica, sans-serif;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="font-size: 14px; color: #FFE600; font-weight: bold; padding: 0 0 12px 0;">⚡ Important Information</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 13px; color: #A0A0A0; padding: 4px 0;">• Please arrive <strong style="color: #FFFFFF;">15 minutes before</strong> your scheduled time</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 13px; color: #A0A0A0; padding: 4px 0;">• Bring a valid <strong style="color: #FFFFFF;">ID document</strong></td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 13px; color: #A0A0A0; padding: 4px 0;">• Show your <strong style="color: #FFE600;">booking reference</strong> when you arrive</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 13px; color: #A0A0A0; padding: 4px 0;">• Check the weather and dress appropriately</td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
@@ -327,23 +381,34 @@ function generateBookingConfirmationHTML(booking) {
           
           <!-- Footer -->
           <tr>
-            <td style="padding-top: 40px; text-align: center;">
-              <p style="color: #FFFFFF; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">
-                Thank you for booking with Bored Tourist! 🎉
-              </p>
-              <p style="color: #A0A0A0; font-size: 13px; margin: 0 0 24px 0;">
-                We hope you have an amazing experience!
-              </p>
-              <p style="color: #666666; font-size: 11px; margin: 0;">
-                © ${new Date().getFullYear()} Bored Tourist. All rights reserved.
-              </p>
-              <p style="color: #444444; font-size: 11px; margin: 8px 0 0 0;">
-                Lisbon, Portugal 🇵🇹
-              </p>
+            <td style="padding-top: 40px; font-family: Arial, Helvetica, sans-serif;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-size: 14px; color: #FFFFFF; font-weight: bold; text-align: center; padding: 0 0 8px 0;">
+                    Thank you for booking with Bored Tourist! 🎉
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 13px; color: #A0A0A0; text-align: center; padding: 0 0 24px 0;">
+                    We hope you have an amazing experience!
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 11px; color: #666666; text-align: center;">
+                    © ${new Date().getFullYear()} Bored Tourist. All rights reserved.
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 11px; color: #444444; text-align: center; padding-top: 8px;">
+                    Lisbon, Portugal 🇵🇹
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           
         </table>
+        
       </td>
     </tr>
   </table>

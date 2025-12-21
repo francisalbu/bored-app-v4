@@ -325,14 +325,33 @@ IMPORTANT: It's better to return 1-2 perfect matches than 3+ mediocre ones.`;
       matchMethod,
     };
     
-    // ============================================
-    // CACHE THE RESULT - Prevents future API calls for same URL
-    // ============================================
-    setInCache(url, response);
-    
-    res.json(response);
-    
-  } catch (error) {
+// ============================================
+// CACHE THE RESULT - Prevents future API calls for same URL
+// ============================================
+setInCache(url, response);
+
+// ============================================
+// TRACK SHARED LINK - Save to database for analytics
+// ============================================
+try {
+  await supabase.from('shared_links').insert({
+    shared_url: url,
+    platform: platform,
+    description: metadata.description || null,
+    hashtags: metadata.hashtags || [],
+    username: metadata.username || null,
+    matched_experience_ids: matchedIds.slice(0, 10), // Save up to 10 matched IDs
+    match_method: matchMethod,
+    match_count: matchedExperiences.length,
+    user_id: req.body.userId || null, // Optional: if frontend sends user ID
+  });
+  console.log('📊 Tracked shared link in database');
+} catch (trackError) {
+  // Don't fail the request if tracking fails
+  console.error('⚠️ Failed to track shared link:', trackError.message);
+}
+
+res.json(response);  } catch (error) {
     console.error('❌ Smart match error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
