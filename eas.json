@@ -23,7 +23,9 @@
     "production": {
       "node": "22.11.0",
       "env": {
-        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_LokNB17umzEfSPpoF2ZB8wrK6NfDuMXOOdg1cvmQweG",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com"
       },
       "ios": {
         "resourceClass": "m-medium",

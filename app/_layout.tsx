@@ -224,32 +224,43 @@ export default function RootLayout() {
     return null;
   }
 
-  return (
-    <PostHogProvider apiKey={POSTHOG_API_KEY} options={POSTHOG_OPTIONS}>
-      <QueryClientProvider client={queryClient}>
-        <LanguageProvider>
-          <StripeProvider
-            publishableKey={STRIPE_PUBLISHABLE_KEY}
-            urlScheme="boredtourist"
-            merchantIdentifier="merchant.app.rork.bored-explorer"
-          >
-            <AuthProvider>
-              <PreferencesProvider>
-                <BookingsProvider>
-                  <FavoritesProvider>
-                    <GestureHandlerRootView style={{ flex: 1 }}>
-                      <RootLayoutNav />
-                      {showSplash && (
-                        <AnimatedSplash onFinish={() => setShowSplash(false)} />
-                      )}
-                    </GestureHandlerRootView>
-                  </FavoritesProvider>
-                </BookingsProvider>
-              </PreferencesProvider>
-            </AuthProvider>
-          </StripeProvider>
-        </LanguageProvider>
-      </QueryClientProvider>
-    </PostHogProvider>
+  // Core app content without PostHog
+  const AppContent = (
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <StripeProvider
+          publishableKey={STRIPE_PUBLISHABLE_KEY}
+          urlScheme="boredtourist"
+          merchantIdentifier="merchant.app.rork.bored-explorer"
+        >
+          <AuthProvider>
+            <PreferencesProvider>
+              <BookingsProvider>
+                <FavoritesProvider>
+                  <GestureHandlerRootView style={{ flex: 1 }}>
+                    <RootLayoutNav />
+                    {showSplash && (
+                      <AnimatedSplash onFinish={() => setShowSplash(false)} />
+                    )}
+                  </GestureHandlerRootView>
+                </FavoritesProvider>
+              </BookingsProvider>
+            </PreferencesProvider>
+          </AuthProvider>
+        </StripeProvider>
+      </LanguageProvider>
+    </QueryClientProvider>
   );
+
+  // Only wrap with PostHog if API key is available
+  if (POSTHOG_API_KEY && POSTHOG_API_KEY.length > 0) {
+    return (
+      <PostHogProvider apiKey={POSTHOG_API_KEY} options={POSTHOG_OPTIONS}>
+        {AppContent}
+      </PostHogProvider>
+    );
+  }
+
+  // Return without PostHog if no API key
+  return AppContent;
 }
