@@ -441,10 +441,12 @@ async function sendBookingConfirmation(booking, maxRetries = 3) {
       console.log(`📧 [Attempt ${attempt}/${maxRetries}] Sending booking confirmation to ${booking.customer_email}...`);
       console.log(`📧 Booking reference: ${booking.booking_reference}`);
       console.log(`📧 Experience: ${booking.experience_title}`);
+      console.log(`📧 CC: ${CONTACT.adminEmail}`);
       
       const { data, error } = await resend.emails.send({
         from: CONTACT.fromEmail,
         to: booking.customer_email,
+        cc: CONTACT.adminEmail, // Always CC the admin to track all bookings
         subject: `✅ Booking Confirmed: ${booking.experience_title} - ${booking.booking_reference}`,
         html: generateBookingConfirmationHTML(booking),
         text: generateBookingConfirmationText(booking),

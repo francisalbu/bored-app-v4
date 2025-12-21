@@ -31,16 +31,19 @@ export default function NotFoundScreen() {
       return;
     }
 
-    // Keep waiting for share intent (up to 3 seconds)
-    if (attempts < 6) {
+    // Keep waiting for share intent (up to 2 seconds - reduced from 3)
+    if (attempts < 4) {
       const timer = setTimeout(() => {
         setAttempts(prev => prev + 1);
         console.log(`📤 [NOT-FOUND] Waiting for share intent... attempt ${attempts + 1}`);
       }, 500);
       return () => clearTimeout(timer);
     } else {
-      // After 3 seconds, stop waiting
+      // After 2 seconds, if no share intent, go directly to feed
+      // This prevents showing "Something went wrong" when returning from payment sheets, etc.
+      console.log('📤 [NOT-FOUND] No share intent found, redirecting to feed...');
       setWaitingForIntent(false);
+      router.replace('/(tabs)');
     }
   }, [hasShareIntent, shareIntent, attempts]);
 
@@ -57,16 +60,13 @@ export default function NotFoundScreen() {
     );
   }
 
-  // After timeout, show option to go to feed
+  // This should rarely be shown now (only if router.replace fails)
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.container}>
-        <Text style={styles.emoji}>🧭</Text>
-        <Text style={styles.title}>Something went wrong</Text>
-        <Pressable onPress={() => router.replace('/(tabs)')} style={styles.button}>
-          <Text style={styles.buttonText}>Go to Feed</Text>
-        </Pressable>
+        <ActivityIndicator size="large" color={colors.dark.primary} />
+        <Text style={styles.waitingText}>Redirecting...</Text>
       </View>
     </>
   );
@@ -83,25 +83,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: colors.dark.textSecondary,
     fontSize: 14,
-  },
-  emoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    color: colors.dark.text,
-    marginBottom: 24,
-  },
-  button: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: colors.dark.primary,
-    borderRadius: 12,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.dark.background,
   },
 });

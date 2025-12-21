@@ -6,14 +6,13 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Linking,
   Image,
   Animated,
   Easing,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, ExternalLink, MapPin, Star, Clock, Sparkles, Search } from 'lucide-react-native';
+import { X, MapPin, Star, Clock, Sparkles, Search } from 'lucide-react-native';
 import { useShareIntent } from 'expo-share-intent';
 import colors from '@/constants/colors';
 import typography from '@/constants/typography';
@@ -484,19 +483,6 @@ export default function SharedContentScreen() {
     });
   };
 
-  const handleOpenOriginal = () => {
-    if (sharedUrl) {
-      Linking.openURL(sharedUrl);
-    }
-  };
-
-  const getPlatformName = () => {
-    if (sharedUrl?.includes('tiktok')) return 'TikTok';
-    if (sharedUrl?.includes('instagram') || sharedUrl?.includes('instagr.am')) return 'Instagram';
-    if (sharedUrl?.includes('youtube')) return 'YouTube';
-    return 'Social Media';
-  };
-
   // Show the detecting/scanning screen while loading or analyzing
   if (!paramsReady || analyzing) {
     return (
@@ -573,7 +559,7 @@ export default function SharedContentScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Sparkles size={24} color={colors.dark.accent} />
-          <Text style={styles.headerTitle}>Save to Bored Tourist</Text>
+          <Text style={styles.headerTitle}>Bored Tourist</Text>
         </View>
         <Pressable onPress={handleClose} style={styles.closeButton}>
           <X size={24} color={colors.dark.text} />
@@ -581,27 +567,11 @@ export default function SharedContentScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Shared Content Info */}
-        <View style={styles.sharedCard}>
-          <Text style={styles.sharedLabel}>Shared from {getPlatformName()}</Text>
-          {sharedUrl && (
-            <Pressable onPress={handleOpenOriginal} style={styles.urlContainer}>
-              <Text style={styles.sharedUrl} numberOfLines={2}>{sharedUrl}</Text>
-              <ExternalLink size={16} color={colors.dark.accent} />
-            </Pressable>
-          )}
-          {sharedText && !sharedUrl && (
-            <Text style={styles.sharedText} numberOfLines={3}>{sharedText}</Text>
-          )}
-        </View>
-
         {/* Matched Experiences */}
         {matchedExperiences.length > 0 && (
           <View style={styles.matchesSection}>
             <Text style={styles.sectionTitle}>
-              {matchMethod === 'ai' 
-                ? '🤖 AI-Matched Experiences'
-                : '🎯 Matching Experiences'}
+              🎯 Book an Experience!
             </Text>
             <Text style={styles.sectionSubtitle}>
               {`Found ${matchedExperiences.length} experience${matchedExperiences.length > 1 ? 's' : ''} that match your content`}
@@ -668,15 +638,15 @@ export default function SharedContentScreen() {
             <Text style={styles.noMatchesEmoji}>🔍</Text>
             <Text style={styles.noMatchesTitle}>No matches found</Text>
             <Text style={styles.noMatchesText}>
-              We couldn't find experiences matching this content. Try sharing a different video!
+              We couldn't find experiences matching this content. Try sharing a different video or explore our experiences!
             </Text>
             
-            {/* Back button */}
+            {/* Explore Experiences button */}
             <Pressable 
-              style={styles.backToAppButton}
+              style={styles.exploreButton}
               onPress={handleClose}
             >
-              <Text style={styles.backToAppButtonText}>← Back to {getPlatformName()}</Text>
+              <Text style={styles.exploreButtonText}>Explore Experiences</Text>
             </Pressable>
           </View>
         )}
@@ -874,6 +844,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
+  },
+  exploreButton: {
+    marginTop: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    backgroundColor: colors.dark.primary,
+    borderRadius: 12,
+  },
+  exploreButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.dark.background,
   },
   backToAppButton: {
     marginTop: 24,

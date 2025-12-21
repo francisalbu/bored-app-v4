@@ -116,7 +116,7 @@ router.post('/confirm', async (req, res) => {
       const { data: booking, error: fetchError } = await from('bookings')
         .select(`
           *,
-          experiences(title, location, duration, image_url),
+          experiences(title, location, duration, image_url, images),
           availability_slots(date, start_time, end_time)
         `)
         .eq('id', bookingId)
@@ -130,13 +130,16 @@ router.post('/confirm', async (req, res) => {
         console.log('📧 Booking reference:', booking?.booking_reference);
       }
 
-      // Transform for email service
+      // Transform for email service - use images[0] if available, otherwise fallback to image_url
+      const experienceImages = booking?.experiences?.images || [];
+      const experienceImage = experienceImages.length > 0 ? experienceImages[0] : booking?.experiences?.image_url;
+      
       const bookingForEmail = booking ? {
         ...booking,
         experience_title: booking.experiences?.title,
         experience_location: booking.experiences?.location,
         experience_duration: booking.experiences?.duration,
-        experience_image: booking.experiences?.image_url,
+        experience_image: experienceImage,
         slot_date: booking.availability_slots?.date,
         slot_start_time: booking.availability_slots?.start_time,
         slot_end_time: booking.availability_slots?.end_time,
@@ -224,19 +227,23 @@ router.post('/webhook', async (req, res) => {
             const { data: booking } = await from('bookings')
               .select(`
                 *,
-                experiences(title, location, duration, image_url),
+                experiences(title, location, duration, image_url, images),
                 availability_slots(date, start_time, end_time)
               `)
               .eq('id', bookingId)
               .single();
             
             if (booking && booking.customer_email) {
+              // Use images[0] if available, otherwise fallback to image_url
+              const experienceImages = booking.experiences?.images || [];
+              const experienceImage = experienceImages.length > 0 ? experienceImages[0] : booking.experiences?.image_url;
+              
               const bookingForEmail = {
                 ...booking,
                 experience_title: booking.experiences?.title,
                 experience_location: booking.experiences?.location,
                 experience_duration: booking.experiences?.duration,
-                experience_image: booking.experiences?.image_url,
+                experience_image: experienceImage,
                 slot_date: booking.availability_slots?.date,
                 slot_start_time: booking.availability_slots?.start_time,
                 slot_end_time: booking.availability_slots?.end_time,

@@ -691,9 +691,17 @@ export default function FeedScreen() {
           <View style={styles.endOfFeedContainer}>
             <Text style={styles.endOfFeedTitle}>That's all for now! 🔥</Text>
             <Text style={styles.endOfFeedSubtitle}>
-              We're constantly hunting for more epic adventures to add to your feed.{'\n\n'}
-              In the meantime, dive into the amazing experiences we've curated just for you! 😎
+              We're constantly hunting for more epic adventures to add to your feed.
             </Text>
+            <Text style={styles.endOfFeedSubtitle}>
+              In the meantime, check our amazing Instagram & TikTok Import feature!
+            </Text>
+            <Pressable 
+              style={styles.endOfFeedButton}
+              onPress={() => setShowImportTutorial(true)}
+            >
+              <Text style={styles.endOfFeedButtonText}>Try Import Feature</Text>
+            </Pressable>
           </View>
         }
       />
@@ -2090,6 +2098,20 @@ const styles = StyleSheet.create({
     color: colors.dark.textSecondary,
     textAlign: 'center' as const,
     lineHeight: 24,
+    marginBottom: 8,
+  },
+  endOfFeedButton: {
+    backgroundColor: colors.dark.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 24,
+  },
+  endOfFeedButtonText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: colors.dark.background,
+    textAlign: 'center' as const,
   },
 });
 

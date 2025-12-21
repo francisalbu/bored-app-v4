@@ -543,7 +543,8 @@ export default function PaymentScreen() {
             name: customerName,
             email: customerEmail,
           },
-          returnURL: 'boredtourist://payment-complete',
+          // Use the main app scheme for return URL
+          returnURL: 'app.rork.bored-explorer://payment-complete',
         };
         
         console.log('🔵 [PAYMENT] Calling initPaymentSheet...');

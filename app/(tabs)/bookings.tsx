@@ -714,8 +714,51 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLengthWarning, setShowLengthWarning] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const MIN_COMMENT_LENGTH = 20; // Minimum characters required
+
+  // Check if comment is too short after user stops typing
+  const handleCommentChange = (text: string) => {
+    setComment(text);
+    setShowLengthWarning(false); // Hide warning while typing
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // If text is between 1 and MIN_COMMENT_LENGTH-1, start timer to show warning
+    if (text.trim().length > 0 && text.trim().length < MIN_COMMENT_LENGTH) {
+      typingTimeoutRef.current = setTimeout(() => {
+        // Only show warning if still under minimum
+        if (text.trim().length > 0 && text.trim().length < MIN_COMMENT_LENGTH) {
+          setShowLengthWarning(true);
+        }
+      }, 2500); // 2.5 seconds delay
+    }
+  };
+
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Reset state when modal opens/closes
+  React.useEffect(() => {
+    if (!visible) {
+      setRating(0);
+      setComment('');
+      setShowLengthWarning(false);
+    }
+  }, [visible]);
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -723,8 +766,8 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
       return;
     }
 
-    if (comment.trim().length < 10) {
-      Alert.alert(t('common.error'), t('reviews.commentTooShort'));
+    if (comment.trim().length < MIN_COMMENT_LENGTH) {
+      Alert.alert(t('common.error'), t('reviews.commentTooShort') + ` (${MIN_COMMENT_LENGTH} ${t('reviews.charactersMinimum')})`);
       return;
     }
 
@@ -820,7 +863,7 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
                 placeholder={t('reviews.shareExperience')}
                 placeholderTextColor={colors.dark.textTertiary}
                 value={comment}
-                onChangeText={setComment}
+                onChangeText={handleCommentChange}
                 multiline
                 numberOfLines={6}
                 maxLength={1000}
@@ -832,19 +875,26 @@ function ReviewModal({ visible, booking, onClose, onSubmitSuccess }: ReviewModal
                   }, 300);
                 }}
               />
-              <Text style={styles.reviewCharCount}>
-                {comment.length}/1000
-              </Text>
+              <View style={styles.reviewCommentFooter}>
+                {showLengthWarning && comment.trim().length < MIN_COMMENT_LENGTH && (
+                  <Text style={styles.reviewLengthWarning}>
+                    ⚠️ {t('reviews.needMoreChars', { count: MIN_COMMENT_LENGTH - comment.trim().length })}
+                  </Text>
+                )}
+                <Text style={styles.reviewCharCount}>
+                  {comment.length}/1000
+                </Text>
+              </View>
             </View>
 
             {/* Submit Button */}
             <Pressable
               style={[
                 styles.reviewSubmitButton,
-                (rating === 0 || comment.trim().length < 10 || isSubmitting) && styles.reviewSubmitButtonDisabled
+                (rating === 0 || comment.trim().length < MIN_COMMENT_LENGTH || isSubmitting) && styles.reviewSubmitButtonDisabled
               ]}
               onPress={handleSubmit}
-              disabled={rating === 0 || comment.trim().length < 10 || isSubmitting}
+              disabled={rating === 0 || comment.trim().length < MIN_COMMENT_LENGTH || isSubmitting}
             >
               {isSubmitting ? (
                 <ActivityIndicator size="small" color={colors.dark.background} />
@@ -1687,11 +1737,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.dark.border,
   },
+  reviewCommentFooter: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginTop: 8,
+  },
+  reviewLengthWarning: {
+    fontSize: 12,
+    color: '#FFB800',
+    flex: 1,
+    marginRight: 8,
+  },
   reviewCharCount: {
     fontSize: 12,
     color: colors.dark.textTertiary,
     textAlign: 'right' as const,
-    marginTop: 8,
   },
   reviewSubmitButton: {
     backgroundColor: colors.dark.primary,
