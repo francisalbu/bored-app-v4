@@ -24,7 +24,7 @@ const CONTACT = {
   whatsappLink: 'https://wa.me/351967407859',
   email: 'bookings@boredtourist.com',
   fromEmail: 'Bored Tourist <bookings@boredtourist.com>',
-  adminEmail: 'francisalbu@gmail.com', // Fallback admin email
+  adminEmail: 'bookings@boredtourist.com', // Admin email for failure notifications
 };
 
 /**
