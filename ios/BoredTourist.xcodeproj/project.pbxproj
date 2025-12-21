@@ -7,37 +7,66 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0C3D5E215EE6446AA2245688 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9FE0E6FA5B42C89E1BA56A /* ShareViewController.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1AB0C2EF9B370D61C8404221 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 47726A7EE17B453FA171A248 /* PrivacyInfo.xcprivacy */; };
+		2AFC0DC5B8E6DBCE184FE83E /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C43AF27EAAF3BD0F4FF06E25 /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		6F7BEC0ED91845BC86CC4E49 /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1000EAC6FF4F08B957C893 /* noop-file.swift */; };
+		727C8A26F90348E6B4241968 /* SavetoBoredTourist.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = D93638063F0D428A86B06762 /* SavetoBoredTourist.appex */; };
+		7F2425C1B6C281ABDE2913C9 /* libPods-BoredTourist.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A4C7B8931CFCBC7AC5ADA5F /* libPods-BoredTourist.a */; };
+		9A383608DD5F481C928440DF /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9BFCCB347A544B1BAFD9F570 /* MainInterface.storyboard */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		D02A49EB7B484E08AA177C4F /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = 880EC7732EBE413583F47257 /* ShareExtensionPreprocessor.js */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		5E32C659DBF7445C825797F1 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C960A70C0A4D198C074F67 /* ShareViewController.swift */; };
-		29E835220D044D008B8393B0 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A94DE44C63DD448F96C13157 /* MainInterface.storyboard */; };
-		C88FC261839A4EF288ED93F4 /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = E1AA3DEBF8224CE688A55A20 /* ShareExtensionPreprocessor.js */; };
-		0FB1892F001A4962AA583BD6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2381FB6B8BBE4C50A90927CE /* PrivacyInfo.xcprivacy */; };
-		E3EB385B2F2A4BC98356CC4F /* ShareExtension-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = E492C314204642F9952AF428 /* ShareExtension-Info.plist */; };
-		4F7024762EF74510BD6777BC /* ShareExtension.entitlements in Resources */ = {isa = PBXBuildFile; fileRef = B86540CA197E41ED8CF3DAAA /* ShareExtension.entitlements */; };
-		F3DABDE28E4349269379A5B3 /* SavetoBoredTourist.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = 92E9E6489E2A4864971D47E1 /* SavetoBoredTourist.appex */; };
-		2C1719F7941C4059BD163EC3 /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2143E992FF644FEA7987F87 /* noop-file.swift */; };
+		F47F0634BB4E479495A8FDD9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 47726A7EE17B453FA171A248 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8E0541C303C74F898EEBE04F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F520F3B9A7FD451BBA2CAF16;
+			remoteInfo = SavetoBoredTourist;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		249233CBFA9F4CF78234A90A /* Copy Files */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				727C8A26F90348E6B4241968 /* SavetoBoredTourist.appex in Copy Files */,
+			);
+			name = "Copy Files";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* BoredTourist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BoredTourist.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = BoredTourist/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = BoredTourist/Info.plist; sourceTree = "<group>"; };
+		3A4C7B8931CFCBC7AC5ADA5F /* libPods-BoredTourist.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BoredTourist.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		47726A7EE17B453FA171A248 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		511F3CEB34F041D9AD5CC161 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "ShareExtension-Info.plist"; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
+		880EC7732EBE413583F47257 /* ShareExtensionPreprocessor.js */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtensionPreprocessor.js; path = ShareExtensionPreprocessor.js; sourceTree = "<group>"; };
+		95D02A1B563C40869763100F /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
+		9BFCCB347A544B1BAFD9F570 /* MainInterface.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = MainInterface.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
+		9C7E1D1A83D92DF57A14ED9C /* Pods-BoredTourist.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BoredTourist.release.xcconfig"; path = "Target Support Files/Pods-BoredTourist/Pods-BoredTourist.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = BoredTourist/SplashScreen.storyboard; sourceTree = "<group>"; };
+		AE5108BE1D6D5A3D80C98EDB /* Pods-BoredTourist.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BoredTourist.debug.xcconfig"; path = "Target Support Files/Pods-BoredTourist/Pods-BoredTourist.debug.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		C43AF27EAAF3BD0F4FF06E25 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-BoredTourist/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		D93638063F0D428A86B06762 /* SavetoBoredTourist.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = SavetoBoredTourist.appex; path = SavetoBoredTourist.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC9FE0E6FA5B42C89E1BA56A /* ShareViewController.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = ShareViewController.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BoredTourist/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* BoredTourist-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "BoredTourist-Bridging-Header.h"; path = "BoredTourist/BoredTourist-Bridging-Header.h"; sourceTree = "<group>"; };
-		F4C960A70C0A4D198C074F67 /* ShareViewController.swift */ = {isa = PBXFileReference; name = "ShareViewController.swift"; path = "ShareViewController.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
-		A94DE44C63DD448F96C13157 /* MainInterface.storyboard */ = {isa = PBXFileReference; name = "MainInterface.storyboard"; path = "MainInterface.storyboard"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		E1AA3DEBF8224CE688A55A20 /* ShareExtensionPreprocessor.js */ = {isa = PBXFileReference; name = "ShareExtensionPreprocessor.js"; path = "ShareExtensionPreprocessor.js"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		2381FB6B8BBE4C50A90927CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; name = "PrivacyInfo.xcprivacy"; path = "PrivacyInfo.xcprivacy"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		E492C314204642F9952AF428 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; name = "ShareExtension-Info.plist"; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = text.plist.xml; explicitFileType = undefined; includeInIndex = 0; };
-		B86540CA197E41ED8CF3DAAA /* ShareExtension.entitlements */ = {isa = PBXFileReference; name = "ShareExtension.entitlements"; path = "ShareExtension.entitlements"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		92E9E6489E2A4864971D47E1 /* SavetoBoredTourist.appex */ = {isa = PBXFileReference; name = "SavetoBoredTourist.appex"; path = "SavetoBoredTourist.appex"; sourceTree = BUILT_PRODUCTS_DIR; fileEncoding = undefined; lastKnownFileType = undefined; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; };
-		F2143E992FF644FEA7987F87 /* noop-file.swift */ = {isa = PBXFileReference; name = "noop-file.swift"; path = "BoredTourist/noop-file.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
+		FE1000EAC6FF4F08B957C893 /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "BoredTourist/noop-file.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,10 +74,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7F2425C1B6C281ABDE2913C9 /* libPods-BoredTourist.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B02E87FD3BF24688A819E023 /* Frameworks */ = {
+		E9282483EB8B4F0884C9F802 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -58,6 +88,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0603A9A0F961FB8E2833796D /* BoredTourist */ = {
+			isa = PBXGroup;
+			children = (
+				C43AF27EAAF3BD0F4FF06E25 /* ExpoModulesProvider.swift */,
+			);
+			name = BoredTourist;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* BoredTourist */ = {
 			isa = PBXGroup;
 			children = (
@@ -67,17 +105,42 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				F2143E992FF644FEA7987F87 /* noop-file.swift */,
+				FE1000EAC6FF4F08B957C893 /* noop-file.swift */,
 			);
 			name = BoredTourist;
+			sourceTree = "<group>";
+		};
+		2BD8B916AE7746F984C52F1A /* SavetoBoredTourist */ = {
+			isa = PBXGroup;
+			children = (
+				EC9FE0E6FA5B42C89E1BA56A /* ShareViewController.swift */,
+				9BFCCB347A544B1BAFD9F570 /* MainInterface.storyboard */,
+				880EC7732EBE413583F47257 /* ShareExtensionPreprocessor.js */,
+				47726A7EE17B453FA171A248 /* PrivacyInfo.xcprivacy */,
+				511F3CEB34F041D9AD5CC161 /* ShareExtension-Info.plist */,
+				95D02A1B563C40869763100F /* ShareExtension.entitlements */,
+			);
+			name = SavetoBoredTourist;
+			path = SavetoBoredTourist;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
+				3A4C7B8931CFCBC7AC5ADA5F /* libPods-BoredTourist.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		41C11AD287CD7F8FFAE7186D /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				AE5108BE1D6D5A3D80C98EDB /* Pods-BoredTourist.debug.xcconfig */,
+				9C7E1D1A83D92DF57A14ED9C /* Pods-BoredTourist.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -94,7 +157,9 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				AB2FE01937D146ED825F4F1A /* SavetoBoredTourist */,
+				2BD8B916AE7746F984C52F1A /* SavetoBoredTourist */,
+				41C11AD287CD7F8FFAE7186D /* Pods */,
+				DF6D767A7F6E7E969EFB6B31 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -105,7 +170,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* BoredTourist.app */,
-				92E9E6489E2A4864971D47E1 /* SavetoBoredTourist.appex */,
+				D93638063F0D428A86B06762 /* SavetoBoredTourist.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -119,18 +184,12 @@
 			path = BoredTourist/Supporting;
 			sourceTree = "<group>";
 		};
-		AB2FE01937D146ED825F4F1A /* SavetoBoredTourist */ = {
+		DF6D767A7F6E7E969EFB6B31 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				F4C960A70C0A4D198C074F67 /* ShareViewController.swift */,
-				A94DE44C63DD448F96C13157 /* MainInterface.storyboard */,
-				E1AA3DEBF8224CE688A55A20 /* ShareExtensionPreprocessor.js */,
-				2381FB6B8BBE4C50A90927CE /* PrivacyInfo.xcprivacy */,
-				E492C314204642F9952AF428 /* ShareExtension-Info.plist */,
-				B86540CA197E41ED8CF3DAAA /* ShareExtension.entitlements */,
+				0603A9A0F961FB8E2833796D /* BoredTourist */,
 			);
-			name = SavetoBoredTourist;
-			path = SavetoBoredTourist;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -141,39 +200,41 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "BoredTourist" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
+				0D4F81D93DBCB8FA2D16CFAE /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				81EA6D29CBAC4B79BC3B80D8 /* Copy Files */,
+				249233CBFA9F4CF78234A90A /* Copy Files */,
+				B8A9F596E76422E3983AF163 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				28C4DC035EE548D09D36DC24 /* PBXTargetDependency */,
+				8F55F70D47E0410080B01D16 /* PBXTargetDependency */,
 			);
 			name = BoredTourist;
 			productName = BoredTourist;
 			productReference = 13B07F961A680F5B00A75B9A /* BoredTourist.app */;
 			productType = "com.apple.product-type.application";
 		};
-		675FD05E625A4C8AA37E18D7 /* "SavetoBoredTourist" */ = {
+		F520F3B9A7FD451BBA2CAF16 /* SavetoBoredTourist */ = {
 			isa = PBXNativeTarget;
-			name = "SavetoBoredTourist";
-			productName = "SavetoBoredTourist";
-			productReference = 92E9E6489E2A4864971D47E1;
-			productType = "com.apple.product-type.app-extension";
-			buildConfigurationList = CB3A9F2B7EC74A40A83E189D;
+			buildConfigurationList = 8FFFB619E0F443A1A20AA0D7 /* Build configuration list for PBXNativeTarget "SavetoBoredTourist" */;
 			buildPhases = (
-				4AA4C3D60D174F4EB856BE14 /* Sources */,
-				DE1C20A49BFC45C7BEB23557 /* Resources */,
-				B02E87FD3BF24688A819E023 /* Frameworks */,
+				F700204A71E44E7FBE24EADD /* Sources */,
+				080E4C20DBB041D38E1E39E8 /* Resources */,
+				E9282483EB8B4F0884C9F802 /* Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
+			name = SavetoBoredTourist;
+			productName = SavetoBoredTourist;
+			productReference = D93638063F0D428A86B06762 /* SavetoBoredTourist.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -202,12 +263,22 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* BoredTourist */,
-				675FD05E625A4C8AA37E18D7 /* "SavetoBoredTourist" */,
+				F520F3B9A7FD451BBA2CAF16 /* SavetoBoredTourist */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		080E4C20DBB041D38E1E39E8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A383608DD5F481C928440DF /* MainInterface.storyboard in Resources */,
+				D02A49EB7B484E08AA177C4F /* ShareExtensionPreprocessor.js in Resources */,
+				F47F0634BB4E479495A8FDD9 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		13B07F8E1A680F5B00A75B9A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -215,16 +286,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		DE1C20A49BFC45C7BEB23557 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				29E835220D044D008B8393B0 /* "MainInterface.storyboard" in Resources */,
-				C88FC261839A4EF288ED93F4 /* "ShareExtensionPreprocessor.js" in Resources */,
-				0FB1892F001A4962AA583BD6 /* "PrivacyInfo.xcprivacy" in Resources */,
+				1AB0C2EF9B370D61C8404221 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -270,6 +332,30 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
+		0D4F81D93DBCB8FA2D16CFAE /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/BoredTourist/BoredTourist.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-BoredTourist/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-BoredTourist/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-BoredTourist/expo-configure-project.sh\"\n";
+		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -277,19 +363,97 @@
 			);
 			inputPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BoredTourist/Pods-BoredTourist-resources.sh",
+				"${PODS_CONFIGURATION_BUILD_DIR}/AppAuth/AppAuthCore_Privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXApplication/ExpoApplication_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXUpdates/EXUpdates.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/RCTI18nStrings.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoDevice/ExpoDevice_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoLocalization/ExpoLocalization_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoSystemUI/ExpoSystemUI_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/GTMAppAuth/GTMAppAuth_Privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/GTMSessionFetcher/GTMSessionFetcher_Core_Privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/GoogleSignIn/GoogleSignIn.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/GoogleUtilities/GoogleUtilities_Privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/PostHog/PostHog.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/PromisesObjC/FBLPromises_Privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNSVG/RNSVGFilters.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ReachabilitySwift/ReachabilitySwift.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/SDWebImage/SDWebImage.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/Stripe/StripeBundle.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/StripeCore/StripeCoreBundle.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/StripeFinancialConnections/StripeFinancialConnectionsBundle.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/StripePaymentSheet/StripePaymentSheetBundle.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/StripePayments/StripePaymentsBundle.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/StripePayments/Stripe3DS2.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/StripePaymentsUI/StripePaymentsUIBundle.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/StripeUICore/StripeUICoreBundle.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/expo-dev-launcher/EXDevLauncher.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/expo-dev-menu/EXDevMenu.bundle",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppAuthCore_Privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoApplication_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXUpdates.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCTI18nStrings.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoDevice_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoLocalization_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoSystemUI_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GTMAppAuth_Privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GTMSessionFetcher_Core_Privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleSignIn.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleUtilities_Privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PostHog.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/FBLPromises_Privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNSVGFilters.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ReachabilitySwift.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SDWebImage.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/StripeBundle.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/StripeCoreBundle.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/StripeFinancialConnectionsBundle.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/StripePaymentSheetBundle.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/StripePaymentsBundle.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Stripe3DS2.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/StripePaymentsUIBundle.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/StripeUICoreBundle.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXDevLauncher.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXDevMenu.bundle",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-BoredTourist/Pods-BoredTourist-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		B8A9F596E76422E3983AF163 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-BoredTourist/Pods-BoredTourist-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-BoredTourist/Pods-BoredTourist-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -300,26 +464,37 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				2C1719F7941C4059BD163EC3 /* noop-file.swift in Sources */,
+				6F7BEC0ED91845BC86CC4E49 /* noop-file.swift in Sources */,
+				2AFC0DC5B8E6DBCE184FE83E /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		4AA4C3D60D174F4EB856BE14 /* Sources */ = {
+		F700204A71E44E7FBE24EADD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5E32C659DBF7445C825797F1 /* "ShareViewController.swift" in Sources */,
+				0C3D5E215EE6446AA2245688 /* ShareViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8F55F70D47E0410080B01D16 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F520F3B9A7FD451BBA2CAF16 /* SavetoBoredTourist */;
+			targetProxy = 8E0541C303C74F898EEBE04F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AE5108BE1D6D5A3D80C98EDB /* Pods-BoredTourist.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BoredTourist/BoredTourist.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -338,22 +513,24 @@
 					"-ObjC",
 					"-lc++",
 				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.bored-explorer";
-				PRODUCT_NAME = "BoredTourist";
+				PRODUCT_NAME = BoredTourist;
 				SWIFT_OBJC_BRIDGING_HEADER = "BoredTourist/BoredTourist-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				VERSIONING_SYSTEM = "apple-generic";
 				TARGETED_DEVICE_FAMILY = "1,2";
-				CODE_SIGN_ENTITLEMENTS = BoredTourist/BoredTourist.entitlements;
+				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9C7E1D1A83D92DF57A14ED9C /* Pods-BoredTourist.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BoredTourist/BoredTourist.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = BoredTourist/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -367,13 +544,38 @@
 					"-ObjC",
 					"-lc++",
 				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.bored-explorer";
-				PRODUCT_NAME = "BoredTourist";
+				PRODUCT_NAME = BoredTourist;
 				SWIFT_OBJC_BRIDGING_HEADER = "BoredTourist/BoredTourist-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				VERSIONING_SYSTEM = "apple-generic";
 				TARGETED_DEVICE_FAMILY = "1,2";
-				CODE_SIGN_ENTITLEMENTS = BoredTourist/BoredTourist.entitlements;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		6757DFD9A68549D7913FADE1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = SavetoBoredTourist/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "SavetoBoredTourist/ShareExtension-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.3;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.bored-explorer.share-extension";
+				PRODUCT_NAME = SavetoBoredTourist;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -429,10 +631,14 @@
 					/usr/lib/swift,
 					"$(inherited)",
 				);
-				LIBRARY_SEARCH_PATHS = "\"$(inherited)\"";
+				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -481,56 +687,44 @@
 					/usr/lib/swift,
 					"$(inherited)",
 				);
-				LIBRARY_SEARCH_PATHS = "\"$(inherited)\"";
+				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		DBD1040DE483481E8D7F9578 /* Debug */ = {
-			name = Debug;
+		9B7EE1BBB5E148E3A3ADADBD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = SavetoBoredTourist/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				INFOPLIST_FILE = "SavetoBoredTourist/ShareExtension-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				PRODUCT_NAME = "SavetoBoredTourist";
-				SKIP_INSTALL = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = "SavetoBoredTourist/ShareExtension.entitlements";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "1";
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = "1.0.1";
+				INFOPLIST_FILE = "SavetoBoredTourist/ShareExtension-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.3;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.bored-explorer.share-extension";
+				PRODUCT_NAME = SavetoBoredTourist;
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-		};
-		F2AE40A8F94C4A01AFEF591F /* Release */ = {
-			name = Release;
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				INFOPLIST_FILE = "SavetoBoredTourist/ShareExtension-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				PRODUCT_NAME = "SavetoBoredTourist";
-				SKIP_INSTALL = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = "SavetoBoredTourist/ShareExtension.entitlements";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "1";
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = "1.0.1";
-				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.bored-explorer.share-extension";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
@@ -553,48 +747,16 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CB3A9F2B7EC74A40A83E189D /* Build configuration list for PBXNativeTarget "SavetoBoredTourist" */ = {
+		8FFFB619E0F443A1A20AA0D7 /* Build configuration list for PBXNativeTarget "SavetoBoredTourist" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				DBD1040DE483481E8D7F9578 /* Debug */,
-				F2AE40A8F94C4A01AFEF591F /* Release */,
+				9B7EE1BBB5E148E3A3ADADBD /* Debug */,
+				6757DFD9A68549D7913FADE1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin PBXTargetDependency section */
-		28C4DC035EE548D09D36DC24 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 675FD05E625A4C8AA37E18D7 /* "SavetoBoredTourist" */;
-			targetProxy = 4E91330BC1A8470C868A3F9A /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
-/* Begin PBXContainerItemProxy section */
-		4E91330BC1A8470C868A3F9A /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 675FD05E625A4C8AA37E18D7;
-			remoteInfo = "SavetoBoredTourist";
-		};
-/* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		81EA6D29CBAC4B79BC3B80D8 /* Copy Files */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				F3DABDE28E4349269379A5B3 /* SavetoBoredTourist.appex in Copy Files */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			name = "Copy Files";
-			dstPath = "";
-			dstSubfolderSpec = 13;
-		};
-/* End PBXCopyFilesBuildPhase section */
 	};
 	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
 }
