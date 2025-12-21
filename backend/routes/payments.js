@@ -99,9 +99,12 @@ router.post('/confirm', async (req, res) => {
 
       if (updateError) {
         console.error('❌ Error updating booking:', updateError);
+      } else {
+        console.log('✅ Booking status updated to confirmed/paid');
       }
 
       // Fetch complete booking data for email
+      console.log('📧 Fetching booking data for email...');
       const { data: booking, error: fetchError } = await from('bookings')
         .select(`
           *,
@@ -110,6 +113,14 @@ router.post('/confirm', async (req, res) => {
         `)
         .eq('id', bookingId)
         .single();
+
+      if (fetchError) {
+        console.error('❌ Error fetching booking for email:', fetchError);
+      } else {
+        console.log('✅ Booking data fetched successfully');
+        console.log('📧 Customer email:', booking?.customer_email);
+        console.log('📧 Booking reference:', booking?.booking_reference);
+      }
 
       // Transform for email service
       const bookingForEmail = booking ? {
@@ -123,22 +134,33 @@ router.post('/confirm', async (req, res) => {
         slot_end_time: booking.availability_slots?.end_time,
       } : null;
 
-      // Send confirmation email
+      // Send confirmation email - THIS IS CRITICAL
+      let emailSent = false;
       if (bookingForEmail && bookingForEmail.customer_email) {
-        try {
-          console.log('📧 Sending booking confirmation email to:', bookingForEmail.customer_email);
-          await emailService.sendBookingConfirmation(bookingForEmail);
-          console.log('✅ Booking confirmation email sent successfully');
-        } catch (emailError) {
-          // Don't fail the payment confirmation if email fails
-          console.error('⚠️ Failed to send confirmation email:', emailError.message);
+        console.log('📧 ====== SENDING CONFIRMATION EMAIL ======');
+        console.log('📧 To:', bookingForEmail.customer_email);
+        console.log('📧 Experience:', bookingForEmail.experience_title);
+        console.log('📧 Reference:', bookingForEmail.booking_reference);
+        
+        const emailResult = await emailService.sendBookingConfirmation(bookingForEmail);
+        emailSent = emailResult.success;
+        
+        if (emailResult.success) {
+          console.log('✅ ====== EMAIL SENT SUCCESSFULLY ======');
+        } else {
+          console.error('❌ ====== EMAIL FAILED ======');
+          console.error('❌ Reason:', emailResult.message);
         }
+      } else {
+        console.error('❌ Cannot send email - missing booking data or customer email');
+        console.error('❌ bookingForEmail:', JSON.stringify(bookingForEmail, null, 2));
       }
 
       res.json({
         success: true,
         message: 'Payment confirmed successfully',
         paymentStatus: paymentStatus.status,
+        emailSent: emailSent,
       });
     } else {
       res.status(400).json({

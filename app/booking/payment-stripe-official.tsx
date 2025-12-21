@@ -41,6 +41,8 @@ export default function PaymentScreen() {
   const [ready, setReady] = useState(false);
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const experience = EXPERIENCES.find((exp) => exp.id === experienceId);
   const adultsCount = parseInt(adults || '1');
@@ -152,6 +154,7 @@ export default function PaymentScreen() {
     }
 
     // Payment successful - confirm on backend
+    let backendConfirmed = false;
     try {
       await fetch(`${API_URL}/api/payments/confirm`, {
         method: 'POST',
@@ -161,22 +164,23 @@ export default function PaymentScreen() {
           bookingId,
         }),
       });
-
-      Alert.alert(
-        'Payment Successful!',
-        'Your booking is confirmed.',
-        [{ text: 'View Bookings', onPress: () => router.push('/(tabs)/bookings') }]
-      );
+      backendConfirmed = true;
     } catch (error) {
       console.error('Payment confirmation error:', error);
-      Alert.alert('Warning', 'Payment was processed but confirmation failed. Please contact support.');
+      backendConfirmed = false;
     }
+
+    setSuccessMessage(
+      backendConfirmed
+        ? 'Your booking is confirmed. See your ticket below.'
+        : 'Payment processed! Your ticket is available, but confirmation email may be delayed. Contact support if needed.'
+    );
+    setShowSuccessModal(true);
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}> 
       <Stack.Screen options={{ headerShown: false }} />
-      
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -252,14 +256,14 @@ export default function PaymentScreen() {
           <Text style={styles.infoText}>
             🔒 Secure payment through Stripe
           </Text>
-          <Text style={[styles.infoText, { marginTop: 8 }]}>
+          <Text style={[styles.infoText, { marginTop: 8 }]}> 
             Supports Apple Pay, Google Pay, cards, and more
           </Text>
         </View>
       </ScrollView>
 
       {/* Bottom Button */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}> 
         <Pressable 
           style={[styles.confirmButton, !ready && styles.confirmButtonDisabled]} 
           onPress={openPaymentSheet}
@@ -275,6 +279,53 @@ export default function PaymentScreen() {
           )}
         </Pressable>
       </View>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <View style={{
+            backgroundColor: colors.dark.card,
+            borderRadius: 20,
+            padding: 32,
+            alignItems: 'center',
+            maxWidth: 320,
+            width: '80%',
+          }}>
+            <Text style={{ fontSize: 60, marginBottom: 16 }}>🎉</Text>
+            <Text style={{ fontSize: 22, fontWeight: 'bold', color: colors.dark.text, marginBottom: 8, textAlign: 'center' }}>
+              Payment Successful!
+            </Text>
+            <Text style={{ fontSize: 16, color: colors.dark.textSecondary, marginBottom: 24, textAlign: 'center' }}>
+              {successMessage}
+            </Text>
+            <Pressable
+              style={{
+                backgroundColor: colors.dark.primary,
+                borderRadius: 12,
+                paddingVertical: 14,
+                paddingHorizontal: 32,
+                marginBottom: 8,
+              }}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.replace('/(tabs)/bookings');
+              }}
+            >
+              <Text style={{ color: colors.dark.background, fontWeight: 'bold', fontSize: 16 }}>See your ticket</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }

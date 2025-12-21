@@ -5,9 +5,15 @@
  * https://resend.com
  * 
  * From: bookings@boredtourist.com
+ * 
+ * FALLBACK SYSTEM:
+ * 1. Try Resend (primary)
+ * 2. If fails, save to pending_emails table for manual retry
+ * 3. Also send WhatsApp notification to admin
  */
 
 const { Resend } = require('resend');
+const { from } = require('../config/database');
 
 // Initialize Resend with API key
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -18,7 +24,31 @@ const CONTACT = {
   whatsappLink: 'https://wa.me/351967407859',
   email: 'bookings@boredtourist.com',
   fromEmail: 'Bored Tourist <bookings@boredtourist.com>',
+  adminEmail: 'francisalbu@gmail.com', // Fallback admin email
 };
+
+/**
+ * Save failed email to database for retry
+ */
+async function saveFailedEmail(booking, errorMessage) {
+  try {
+    await from('pending_emails').insert({
+      booking_id: booking.id,
+      customer_email: booking.customer_email,
+      customer_name: booking.customer_name,
+      booking_reference: booking.booking_reference,
+      experience_title: booking.experience_title,
+      error_message: errorMessage,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    });
+    console.log('📝 Saved to pending_emails for retry');
+    return true;
+  } catch (err) {
+    console.error('❌ Failed to save pending email:', err.message);
+    return false;
+  }
+}
 
 /**
  * Format date for email display
@@ -389,37 +419,100 @@ Lisbon, Portugal 🇵🇹
 }
 
 /**
- * Send booking confirmation email
+ * Send booking confirmation email with retry logic
+ * Will retry up to 3 times with exponential backoff
  */
-async function sendBookingConfirmation(booking) {
+async function sendBookingConfirmation(booking, maxRetries = 3) {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('⚠️  RESEND_API_KEY not configured. Email not sent.');
-    return { success: false, message: 'Email service not configured' };
+    console.error('🚨 CRITICAL: RESEND_API_KEY not configured! Email NOT sent to:', booking.customer_email);
+    console.error('🚨 Please set RESEND_API_KEY environment variable on Render.com');
+    return { success: false, message: 'Email service not configured - RESEND_API_KEY missing' };
   }
 
-  try {
-    console.log(`📧 Sending booking confirmation to ${booking.customer_email}...`);
-    
-    const { data, error } = await resend.emails.send({
-      from: CONTACT.fromEmail,
-      to: booking.customer_email,
-      subject: `✅ Booking Confirmed: ${booking.experience_title} - ${booking.booking_reference}`,
-      html: generateBookingConfirmationHTML(booking),
-      text: generateBookingConfirmationText(booking),
-    });
+  if (!booking.customer_email) {
+    console.error('🚨 CRITICAL: No customer email provided for booking:', booking.booking_reference);
+    return { success: false, message: 'No customer email provided' };
+  }
 
-    if (error) {
-      console.error('❌ Resend error:', error);
-      return { success: false, message: error.message };
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`📧 [Attempt ${attempt}/${maxRetries}] Sending booking confirmation to ${booking.customer_email}...`);
+      console.log(`📧 Booking reference: ${booking.booking_reference}`);
+      console.log(`📧 Experience: ${booking.experience_title}`);
+      
+      const { data, error } = await resend.emails.send({
+        from: CONTACT.fromEmail,
+        to: booking.customer_email,
+        subject: `✅ Booking Confirmed: ${booking.experience_title} - ${booking.booking_reference}`,
+        html: generateBookingConfirmationHTML(booking),
+        text: generateBookingConfirmationText(booking),
+      });
+
+      if (error) {
+        console.error(`❌ [Attempt ${attempt}/${maxRetries}] Resend error:`, error);
+        lastError = error;
+        
+        // If not last attempt, wait before retrying (exponential backoff: 1s, 2s, 4s)
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt - 1) * 1000;
+          console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+      } else {
+        console.log(`✅ Booking confirmation email sent successfully!`);
+        console.log(`✅ Email ID: ${data.id}`);
+        console.log(`✅ To: ${booking.customer_email}`);
+        console.log(`✅ Reference: ${booking.booking_reference}`);
+        return { success: true, message: 'Email sent successfully', emailId: data.id };
+      }
+      
+    } catch (error) {
+      console.error(`❌ [Attempt ${attempt}/${maxRetries}] Error sending booking confirmation:`, error);
+      lastError = error;
+      
+      // If not last attempt, wait before retrying
+      if (attempt < maxRetries) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000;
+        console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
-
-    console.log(`✅ Booking confirmation email sent! ID: ${data.id}`);
-    return { success: true, message: 'Email sent successfully', emailId: data.id };
-    
-  } catch (error) {
-    console.error('❌ Error sending booking confirmation:', error);
-    return { success: false, message: error.message };
   }
+  
+  // All retries failed - FALLBACK: Save to database and notify admin
+  console.error(`🚨 CRITICAL: Failed to send confirmation email after ${maxRetries} attempts!`);
+  console.error(`🚨 Customer: ${booking.customer_email}`);
+  console.error(`🚨 Booking: ${booking.booking_reference}`);
+  console.error(`🚨 Last error:`, lastError);
+  
+  // FALLBACK 1: Save to pending_emails table
+  await saveFailedEmail(booking, lastError?.message || 'Unknown error');
+  
+  // FALLBACK 2: Try to send a simple notification to admin
+  try {
+    console.log('📧 Sending fallback notification to admin...');
+    await resend.emails.send({
+      from: CONTACT.fromEmail,
+      to: CONTACT.adminEmail,
+      subject: `🚨 URGENT: Email failed for booking ${booking.booking_reference}`,
+      html: `
+        <h2>⚠️ Email Delivery Failed</h2>
+        <p><strong>Customer:</strong> ${booking.customer_name} (${booking.customer_email})</p>
+        <p><strong>Booking:</strong> ${booking.booking_reference}</p>
+        <p><strong>Experience:</strong> ${booking.experience_title}</p>
+        <p><strong>Error:</strong> ${lastError?.message || 'Unknown'}</p>
+        <p>Please contact the customer manually!</p>
+      `,
+    });
+    console.log('✅ Admin notification sent');
+  } catch (adminErr) {
+    console.error('❌ Even admin notification failed:', adminErr.message);
+  }
+  
+  return { success: false, message: lastError?.message || 'Failed after all retries', savedForRetry: true };
 }
 
 /**
