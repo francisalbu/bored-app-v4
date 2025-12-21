@@ -76,6 +76,8 @@ router.post('/confirm', async (req, res) => {
   try {
     const { paymentIntentId, bookingId } = req.body;
 
+    console.log('🔵 [CONFIRM] Received confirmation request:', { paymentIntentId, bookingId });
+
     if (!paymentIntentId || !bookingId) {
       return res.status(400).json({
         success: false,
@@ -84,20 +86,26 @@ router.post('/confirm', async (req, res) => {
     }
 
     // Verify payment intent status with Stripe
+    console.log('🔵 [CONFIRM] Verifying payment with Stripe...');
     const paymentStatus = await stripeService.getPaymentIntent(paymentIntentId);
+    console.log('🔵 [CONFIRM] Stripe payment status:', paymentStatus.status);
 
     if (paymentStatus.status === 'succeeded') {
-      // Update booking as paid using Supabase
-      const { error: updateError } = await from('bookings')
+      // Update booking as paid using Supabase (search by bookingId only, not payment_intent_id)
+      console.log('🔵 [CONFIRM] Updating booking', bookingId, 'to paid...');
+      const { data: updatedBooking, error: updateError } = await from('bookings')
         .update({
           payment_status: 'paid',
           status: 'confirmed',
+          payment_intent_id: paymentIntentId, // Save the payment intent ID now
           updated_at: new Date().toISOString()
         })
         .eq('id', bookingId)
-        .eq('payment_intent_id', paymentIntentId);
+        .select()
+        .single();
 
       if (updateError) {
+        console.error('❌ [CONFIRM] Error updating booking:', updateError);
         console.error('❌ Error updating booking:', updateError);
       } else {
         console.log('✅ Booking status updated to confirmed/paid');

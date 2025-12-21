@@ -628,6 +628,31 @@ export default function PaymentScreen() {
       console.log('✅ [PAYMENT] Booking created:', newBookingId);
       setBookingId(newBookingId);
 
+      // Step 4: Confirm payment on backend (THIS SENDS THE EMAIL!)
+      console.log('🔵 [PAYMENT] Step 4: Confirming payment and sending email...');
+      try {
+        const confirmResponse = await fetch(`${API_URL}/api/payments/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentIntentId: paymentIntentId,
+            bookingId: newBookingId,
+          }),
+        });
+        
+        const confirmData = await confirmResponse.json();
+        console.log('✅ [PAYMENT] Payment confirmed:', confirmData);
+        
+        if (confirmData.emailSent) {
+          console.log('✅ [PAYMENT] Confirmation email sent!');
+        } else {
+          console.log('⚠️ [PAYMENT] Email might not have been sent');
+        }
+      } catch (confirmError) {
+        console.error('⚠️ [PAYMENT] Confirm error (non-critical):', confirmError);
+        // Don't fail the payment flow, just log the error
+      }
+
       // If user is authenticated and wants to save contact info, update phone in database
       if (!isGuest && saveContactInfo && guestPhone) {
         const fullPhone = `${selectedCountry.dialCode}${guestPhone}`.replace(/\s/g, '');
