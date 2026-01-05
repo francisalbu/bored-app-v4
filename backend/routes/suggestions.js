@@ -10,7 +10,11 @@ const { authenticateSupabase } = require('../middleware/supabaseAuth');
 router.post('/', authenticateSupabase, async (req, res) => {
   try {
     const { instagram_handle, website, description } = req.body;
-    const userId = req.user?.id; // Assuming you have auth middleware
+    // Use supabase_uid for the activity_suggestions table, not the local DB id
+    const userId = req.user?.supabase_uid;
+
+    console.log('🔑 User object:', req.user);
+    console.log('🔑 Using supabase_uid:', userId);
 
     // Validate that user is authenticated
     if (!userId) {
@@ -95,7 +99,7 @@ router.post('/', authenticateSupabase, async (req, res) => {
  */
 router.get('/', authenticateSupabase, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.supabase_uid;
 
     if (!userId) {
       return res.status(401).json({
@@ -143,7 +147,7 @@ router.get('/', authenticateSupabase, async (req, res) => {
  */
 router.get('/admin', authenticateSupabase, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id; // Local DB ID for admin check
     const { status } = req.query;
 
     if (!userId) {
@@ -218,7 +222,7 @@ router.patch('/:id', authenticateSupabase, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, admin_notes } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.id; // Local DB ID for admin check
 
     if (!userId) {
       return res.status(401).json({
