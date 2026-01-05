@@ -358,8 +358,7 @@ export default function PreferencesQuiz({ onComplete, onClose }: PreferencesQuiz
       </View>
 
       <View style={styles.swipeTitleContainer}>
-        <Text style={styles.swipeTitle}>Like it or leave it?</Text>
-        <Text style={styles.swipeSubtitle}>Swipe right for Yes, left for No</Text>
+        <Text style={styles.swipeTitle}>Swipe right for Yes 👉 Swipe left for no 👈</Text>
       </View>
 
       <View style={styles.cardContainer}>

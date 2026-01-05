@@ -1,9 +1,10 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter, useSegments } from 'expo-router';
 import { Home, Search, Ticket, User, Sparkles } from 'lucide-react-native';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import PagerView from 'react-native-pager-view';
 
 import colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';

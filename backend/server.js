@@ -40,6 +40,7 @@ const socialMediaRoutes = require('./routes/socialMedia');
 const boredAIRoutes = require('./routes/boredAI');
 const aiConciergeRoutes = require('./routes/aiConcierge');
 const preferencesRoutes = require('./routes/preferences');
+const suggestionsRoutes = require('./routes/suggestions');
 
 // Initialize Express app
 const app = express();
@@ -100,6 +101,7 @@ app.use('/api/social-media', socialMediaRoutes);
 app.use('/api/bored-ai', boredAIRoutes);
 app.use('/api/ai-concierge', aiConciergeRoutes);
 app.use('/api/preferences', preferencesRoutes); // User preferences and quiz data
+app.use('/api/suggestions', suggestionsRoutes); // Activity suggestions from users
 
 // Privacy Policy page (required for App Store)
 app.get('/privacy', (req, res) => {

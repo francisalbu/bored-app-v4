@@ -84,7 +84,6 @@ export default function FeedScreen() {
   const [selectedFilter, setSelectedFilter] = useState<'nearMe' | 'availableToday'>('nearMe');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
-  const [showNoActivitiesMessage, setShowNoActivitiesMessage] = useState<boolean>(false);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [isGlobalMuted, setIsGlobalMuted] = useState<boolean>(true);
   const [availableExperienceIds, setAvailableExperienceIds] = useState<Set<string>>(new Set());
@@ -478,31 +477,6 @@ export default function FeedScreen() {
     }
   }, [selectedFilter, EXPERIENCES, userLocation, filters, availableExperienceIds, isCheckingAvailability]);
 
-  // Update no activities message based on filtered results
-  // Only show "Lisbon Exclusive" for nearMe filter with no nearby experiences
-  // Never show it when availability filter is active (we have specific empty state for that)
-  React.useEffect(() => {
-    console.log('🔄 Updating showNoActivitiesMessage:', {
-      availability: filters.availability,
-      selectedFilter,
-      filteredLength: filteredExperiences.length,
-    });
-    
-    if (filters.availability) {
-      // When availability filter is active, don't show "Lisbon Exclusive"
-      console.log('  → Setting to false (availability filter active)');
-      setShowNoActivitiesMessage(false);
-    } else if (selectedFilter === 'nearMe' && filteredExperiences.length > 0) {
-      const firstExp = filteredExperiences[0] as any;
-      const hasNearby = firstExp.calculatedDistance ? firstExp.calculatedDistance <= MAX_DISTANCE_KM : true;
-      console.log('  → hasNearby:', hasNearby, 'calculatedDistance:', firstExp.calculatedDistance);
-      setShowNoActivitiesMessage(!hasNearby);
-    } else {
-      console.log('  → Setting to false (else)');
-      setShowNoActivitiesMessage(false);
-    }
-  }, [filteredExperiences, selectedFilter, filters.availability]);
-
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
       const newIndex = viewableItems[0].index;
@@ -572,9 +546,9 @@ export default function FeedScreen() {
       <View style={styles.itemContainer}>
         <ExperienceCard
           experience={item}
-          isActive={index === currentIndex && !showNoActivitiesMessage}
+          isActive={index === currentIndex}
           isSaved={isSaved(item.id)}
-          isTabFocused={isTabFocused && !showNoActivitiesMessage}
+          isTabFocused={isTabFocused}
           isGlobalMuted={isGlobalMuted}
           onReviewsPress={() => setShowReviews(true)}
           onSavePress={() => handleSave(item.id)}
@@ -758,30 +732,6 @@ export default function FeedScreen() {
           </View>
         </View>
       </View>
-
-      {/* No Activities Nearby Message - Fullscreen Lisbon Style */}
-      {showNoActivitiesMessage && selectedFilter === 'nearMe' && (
-        <View style={styles.noActivitiesOverlay}>
-          <ExpoImage
-            source={{ uri: 'https://storage.googleapis.com/bored_tourist_media/images/25abril.jpg' }}
-            style={[styles.noActivitiesBackgroundImage, { opacity: 0.5 }]}
-            contentFit="cover"
-          />
-          <View style={styles.noActivitiesContent}>
-            <Text style={styles.noActivitiesTitle}>LISBON</Text>
-            <Text style={styles.noActivitiesTitleLine2}>EXCLUSIVE</Text>
-            <Text style={styles.noActivitiesSubtitle}>
-              We are currently curating experiences exclusively in Lisbon. Discover what's happening in the capital.
-            </Text>
-            <Pressable 
-              style={styles.exploreLisbonButton}
-              onPress={() => setShowNoActivitiesMessage(false)}
-            >
-              <Text style={styles.exploreLisbonButtonText}>EXPLORE LISBON</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       {experience && (
         <ReviewsModal
@@ -2237,9 +2187,13 @@ function ReviewsModal({ visible, experience, onClose }: ReviewsModalProps) {
                     </View>
                   </View>
                   <Text style={styles.reviewText}>{review.comment}</Text>
-                  {review.verified_purchase && (
+                  {review.booking_id !== null && review.booking_id !== undefined ? (
                     <View style={styles.verifiedBadge}>
                       <Text style={styles.verifiedText}>✓ {t('feed.verifiedPurchase')}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.verifiedBadge}>
+                      <Text style={styles.verifiedText}>✓ Google verified</Text>
                     </View>
                   )}
                 </View>

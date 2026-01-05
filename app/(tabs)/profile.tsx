@@ -1,4 +1,4 @@
-import { MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight, Edit2 } from 'lucide-react-native';
+import { MoreVertical, Star, MessageCircle, Mail, Shield, BookOpen, LogOut, Trash2, Info, ChevronRight, Edit2, Plus } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import {
   Pressable,
@@ -25,6 +25,7 @@ import { usePreferences } from '@/contexts/PreferencesContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import PreferencesQuiz from '@/components/PreferencesQuiz';
 import QuizSuggestionModal from '@/components/QuizSuggestionModal';
+import { SuggestActivityModal } from '@/components/SuggestActivityModal';
 import { api } from '@/services/api';
 import { useExperiences } from '@/hooks/useExperiences';
 import EditProfileModal from '../../components/EditProfileModal';
@@ -41,6 +42,7 @@ export default function ProfileScreen() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [showQuizSuggestion, setShowQuizSuggestion] = useState(false);
+  const [showSuggestActivity, setShowSuggestActivity] = useState(false);
   
   // Show quiz suggestion for new signups
   useEffect(() => {
@@ -486,6 +488,23 @@ export default function ProfileScreen() {
             </Pressable>
           )}
 
+          {/* Suggest Activity Button */}
+          {isAuthenticated && (
+            <Pressable 
+              style={styles.suggestActivityCard}
+              onPress={() => setShowSuggestActivity(true)}
+            >
+              <View style={styles.suggestIconContainer}>
+                <Plus size={24} color={colors.primary} />
+              </View>
+              <View style={styles.suggestContent}>
+                <Text style={styles.suggestTitle}>Propose a new activity</Text>
+                <Text style={styles.suggestSubtitle}>Know something we should feature?</Text>
+              </View>
+              <ChevronRight size={20} color={colors.dark.textTertiary} />
+            </Pressable>
+          )}
+
           {/* Contact Section */}
           <View style={styles.sectionCard}>
             <Pressable style={styles.menuItem} onPress={handleTextFounder}>
@@ -715,6 +734,15 @@ export default function ProfileScreen() {
         userName={user?.name}
       />
 
+      {/* Suggest Activity Modal */}
+      <SuggestActivityModal
+        visible={showSuggestActivity}
+        onClose={() => setShowSuggestActivity(false)}
+        onSuccess={() => {
+          setShowSuggestActivity(false);
+        }}
+      />
+
       {/* TODO: Fix EditProfileModal import issue */}
       {/* <EditProfileModal
         visible={showEditProfile}
@@ -872,6 +900,39 @@ const styles = StyleSheet.create({
   quizSubtitle: {
     fontSize: 13,
     color: '#666666',
+  },
+  // Suggest Activity Card
+  suggestActivityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.primary + '40',
+  },
+  suggestIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  suggestContent: {
+    flex: 1,
+  },
+  suggestTitle: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: colors.dark.text,
+    marginBottom: 2,
+  },
+  suggestSubtitle: {
+    fontSize: 13,
+    color: colors.dark.textSecondary,
   },
   // Saved Card
   savedCard: {

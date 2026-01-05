@@ -314,6 +314,25 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
+
+  // Activity Suggestions APIs
+  async submitActivitySuggestion(data: {
+    instagram_handle?: string;
+    website?: string;
+    description: string;
+  }) {
+    return this.request('/suggestions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getUserSuggestions() {
+    return this.request('/suggestions');
+  }
 }
 
 export const api = new ApiService();

@@ -493,9 +493,13 @@ Book this amazing experience on BoredTourist!`;
                           </View>
                         </View>
                         <Text style={styles.reviewText}>{review.comment}</Text>
-                        {review.verified_purchase && (
+                        {review.booking_id !== null && review.booking_id !== undefined ? (
                           <View style={styles.verifiedBadge}>
                             <Text style={styles.verifiedText}>✓ Verified Purchase</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.verifiedBadge}>
+                            <Text style={styles.verifiedText}>✓ Google verified</Text>
                           </View>
                         )}
                       </View>
