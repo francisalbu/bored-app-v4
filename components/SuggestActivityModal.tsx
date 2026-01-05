@@ -13,8 +13,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { X } from 'lucide-react-native';
-import { colors } from '../constants/colors';
-import { apiService } from '../services/api';
+import colors from '../constants/colors';
+import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 interface SuggestActivityModalProps {
@@ -29,8 +29,7 @@ export function SuggestActivityModal({
   onSuccess,
 }: SuggestActivityModalProps) {
   const { isAuthenticated } = useAuth();
-  const [instagramHandle, setInstagramHandle] = useState('');
-  const [website, setWebsite] = useState('');
+  const [contact, setContact] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,8 +40,8 @@ export function SuggestActivityModal({
       return;
     }
 
-    if (!instagramHandle.trim() && !website.trim()) {
-      Alert.alert('Error', 'Please provide either Instagram handle or website');
+    if (!contact.trim()) {
+      Alert.alert('Error', 'Please provide Instagram handle or website');
       return;
     }
 
@@ -53,10 +52,13 @@ export function SuggestActivityModal({
 
     setIsSubmitting(true);
 
+    // Determine if it's Instagram or website
+    const isInstagram = contact.trim().includes('@') || !contact.trim().includes('.');
+
     try {
-      const response = await apiService.submitActivitySuggestion({
-        instagram_handle: instagramHandle.trim(),
-        website: website.trim(),
+      const response = await api.submitActivitySuggestion({
+        instagram_handle: isInstagram ? contact.trim() : '',
+        website: !isInstagram ? contact.trim() : '',
         description: description.trim(),
       });
 
@@ -69,8 +71,7 @@ export function SuggestActivityModal({
               text: 'OK',
               onPress: () => {
                 // Reset form
-                setInstagramHandle('');
-                setWebsite('');
+                setContact('');
                 setDescription('');
                 onClose();
                 onSuccess?.();
@@ -91,8 +92,7 @@ export function SuggestActivityModal({
 
   const handleClose = () => {
     if (!isSubmitting) {
-      setInstagramHandle('');
-      setWebsite('');
+      setContact('');
       setDescription('');
       onClose();
     }
@@ -127,36 +127,17 @@ export function SuggestActivityModal({
             </Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Instagram Handle</Text>
+              <Text style={styles.label}>
+                Instagram Handle or Website <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="@example"
+                placeholder="@example or https://example.com"
                 placeholderTextColor={colors.dark.textSecondary}
-                value={instagramHandle}
-                onChangeText={setInstagramHandle}
+                value={contact}
+                onChangeText={setContact}
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!isSubmitting}
-              />
-            </View>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Website</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="https://example.com"
-                placeholderTextColor={colors.dark.textSecondary}
-                value={website}
-                onChangeText={setWebsite}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
                 editable={!isSubmitting}
               />
             </View>
@@ -300,7 +281,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   submitButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',

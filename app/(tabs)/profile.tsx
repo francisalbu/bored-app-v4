@@ -495,7 +495,7 @@ export default function ProfileScreen() {
               onPress={() => setShowSuggestActivity(true)}
             >
               <View style={styles.suggestIconContainer}>
-                <Plus size={24} color={colors.primary} />
+                <Plus size={24} color="#FFFFFF" />
               </View>
               <View style={styles.suggestContent}>
                 <Text style={styles.suggestTitle}>Propose a new activity</Text>

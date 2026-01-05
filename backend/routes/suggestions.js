@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { getDB } = require('../config/database');
+const { authenticateSupabase } = require('../middleware/supabaseAuth');
 
 /**
  * POST /api/suggestions
  * Create a new activity suggestion (authenticated users only)
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticateSupabase, async (req, res) => {
   try {
     const { instagram_handle, website, description } = req.body;
     const userId = req.user?.id; // Assuming you have auth middleware
@@ -92,7 +93,7 @@ router.post('/', async (req, res) => {
  * GET /api/suggestions
  * Get user's own suggestions (authenticated users only)
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticateSupabase, async (req, res) => {
   try {
     const userId = req.user?.id;
 
@@ -140,7 +141,7 @@ router.get('/', async (req, res) => {
  * GET /api/suggestions/admin
  * Get all suggestions (admin only)
  */
-router.get('/admin', async (req, res) => {
+router.get('/admin', authenticateSupabase, async (req, res) => {
   try {
     const userId = req.user?.id;
     const { status } = req.query;
@@ -213,7 +214,7 @@ router.get('/admin', async (req, res) => {
  * PATCH /api/suggestions/:id
  * Update suggestion status (admin only)
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', authenticateSupabase, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, admin_notes } = req.body;
