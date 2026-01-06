@@ -93,7 +93,7 @@ export function DiscountCodeInput({ onCodeApplied, onCodeRemoved }: DiscountCode
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Enter the code"
+          placeholder="Enter the promo code"
           placeholderTextColor={colors.dark.textSecondary}
           value={code}
           onChangeText={(text) => {

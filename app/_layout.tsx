@@ -124,6 +124,14 @@ export default function RootLayout() {
     const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 [ROOT] Deep link received:', event.url);
       
+      // Handle experience deep links (boredtourist://experience/8)
+      if (event.url.includes('boredtourist://experience/')) {
+        const experienceId = event.url.split('boredtourist://experience/')[1];
+        console.log('🎯 [ROOT] Navigating to experience:', experienceId);
+        router.push(`/experience/${experienceId}`);
+        return;
+      }
+      
       // Check if it's a shared content URL (from TikTok, Instagram, etc.)
       if (event.url.includes('share') || event.url.includes('shared-content')) {
         console.log('📤 [ROOT] Shared content detected!');

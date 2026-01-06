@@ -207,11 +207,13 @@ export default function ExperienceDetailScreen() {
 
 ${experience.description}
 
-Book this amazing experience on BoredTourist!`;
+Book this amazing experience on BoredTourist!
+boredtourist://experience/${experience.id}`;
 
       await Share.share({
         message: shareMessage,
         title: experience.title,
+        url: `boredtourist://experience/${experience.id}`, // Deep link
       });
       
       trackEvent('detail_experience_shared', {
