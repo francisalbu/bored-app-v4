@@ -41,6 +41,7 @@ const boredAIRoutes = require('./routes/boredAI');
 const aiConciergeRoutes = require('./routes/aiConcierge');
 const preferencesRoutes = require('./routes/preferences');
 const suggestionsRoutes = require('./routes/suggestions');
+const discountCodesRoutes = require('./routes/discountCodes');
 
 // Initialize Express app
 const app = express();
@@ -102,6 +103,7 @@ app.use('/api/bored-ai', boredAIRoutes);
 app.use('/api/ai-concierge', aiConciergeRoutes);
 app.use('/api/preferences', preferencesRoutes); // User preferences and quiz data
 app.use('/api/suggestions', suggestionsRoutes); // Activity suggestions from users
+app.use('/api/discount-codes', discountCodesRoutes); // Discount codes validation and usage
 
 // Privacy Policy page (required for App Store)
 app.get('/privacy', (req, res) => {

@@ -333,6 +333,31 @@ class ApiService {
   async getUserSuggestions() {
     return this.request('/suggestions');
   }
+
+  // Discount Codes APIs
+  async validateDiscountCode(code: string) {
+    return this.request('/discount-codes/validate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async applyDiscountCode(code: string, booking_id?: number) {
+    return this.request('/discount-codes/apply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code, booking_id }),
+    });
+  }
+
+  async getMyDiscountUsage() {
+    return this.request('/discount-codes/my-usage');
+  }
 }
 
 export const api = new ApiService();

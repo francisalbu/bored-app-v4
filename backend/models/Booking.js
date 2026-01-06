@@ -72,7 +72,8 @@ async function createBooking(userId, bookingData) {
     participants,
     customer_name,
     customer_email,
-    customer_phone
+    customer_phone,
+    discount_code
   } = bookingData;
   
   try {
@@ -107,6 +108,7 @@ async function createBooking(userId, bookingData) {
         customer_name,
         customer_email,
         customer_phone,
+        discount_code, // Add discount code
         status: 'confirmed',
         payment_status: 'pending'
       })

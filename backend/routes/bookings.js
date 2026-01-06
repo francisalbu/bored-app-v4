@@ -52,7 +52,8 @@ router.post('/',
         participants: req.body.participants,
         customer_name: req.body.customer_name,
         customer_email: req.body.customer_email,
-        customer_phone: req.body.customer_phone
+        customer_phone: req.body.customer_phone,
+        discount_code: req.body.discount_code // Add discount code support
       };
       
       // Try to authenticate user if token is present (optional)

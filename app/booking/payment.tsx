@@ -28,6 +28,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import AuthBottomSheet from '@/components/AuthBottomSheet';
 import { useExperience } from '@/hooks/useApi';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { DiscountCodeInput } from '@/components/DiscountCodeInput';
 
 // Check if running in Expo Go (Stripe doesn't work in Expo Go)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -147,6 +148,11 @@ export default function PaymentScreen() {
   // Auth bottom sheet
   const [showAuthSheet, setShowAuthSheet] = useState(false);
   
+  // Discount code state
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [isDiscountApplied, setIsDiscountApplied] = useState(false);
+  
   // Auto-fill user info when logged in
   useEffect(() => {
     if (user) {
@@ -238,7 +244,22 @@ export default function PaymentScreen() {
   
   const adultsCount = parseInt(adults || '1');
   const pricePerGuest = parseFloat(price || '0');
-  const totalPrice = pricePerGuest * adultsCount;
+  const originalPrice = pricePerGuest * adultsCount;
+  
+  // Calculate final price with discount
+  const discountAmount = isDiscountApplied ? (originalPrice * discountPercentage) / 100 : 0;
+  const totalPrice = originalPrice - discountAmount;
+  
+  // Debug price calculation
+  useEffect(() => {
+    console.log('💰 [PAYMENT] Price calculation:', {
+      originalPrice,
+      isDiscountApplied,
+      discountPercentage,
+      discountAmount,
+      totalPrice
+    });
+  }, [originalPrice, isDiscountApplied, discountPercentage, discountAmount, totalPrice]);
   
   // Track screen view when payment page loads
   useEffect(() => {
@@ -615,6 +636,7 @@ export default function PaymentScreen() {
         customer_name: customerName,
         customer_email: customerEmail,
         customer_phone: `${selectedCountry.dialCode}${guestPhone}`.replace(/\s/g, ''),
+        discount_code: isDiscountApplied ? discountCode : undefined,
       });
 
       if (!bookingResult.success || !bookingResult.data?.id) {
@@ -800,8 +822,39 @@ export default function PaymentScreen() {
             <Text style={styles.priceLabel}>
               €{pricePerGuest} x {adultsCount} {adultsCount > 1 ? 'people' : 'person'}
             </Text>
-            <Text style={styles.priceValue}>€{totalPrice.toFixed(2)}</Text>
+            <Text style={styles.priceValue}>€{originalPrice.toFixed(2)}</Text>
           </View>
+          
+          {/* Show discount if applied */}
+          {isDiscountApplied && (
+            <View style={styles.priceRow}>
+              <Text style={[styles.priceLabel, { color: colors.dark.primary }]}>
+                Discount ({discountPercentage}% off)
+              </Text>
+              <Text style={[styles.priceValue, { color: colors.dark.primary }]}>
+                -€{discountAmount.toFixed(2)}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Discount Code Input */}
+        <View style={styles.section}>
+          <DiscountCodeInput
+            onCodeApplied={(code, percentage) => {
+              console.log('🔵 [PAYMENT] Discount code applied:', { code, percentage });
+              setDiscountCode(code);
+              setDiscountPercentage(percentage);
+              setIsDiscountApplied(true);
+              console.log('🔵 [PAYMENT] State updated - isDiscountApplied: true');
+            }}
+            onCodeRemoved={() => {
+              console.log('🔵 [PAYMENT] Discount code removed');
+              setDiscountCode('');
+              setDiscountPercentage(0);
+              setIsDiscountApplied(false);
+            }}
+          />
         </View>
 
         {/* Total */}
