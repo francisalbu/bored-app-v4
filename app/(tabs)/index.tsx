@@ -822,20 +822,8 @@ function ExperienceCard({ experience, isActive, isSaved, isTabFocused, isGlobalM
 
   const handleShare = async () => {
     try {
-      const shareMessage = `🎉 ${experience.title}
-
-📍 ${experience.location}
-⭐ ${experience.rating} (${experience.reviewCount} reviews)
-⏱️ ${experience.duration}
-💰 ${experience.currency}${experience.price}/person
-
-${experience.description}
-
-Book this amazing experience on BoredTourist!`;
-
       const result = await Share.share({
-        message: shareMessage,
-        title: experience.title,
+        message: `Check out this activity on BoredTourist! https://apps.apple.com/pt/app/bored-tourist/id6755624970`,
       });
 
       if (result.action === Share.sharedAction) {

@@ -49,7 +49,7 @@ export default function AnimatedSplash({ onFinish }: AnimatedSplashProps) {
       ]}
     >
       <Animated.Image
-        source={require('../assets/images/splash-logo.png')}
+        source={require('../assets/images/appstore_Bored.png')}
         style={[
           styles.logo,
           {
@@ -65,7 +65,7 @@ export default function AnimatedSplash({ onFinish }: AnimatedSplashProps) {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F4E04D',
+    backgroundColor: '#fff100',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,

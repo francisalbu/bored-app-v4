@@ -5,14 +5,14 @@
     "version": "1.0.3",
     "runtimeVersion": "1.0.3",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/appstore_Bored.png",
     "scheme": "app.rork.bored-explorer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-logo.png",
+      "image": "./assets/images/appstore_Bored.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F4E04D"
+      "backgroundColor": "#fff100"
     },
     "ios": {
       "supportsTablet": true,
@@ -61,8 +61,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#F4E04D"
+        "foregroundImage": "./assets/images/appstore_Bored.png",
+        "backgroundColor": "#fff100"
       },
       "package": "app.rork.bored_explorer",
       "config": {
@@ -78,7 +78,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/appstore_Bored.png"
     },
     "plugins": [
       [
