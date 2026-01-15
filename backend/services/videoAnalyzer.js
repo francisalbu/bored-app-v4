@@ -162,6 +162,20 @@ class VideoAnalyzer {
   async extractFramesFromUrl(videoUrl, numFrames = 3) {
     await this.ensureTempDir();
     
+    // Clean old frames and videos first
+    try {
+      const fsSync = require('fs');
+      const files = fsSync.readdirSync(this.tempDir);
+      for (const file of files) {
+        if (file.endsWith('.jpg') || file.endsWith('.mp4')) {
+          fsSync.unlinkSync(path.join(this.tempDir, file));
+        }
+      }
+      console.log('🧹 Cleaned temp directory');
+    } catch (err) {
+      console.log('⚠️ Could not clean temp directory:', err.message);
+    }
+    
     const videoPath = path.join(this.tempDir, `video_${Date.now()}.mp4`);
     
     try {
@@ -216,7 +230,15 @@ class VideoAnalyzer {
       console.log(`📸 Extracting ${numFrames} frames from downloaded video...`);
       
       ffmpeg(videoPath)
-        .inputOptions(['-t 10']) // Process only first 10 seconds
+        .inputOptions([
+          '-t 10', // Process only first 10 seconds
+          '-err_detect ignore_err', // Ignore errors in stream
+          '-fflags +genpts' // Generate presentation timestamps
+        ])
+        .outputOptions([
+          '-vsync vfr', // Variable frame rate
+          '-qscale:v 2' // High quality
+        ])
         .screenshots({
           count: numFrames,
           folder: this.tempDir,
@@ -231,8 +253,10 @@ class VideoAnalyzer {
         })
         .on('error', (err) => {
           console.error('❌ Frame extraction failed:', err.message);
+          console.error('Error code:', err.code);
+          // Try to clean up video file
           require('fs').unlink(videoPath, () => {});
-          reject(err);
+          reject(new Error(`Failed to extract frames: ${err.message}. Video may be corrupted or in unsupported format.`));
         });
     });
   }
