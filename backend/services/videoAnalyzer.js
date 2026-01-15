@@ -37,41 +37,69 @@ class VideoAnalyzer {
   }
 
   /**
-   * Get direct video URL from Instagram/TikTok using yt-dlp
-   * This gets the actual video URL without downloading the file
+   * Get direct video URL from Instagram using RapidAPI
+   * Much more reliable than scraping!
    */
   async getDirectVideoUrl(url) {
     try {
-      console.log('🔗 Getting direct video URL...');
+      console.log('🔗 Getting video URL via RapidAPI...');
       
-      // Use yt-dlp to get the direct URL without downloading
-      const command = `yt-dlp -f "best[ext=mp4]" --get-url "${url}"`;
-      const { stdout } = await execAsync(command, { timeout: 15000 });
+      const rapidApiKey = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p11d71ejsn0d42966b3d99';
       
-      const videoUrl = stdout.trim();
-      console.log('✅ Got direct video URL');
+      // Use RapidAPI Instagram Downloader
+      const response = await axios.get('https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com/get-info-rapidapi', {
+        params: { url: url },
+        headers: {
+          'X-RapidAPI-Key': rapidApiKey,
+          'X-RapidAPI-Host': 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com'
+        },
+        timeout: 15000
+      });
       
-      return videoUrl;
+      // Extract video URL and metadata
+      const videoUrl = response.data?.download_url || response.data?.video_url;
+      const caption = response.data?.caption || '';
+      const hashtags = this.extractHashtags(caption);
+      
+      console.log('✅ Got video URL via RapidAPI');
+      console.log('📝 Caption:', caption?.substring(0, 100));
+      console.log('🏷️ Hashtags:', hashtags.join(', '));
+      
+      if (!videoUrl) {
+        throw new Error('No video URL in RapidAPI response');
+      }
+      
+      return {
+        videoUrl,
+        caption,
+        hashtags
+      };
+      
     } catch (error) {
-      console.error('⚠️ Failed to get direct URL:', error.message);
+      console.error('⚠️ RapidAPI failed:', error.message);
       
-      // Fallback: try to use oEmbed or other APIs
+      // Fallback: try direct Instagram scraping
       if (url.includes('instagram.com')) {
-        return this.getInstagramVideoUrl(url);
+        return this.getInstagramVideoUrlFallback(url);
       }
       
-      if (url.includes('tiktok.com')) {
-        return this.getTikTokVideoUrl(url);
-      }
-      
-      throw new Error('Could not get video URL. Make sure yt-dlp is installed.');
+      throw new Error('Could not get video URL. Please check the Instagram link.');
     }
   }
 
   /**
-   * Get Instagram video URL via oEmbed (fallback)
+   * Extract hashtags from caption
    */
-  async getInstagramVideoUrl(url) {
+  extractHashtags(text) {
+    if (!text) return [];
+    const matches = text.match(/#\w+/g) || [];
+    return matches.map(tag => tag.toLowerCase());
+  }
+
+  /**
+   * Fallback: Get Instagram video URL via direct scraping
+   */
+  async getInstagramVideoUrlFallback(url) {
     try {
       const postId = this.extractInstagramId(url);
       const response = await axios.get(
@@ -84,19 +112,18 @@ class VideoAnalyzer {
         }
       );
       
-      return response.data?.graphql?.shortcode_media?.video_url || 
-             response.data?.items?.[0]?.video_versions?.[0]?.url;
+      const videoUrl = response.data?.graphql?.shortcode_media?.video_url || 
+                       response.data?.items?.[0]?.video_versions?.[0]?.url;
+      const caption = response.data?.graphql?.shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
+      
+      return {
+        videoUrl,
+        caption,
+        hashtags: this.extractHashtags(caption)
+      };
     } catch (error) {
       throw new Error('Failed to get Instagram video URL');
     }
-  }
-
-  /**
-   * Get TikTok video URL (fallback)
-   */
-  async getTikTokVideoUrl(url) {
-    // TikTok requires more complex handling
-    throw new Error('TikTok requires yt-dlp. Please install: brew install yt-dlp');
   }
 
   /**
@@ -359,24 +386,32 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   async analyzeVideoUrl(url, description = '') {
     const startTime = Date.now();
     let framePaths = [];
+    let metadata = {};
     
     try {
       console.log(`\n🎬 Starting video analysis for: ${url}`);
-      console.log('⚡ NEW METHOD: Extracting frames directly from URL (no download!)');
+      console.log('⚡ Using RapidAPI + OpenAI Vision (multimodal approach)');
       
-      // Step 1: Get direct video URL
-      console.log('🔗 Step 1: Getting direct video URL...');
-      const directVideoUrl = await this.getDirectVideoUrl(url);
-      console.log(`✅ Got video URL`);
+      // Step 1: Get direct video URL + metadata via RapidAPI
+      console.log('🔗 Step 1: Getting video via RapidAPI...');
+      const videoData = await this.getDirectVideoUrl(url);
+      metadata.caption = videoData.caption;
+      metadata.hashtags = videoData.hashtags;
+      console.log(`✅ Got video URL + metadata`);
       
       // Step 2: Extract frames DIRECTLY from URL (no download!)
-      console.log('🎞️ Step 2: Extracting frames from URL...');
-      framePaths = await this.extractFramesFromUrl(directVideoUrl, 6);
-      console.log(`✅ Extracted ${framePaths.length} frames (without downloading video!)`);
+      console.log('🎞️ Step 2: Extracting 3-5 key frames...');
+      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 5);
+      console.log(`✅ Extracted ${framePaths.length} frames`);
       
-      // Step 3: Analyze all frames with AI
-      console.log('🤖 Step 3: Analyzing frames with AI...');
-      const frameAnalyses = await this.analyzeAllFrames(framePaths, description);
+      // Step 3: Analyze with multimodal AI (frames + caption + hashtags)
+      console.log('🤖 Step 3: Analyzing with OpenAI Vision (multimodal)...');
+      const frameAnalyses = await this.analyzeAllFramesWithContext(
+        framePaths, 
+        description,
+        metadata.caption,
+        metadata.hashtags
+      );
       
       // Step 4: Combine results
       console.log('🧮 Step 4: Combining results...');
@@ -387,22 +422,48 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
       console.log(`📍 Activity: ${finalAnalysis.activity}`);
       console.log(`🌍 Location: ${finalAnalysis.location}`);
       console.log(`💯 Confidence: ${(finalAnalysis.confidence * 100).toFixed(1)}%`);
-      console.log(`⚡ No video download required!`);
+      console.log(`⚡ Used RapidAPI + multimodal analysis!`);
       
       return {
         ...finalAnalysis,
         processingTime,
-        method: 'streaming_frames',
-        userDescription: description
+        method: 'rapidapi_multimodal',
+        userDescription: description,
+        caption: metadata.caption,
+        hashtags: metadata.hashtags
       };
       
     } catch (error) {
       console.error('❌ Video analysis failed:', error);
       throw error;
     } finally {
-      // Cleanup only the frames (no video file to delete!)
+      // Cleanup only the frames (no video file!)
       await this.cleanup(null, framePaths);
     }
+  }
+
+  /**
+   * Analyze frames with full context (caption + hashtags)
+   */
+  async analyzeAllFramesWithContext(framePaths, userDescription, caption, hashtags) {
+    console.log(`🔍 Analyzing ${framePaths.length} frames with full context...`);
+    
+    // Build context from all available info
+    const contextInfo = [];
+    if (caption) contextInfo.push(`Caption: "${caption}"`);
+    if (hashtags && hashtags.length > 0) contextInfo.push(`Hashtags: ${hashtags.join(' ')}`);
+    if (userDescription) contextInfo.push(`User note: "${userDescription}"`);
+    
+    const fullContext = contextInfo.join('\n');
+    
+    const analysisPromises = framePaths.map((framePath, index) =>
+      this.analyzeFrame(framePath, index + 1, framePaths.length, fullContext)
+    );
+    
+    const results = await Promise.all(analysisPromises);
+    console.log('✅ All frames analyzed with context!');
+    
+    return results;
   }
 
   /**
