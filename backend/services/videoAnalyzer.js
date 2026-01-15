@@ -43,29 +43,34 @@ class VideoAnalyzer {
   async getDirectVideoUrl(url) {
     console.log('🔗 Getting video URL for:', url);
     
-    // Method 1: Try RapidAPI first
+    // Method 1: Try RapidAPI (Instagram Scraper Stable API)
     try {
       const rapidApiKey = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p11d71ejsn0d42966b3d99';
+      const mediaCode = this.extractInstagramId(url);
       
-      console.log('📡 Calling RapidAPI with key:', rapidApiKey.substring(0, 10) + '...');
+      if (!mediaCode) {
+        throw new Error('Could not extract media code from URL');
+      }
       
-      const response = await axios.get('https://instagram-scraper-api2.p.rapidapi.com/v1/post_info', {
-        params: { code_or_id_or_url: url },
+      console.log('📡 Calling RapidAPI with media_code:', mediaCode);
+      
+      const response = await axios.get('https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php', {
+        params: { media_code: mediaCode },
         headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': 'instagram-scraper-api2.p.rapidapi.com'
+          'x-rapidapi-key': rapidApiKey,
+          'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com'
         },
-        timeout: 10000
+        timeout: 15000
       });
       
       console.log('📦 RapidAPI Response Status:', response.status);
       console.log('📦 RapidAPI Response Data:', JSON.stringify(response.data, null, 2));
       
-      const videoUrl = response.data?.data?.video_url || response.data?.data?.video_versions?.[0]?.url;
-      const caption = response.data?.data?.caption?.text || '';
+      const videoUrl = response.data?.video_url || response.data?.video_versions?.[0]?.url;
+      const caption = response.data?.caption || response.data?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
       
       if (videoUrl) {
-        console.log('✅ Got video via RapidAPI');
+        console.log('✅ Got video via RapidAPI:', videoUrl.substring(0, 60) + '...');
         return {
           videoUrl,
           caption,
@@ -383,6 +388,12 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   extractInstagramId(url) {
     const match = url.match(/\/p\/([^\/\?]+)|\/reel\/([^\/\?]+)/);
     return match ? (match[1] || match[2]) : null;
+  }
+  
+  extractHashtags(text) {
+    if (!text) return [];
+    const matches = text.match(/#[\w]+/g);
+    return matches || [];
   }
 
   /**

@@ -338,61 +338,6 @@ router.get('/analyzed/:id', authenticateSupabase, async (req, res) => {
 });
 
 /**
- * POST /api/suggestions/test-analyze
- * TEST ENDPOINT - No auth required (remove after testing!)
- */
-router.post('/test-analyze', async (req, res) => {
-  const { instagram_url, tiktok_url, description } = req.body;
-  const url = instagram_url || tiktok_url;
-  
-  if (!url) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Instagram or TikTok URL is required' 
-    });
-  }
-
-  try {
-    console.log(`\n🧪 TEST: Video analysis request`);
-    console.log(`🔗 URL: ${url}`);
-    
-    const analysis = await videoAnalyzer.analyzeVideoUrl(url, description || '');
-    
-    const experiences = await getYourGuideService.searchExperiences({
-      activity: analysis.activity,
-      location: analysis.location,
-      limit: 5
-    });
-    
-    res.json({
-      success: true,
-      data: {
-        analysis: {
-          activity: analysis.activity,
-          location: analysis.location,
-          confidence: analysis.confidence,
-          landmarks: analysis.landmarks || [],
-          features: analysis.features || [],
-          processingTime: analysis.processingTime
-        },
-        experiences: experiences,
-        meta: {
-          framesAnalyzed: analysis.frameAnalyses?.length || 0,
-          method: analysis.method
-        }
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ Test analysis failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message
-    });
-  }
-});
-
-/**
  * GET /api/suggestions
  * Get user's own suggestions (authenticated users only)
  */

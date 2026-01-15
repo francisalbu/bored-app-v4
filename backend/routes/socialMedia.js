@@ -11,7 +11,7 @@ const { createClient } = require('@supabase/supabase-js');
 // Credentials (use environment variables in production)
 const SUPABASE_URL = 'https://hnivuisqktlrusyqywaz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuaXZ1aXNxa3RscnVzeXF5d2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxNzE2NzgsImV4cCI6MjA3ODc0NzY3OH0.amqHQkxh9tun5cIHUJN23ocGImZek6QfoSGpLDSUhDA';
-const OPENAI_KEY = process.env.OPENAI_KEY; // Set in Render dashboard
+const OPENAI_KEY = process.env.OPENAI_API_KEY; // Set in Render dashboard
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p11d71ejsn0d42966b3d99';
 
 // Initialize clients
