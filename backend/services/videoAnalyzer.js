@@ -414,6 +414,8 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
       // Step 4: Combine results
       console.log('🧮 Step 4: Combining results...');
       const finalAnalysis = this.combineFrameAnalyses(frameAnalyses);
+      console.log('📊 DEBUG - frameAnalyses count:', frameAnalyses.length);
+      console.log('📊 DEBUG - finalAnalysis.frameAnalyses:', finalAnalysis.frameAnalyses);
       
       const processingTime = Date.now() - startTime;
       console.log(`\n✅ Analysis complete in ${(processingTime/1000).toFixed(1)}s`);
@@ -442,8 +444,9 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
       console.error('❌ Video analysis failed:', error);
       throw error;
     } finally {
-      // Cleanup only the frames (no video file!)
-      await this.cleanup(null, framePaths);
+      // TEMP: Skip cleanup to verify frames are being extracted
+      // await this.cleanup(null, framePaths);
+      console.log('⚠️ Skipping cleanup - frames kept in temp/ for verification');
     }
   }
 
@@ -469,13 +472,13 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
       const analysis = await this.analyzeFrame(framePaths[i], i + 1, framePaths.length, fullContext);
       results.push(analysis);
       
-      // Cleanup frame immediately after analysis
-      try {
-        await fs.unlink(framePaths[i]);
-        console.log(`🗑️ Cleaned frame ${i + 1}`);
-      } catch (e) {
-        console.error(`Failed to cleanup frame ${i + 1}:`, e.message);
-      }
+      // TEMP: Keep frames to verify extraction is working
+      // try {
+      //   await fs.unlink(framePaths[i]);
+      //   console.log(`🗑️ Cleaned frame ${i + 1}`);
+      // } catch (e) {
+      //   console.error(`Failed to cleanup frame ${i + 1}:`, e.message);
+      // }
       
       // Force garbage collection hint
       if (global.gc) global.gc();
