@@ -168,7 +168,10 @@ class VideoAnalyzer {
         url: videoUrl,
         responseType: 'stream',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          // Pretend request comes from a real iPhone
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+          'Referer': 'https://www.instagram.com/',
+          'Accept': '*/*'
         },
         timeout: 30000
       });
@@ -197,6 +200,7 @@ class VideoAnalyzer {
       console.log(`📸 Extracting ${numFrames} frames from downloaded video...`);
       
       ffmpeg(videoPath)
+        .inputOptions(['-t 10']) // Process only first 10 seconds
         .screenshots({
           count: numFrames,
           folder: this.tempDir,
