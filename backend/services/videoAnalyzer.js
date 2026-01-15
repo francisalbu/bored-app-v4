@@ -416,13 +416,14 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
       console.log(`✅ Got video URL + metadata`);
       
       // Step 2: Extract frames DIRECTLY from URL (no download!)
-      console.log('🎞️ Step 2: Extracting 3-5 key frames...');
-      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 5);
+      console.log('🎞️ Step 2: Extracting 3 key frames...');
+      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 3);
       console.log(`✅ Extracted ${framePaths.length} frames`);
       
       // Step 3: Analyze with multimodal AI (frames + caption + hashtags)
-      console.log('🤖 Step 3: Analyzing with OpenAI Vision (multimodal)...');
-      const frameAnalyses = await this.analyzeAllFramesWithContext(
+      // Process SEQUENTIALLY to save memory!
+      console.log('🤖 Step 3: Analyzing with OpenAI Vision (memory-optimized)...');
+      const frameAnalyses = await this.analyzeFramesSequentially(
         framePaths, 
         description,
         metadata.caption,
@@ -459,7 +460,45 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   }
 
   /**
-   * Analyze frames with full context (caption + hashtags)
+   * Analyze frames SEQUENTIALLY to save memory (Render has 512MB limit)
+   */
+  async analyzeFramesSequentially(framePaths, userDescription, caption, hashtags) {
+    console.log(`🔍 Analyzing ${framePaths.length} frames SEQUENTIALLY (memory-optimized)...`);
+    
+    // Build context from all available info
+    const contextInfo = [];
+    if (caption) contextInfo.push(`Caption: "${caption}"`);
+    if (hashtags && hashtags.length > 0) contextInfo.push(`Hashtags: ${hashtags.join(' ')}`);
+    if (userDescription) contextInfo.push(`User note: "${userDescription}"`);
+    
+    const fullContext = contextInfo.join('\n');
+    
+    const results = [];
+    
+    // Process ONE frame at a time to save memory
+    for (let i = 0; i < framePaths.length; i++) {
+      console.log(`📊 Analyzing frame ${i + 1}/${framePaths.length}...`);
+      const analysis = await this.analyzeFrame(framePaths[i], i + 1, framePaths.length, fullContext);
+      results.push(analysis);
+      
+      // Cleanup frame immediately after analysis
+      try {
+        await fs.unlink(framePaths[i]);
+        console.log(`🗑️ Cleaned frame ${i + 1}`);
+      } catch (e) {
+        console.error(`Failed to cleanup frame ${i + 1}:`, e.message);
+      }
+      
+      // Force garbage collection hint
+      if (global.gc) global.gc();
+    }
+    
+    console.log('✅ All frames analyzed sequentially!');
+    return results;
+  }
+  
+  /**
+   * Analyze frames with full context (caption + hashtags) - PARALLEL VERSION (kept for reference)
    */
   async analyzeAllFramesWithContext(framePaths, userDescription, caption, hashtags) {
     console.log(`🔍 Analyzing ${framePaths.length} frames with full context...`);
@@ -483,24 +522,29 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   }
 
   /**
-   * Cleanup temporary files
+   * Cleanup temporary files (most are already cleaned sequentially)
    */
   async cleanup(videoPath, framePaths) {
-    console.log('🧹 Cleaning up temporary files...');
+    console.log('🧹 Final cleanup check...');
     
     // Only frames to delete now (no video!)
     const filesToDelete = [...framePaths].filter(Boolean);
     
+    let deletedCount = 0;
     for (const file of filesToDelete) {
       try {
         await fs.unlink(file);
+        deletedCount++;
         console.log(`🗑️ Deleted: ${path.basename(file)}`);
       } catch (error) {
-        console.error(`Failed to delete ${file}:`, error.message);
+        // File already deleted sequentially - no problem
+        if (error.code !== 'ENOENT') {
+          console.error(`Failed to delete ${file}:`, error.message);
+        }
       }
     }
     
-    console.log('✅ Cleanup complete');
+    console.log(`✅ Cleanup complete (${deletedCount} files remaining)`);
   }
 }
 
