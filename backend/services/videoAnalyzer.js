@@ -220,7 +220,7 @@ class VideoAnalyzer {
       throw new Error('Could not download video from CDN - link may have expired or headers rejected');
     }
     
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const frameFiles = [];
       
       for (let i = 1; i <= numFrames; i++) {
@@ -229,74 +229,142 @@ class VideoAnalyzer {
       
       console.log(`📸 Extracting ${numFrames} frames from downloaded video...`);
       
-      ffmpeg(videoPath)
-        .inputOptions([
-          '-t 10', // Process only first 10 seconds
-          '-err_detect ignore_err', // Ignore errors in stream
-          '-fflags +genpts' // Generate presentation timestamps
-        ])
-        .outputOptions([
-          '-vsync vfr', // Variable frame rate
-          '-qscale:v 2' // High quality
-        ])
-        .screenshots({
-          count: numFrames,
-          folder: this.tempDir,
-          size: '1280x?',
-          filename: 'frame-%i.jpg'
-        })
-        .on('end', () => {
-          console.log(`✅ ${numFrames} frames extracted!`);
-          // Delete video after extraction
-          require('fs').unlink(videoPath, () => {});
-          resolve(frameFiles);
-        })
-        .on('error', (err) => {
-          console.error('❌ Frame extraction failed:', err.message);
-          console.error('Error code:', err.code);
-          // Try to clean up video file
-          require('fs').unlink(videoPath, () => {});
-          reject(new Error(`Failed to extract frames: ${err.message}. Video may be corrupted or in unsupported format.`));
-        });
+      // Use direct FFmpeg command instead of fluent-ffmpeg (more reliable)
+      const framePattern = path.join(this.tempDir, 'frame-%d.jpg');
+      const ffmpegCmd = `ffmpeg -i "${videoPath}" -t 10 -vf "select='not(mod(n\\,${Math.floor(300/numFrames)}))'" -vsync vfr -frames:v ${numFrames} -qscale:v 2 "${framePattern}" -y 2>&1`;
+      
+      try {
+        const { stdout, stderr } = await execAsync(ffmpegCmd);
+        console.log('✅ FFmpeg output:', stderr.split('\n').slice(-5).join('\n'));
+        
+        // Verify frames were created
+        const fsSync = require('fs');
+        let framesCreated = 0;
+        for (const framePath of frameFiles) {
+          if (fsSync.existsSync(framePath)) {
+            framesCreated++;
+          }
+        }
+        
+        if (framesCreated === 0) {
+          throw new Error('No frames were extracted');
+        }
+        
+        console.log(`✅ ${framesCreated} frames extracted!`);
+        // Delete video after successful extraction
+        require('fs').unlink(videoPath, () => {});
+        resolve(frameFiles.filter(f => fsSync.existsSync(f)));
+      } catch (err) {
+        console.error('❌ Frame extraction failed:', err.message);
+        console.error('⚠️ Video kept at:', videoPath, 'for debugging');
+        reject(new Error(`Failed to extract frames: ${err.message}`));
+      }
     });
   }
 
   /**
-   * Analyze single frame with GPT-4 Vision (OpenAI)
+   * Extract activity and location from Instagram metadata (caption, hashtags, location tag)
+   * This is PRIORITY 1 - always check metadata first!
    */
-  async analyzeFrame(framePath, frameNumber, totalFrames, description = '') {
+  async extractFromMetadata(caption = '', hashtags = [], locationTag = '') {
+    console.log('📝 Analyzing Instagram metadata first...');
+    console.log('📍 Location tag:', locationTag || 'none');
+    console.log('🏷️ Hashtags:', hashtags.join(', ') || 'none');
+    
+    const metadataText = `
+Caption: ${caption}
+Hashtags: ${hashtags.join(' ')}
+Location Tag: ${locationTag}
+`.trim();
+    
+    if (!metadataText || metadataText.length < 10) {
+      console.log('⚠️ No metadata available');
+      return { activity: null, location: null, confidence: 0, source: 'none' };
+    }
+    
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{
+          role: "system",
+          content: "You extract travel activity and location from Instagram metadata. If location tag exists, USE IT as primary location. Extract activity from hashtags and caption."
+        }, {
+          role: "user",
+          content: `Extract activity and location from this Instagram post:
+
+${metadataText}
+
+RULES:
+1. If "Location Tag" exists, USE IT as the primary location (it's official Instagram tag)
+2. Extract activity from hashtags (e.g., #surf = surfing, #ski = skiing)
+3. If no clear activity, return null
+4. Return high confidence (0.9+) if location tag exists
+
+Return JSON only:
+{
+  "activity": "specific activity or null",
+  "location": "location from tag or caption or null",
+  "confidence": 0.0-1.0
+}`
+        }],
+        temperature: 0.3,
+        max_tokens: 150
+      });
+      
+      const text = response.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
+      const result = JSON.parse(text);
+      
+      console.log(`📊 Metadata extraction: activity="${result.activity}", location="${result.location}", confidence=${result.confidence}`);
+      
+      return {
+        activity: result.activity,
+        location: result.location,
+        confidence: result.confidence || 0,
+        source: 'metadata'
+      };
+    } catch (error) {
+      console.error('❌ Metadata extraction failed:', error.message);
+      return { activity: null, location: null, confidence: 0, source: 'error' };
+    }
+  }
+
+  /**
+   * Analyze single frame with GPT-4 Vision (OpenAI)
+   * NOW includes metadata context for better accuracy
+   */
+  async analyzeFrame(framePath, frameNumber, totalFrames, description = '', metadataInfo = null) {
     const imageBase64 = await fs.readFile(framePath, 'base64');
     
-    const prompt = `You are a travel detective analyzing frame ${frameNumber}/${totalFrames} from a social media video.
+    // Build context from metadata
+    let metadataContext = '';
+    if (metadataInfo) {
+      if (metadataInfo.location) metadataContext += `\n🏷️ Instagram Location Tag: ${metadataInfo.location}`;
+      if (metadataInfo.activity) metadataContext += `\n🎯 Detected Activity: ${metadataInfo.activity}`;
+      if (metadataInfo.hashtags?.length) metadataContext += `\n#️⃣ Hashtags: ${metadataInfo.hashtags.join(' ')}`;
+    }
+    
+    const prompt = `You are analyzing frame ${frameNumber}/${totalFrames} from an Instagram/TikTok video.
 
-YOUR MISSION: Identify the activity AND location to suggest similar GetYourGuide experiences.
+${metadataContext}
 
-🔍 DETECTIVE RULES:
-1. ACTIVITY: Be specific (Surfing, Wine Tasting, Alpine Skiing, Snorkeling, Street Food Tour)
-2. LOCATION: You MUST make an educated guess. Use ALL clues:
-   - Architecture style (Mediterranean? Nordic? Asian?)
-   - Natural landscape (Alpine peaks? Tropical beach? Desert?)
-   - Weather/lighting (sunny Mediterranean? snowy Alps?)
-   - Visible brands, signs, language hints
-   - Mountain shapes (are these the Alps? Rockies? Andes?)
-   - Beach style (Caribbean? Bali? Australia?)
+IMPORTANT:
+- If Instagram Location Tag exists above, USE IT as primary location (it's official)
+- If Activity is already detected, CONFIRM it from visual or add details
+- Your job: COMPLEMENT metadata with visual details (text in video, landmarks, atmosphere)
 
-3. CONTEXT from post metadata: ${description || 'No metadata available'}
+ANALYZE THIS FRAME FOR:
+1. Activity confirmation/details (what exactly is happening?)
+2. Visual landmarks or text visible in the frame
+3. Atmospheric details (weather, time of day, etc.)
 
-🚫 FORBIDDEN: Do NOT say "Unknown" unless the image is completely blurred or dark.
-✅ REQUIRED: If unsure of exact city, give region/country based on visual probability.
-
-Examples of GOOD answers:
-- "Alpine Skiing, Les Trois Vallées, France" (if you see classic French Alps)
-- "Beach Surfing, Bali, Indonesia" (if tropical with Hindu statues)
-- "Hiking, Scottish Highlands, UK" (if you see heather and grey skies)
+${description ? `User description: ${description}` : ''}
 
 Return ONLY valid JSON (no markdown):
 {
-  "activity": "Specific Activity Name",
-  "location": "Best Guess Location (City/Region, Country)",
-  "landmarks": ["any recognizable features"],
-  "features": ["visual clues used"],
+  "activity": "confirmed activity or visual details",
+  "location": "location (prefer metadata tag if exists)",
+  "landmarks": ["text/landmarks visible in frame"],
+  "features": ["visual clues"],
   "confidence": 0.75
 }`;
 
@@ -485,14 +553,22 @@ Return ONLY valid JSON (no markdown):
       metadata.location = videoData.location; // Instagram location tag!
       console.log(`✅ Got video URL + metadata`);
       
-      // Step 2: Download + extract frames from CDN URL (must use immediately before expiration!)
-      console.log('🎞️ Step 2: Extracting 3 key frames from CDN...');
+      // Step 2: PRIORITY - Extract from metadata FIRST (location tag, hashtags, caption)
+      console.log('📝 Step 2: Extracting from Instagram metadata (PRIORITY 1)...');
+      const metadataAnalysis = await this.extractFromMetadata(
+        metadata.caption,
+        metadata.hashtags,
+        metadata.location
+      );
+      console.log(`✅ Metadata analysis: activity="${metadataAnalysis.activity}", location="${metadataAnalysis.location}"`);
+      
+      // Step 3: Download + extract frames from CDN URL (must use immediately before expiration!)
+      console.log('🎞️ Step 3: Extracting 3 key frames to complement metadata...');
       framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 3);
       console.log(`✅ Extracted ${framePaths.length} frames`);
       
-      // Step 3: Analyze with multimodal AI (frames + caption + hashtags + location!)
-      // Process SEQUENTIALLY to save memory!
-      console.log('🤖 Step 3: Analyzing with OpenAI Vision (memory-optimized)...');
+      // Step 4: Analyze frames to COMPLEMENT metadata (not replace!)
+      console.log('🤖 Step 4: Analyzing frames to complement metadata...');
       const analysisResult = await this.analyzeFramesSequentially(
         framePaths, 
         description,
@@ -504,9 +580,24 @@ Return ONLY valid JSON (no markdown):
       const frameAnalyses = analysisResult.analyses;
       const extractedFrames = analysisResult.frames;
       
-      // Step 4: Combine results
-      console.log('🧮 Step 4: Combining results...');
-      const finalAnalysis = this.combineFrameAnalyses(frameAnalyses);
+      // Step 5: Combine results - PRIORITIZE metadata over frame analysis
+      console.log('🧮 Step 5: Combining metadata + frame analysis (metadata priority)...');
+      const framesCombined = this.combineFrameAnalyses(frameAnalyses);
+      
+      // MERGE: Metadata takes priority, frames complement
+      const finalAnalysis = {
+        activity: metadataAnalysis.activity || framesCombined.activity,
+        location: metadataAnalysis.location || framesCombined.location,
+        confidence: metadataAnalysis.confidence > 0 ? 
+          Math.max(metadataAnalysis.confidence, framesCombined.confidence) : 
+          framesCombined.confidence,
+        landmarks: framesCombined.landmarks || [],
+        features: framesCombined.features || [],
+        votingScores: framesCombined.votingScores,
+        frameAnalyses: frameAnalyses,
+        metadataUsed: metadataAnalysis.confidence > 0,
+        source: metadataAnalysis.confidence > 0 ? 'metadata+frames' : 'frames_only'
+      };
       console.log('📊 DEBUG - frameAnalyses count:', frameAnalyses.length);
       console.log('📊 DEBUG - finalAnalysis.frameAnalyses:', finalAnalysis.frameAnalyses);
       
@@ -585,7 +676,13 @@ Return ONLY valid JSON (no markdown):
         console.error(`Failed to read frame ${i + 1}:`, err.message);
       }
       
-      const analysis = await this.analyzeFrame(framePaths[i], i + 1, framePaths.length, fullContext);
+      const analysis = await this.analyzeFrame(
+        framePaths[i], 
+        i + 1, 
+        framePaths.length, 
+        fullContext,
+        { location: instagramLocation, hashtags: hashtags } // Pass metadata to frame analysis
+      );
       results.push(analysis);
       
       // TEMP: Keep frames to verify extraction is working
