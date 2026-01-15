@@ -12,7 +12,16 @@ class VideoAnalyzer {
   constructor() {
     this.openaiClient = null; // Lazy load
     this.tempDir = path.join(__dirname, '../temp');
-    this.ensureTempDir();
+    // Create temp dir synchronously to avoid race conditions
+    try {
+      const fsSync = require('fs');
+      if (!fsSync.existsSync(this.tempDir)) {
+        fsSync.mkdirSync(this.tempDir, { recursive: true });
+        console.log('✅ Created temp directory:', this.tempDir);
+      }
+    } catch (error) {
+      console.error('❌ Error creating temp directory:', error);
+    }
   }
 
   // Lazy load OpenAI client
