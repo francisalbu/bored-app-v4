@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDB } = require('../config/database');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const videoAnalyzer = require('../services/videoAnalyzer');
+const grokAnalyzer = require('../services/grokAnalyzer');
 const getYourGuideService = require('../services/getYourGuideService');
 
 /**
@@ -146,6 +147,65 @@ router.post('/test-analyze', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Test analysis failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+/**
+ * POST /api/suggestions/test-grok (NO AUTH - Test Grok AI)
+ * Test Grok AI analysis - MUCH simpler approach!
+ */
+router.post('/test-grok', async (req, res) => {
+  const { instagram_url, tiktok_url, description } = req.body;
+  const url = instagram_url || tiktok_url;
+  
+  if (!url) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Instagram or TikTok URL is required' 
+    });
+  }
+
+  try {
+    console.log(`\n🤖 GROK TEST - Analyzing: ${url}`);
+    
+    // Step 1: Analyze with Grok AI (no video download, no FFmpeg, no frames!)
+    const analysis = await grokAnalyzer.analyzeInstagramUrl(url, description || '');
+    
+    // Step 2: Search GetYourGuide for experiences
+    const experiences = await getYourGuideService.searchExperiences({
+      activity: analysis.activity,
+      location: analysis.location,
+      limit: 5
+    });
+    
+    // Return results
+    res.json({
+      success: true,
+      data: {
+        analysis: {
+          activity: analysis.activity,
+          location: analysis.location,
+          description: analysis.description,
+          hashtags: analysis.hashtags,
+          confidence: analysis.confidence,
+          processingTime: analysis.processingTime
+        },
+        experiences: experiences,
+        meta: {
+          method: 'grok_ai',
+          testMode: true,
+          note: 'Using Grok AI - no video processing needed!'
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Grok test failed:', error);
     res.status(500).json({ 
       success: false, 
       message: error.message,
