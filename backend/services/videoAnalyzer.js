@@ -37,93 +37,98 @@ class VideoAnalyzer {
   }
 
   /**
-   * Get direct video URL from Instagram using RapidAPI
-   * Much more reliable than scraping!
+   * Get direct video URL from Instagram using multiple methods
+   * Priority: RapidAPI → Direct Scraping → oEmbed
    */
   async getDirectVideoUrl(url) {
+    console.log('🔗 Getting video URL for:', url);
+    
+    // Method 1: Try RapidAPI first
     try {
-      console.log('🔗 Getting video URL via RapidAPI...');
-      
       const rapidApiKey = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p11d71ejsn0d42966b3d99';
       
-      // Use RapidAPI Instagram Downloader
-      const response = await axios.get('https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com/get-info-rapidapi', {
-        params: { url: url },
+      console.log('📡 Calling RapidAPI with key:', rapidApiKey.substring(0, 10) + '...');
+      
+      const response = await axios.get('https://instagram-scraper-api2.p.rapidapi.com/v1/post_info', {
+        params: { code_or_id_or_url: url },
         headers: {
           'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com'
+          'X-RapidAPI-Host': 'instagram-scraper-api2.p.rapidapi.com'
         },
-        timeout: 15000
+        timeout: 10000
       });
       
-      // Extract video URL and metadata
-      const videoUrl = response.data?.download_url || response.data?.video_url;
-      const caption = response.data?.caption || '';
-      const hashtags = this.extractHashtags(caption);
+      console.log('📦 RapidAPI Response Status:', response.status);
+      console.log('📦 RapidAPI Response Data:', JSON.stringify(response.data, null, 2));
       
-      console.log('✅ Got video URL via RapidAPI');
-      console.log('📝 Caption:', caption?.substring(0, 100));
-      console.log('🏷️ Hashtags:', hashtags.join(', '));
+      const videoUrl = response.data?.data?.video_url || response.data?.data?.video_versions?.[0]?.url;
+      const caption = response.data?.data?.caption?.text || '';
       
-      if (!videoUrl) {
-        throw new Error('No video URL in RapidAPI response');
+      if (videoUrl) {
+        console.log('✅ Got video via RapidAPI');
+        return {
+          videoUrl,
+          caption,
+          hashtags: this.extractHashtags(caption)
+        };
       }
       
-      return {
-        videoUrl,
-        caption,
-        hashtags
-      };
-      
+      console.log('⚠️ No video URL found in RapidAPI response');
     } catch (error) {
-      console.error('⚠️ RapidAPI failed:', error.message);
-      
-      // Fallback: try direct Instagram scraping
-      if (url.includes('instagram.com')) {
-        return this.getInstagramVideoUrlFallback(url);
-      }
-      
-      throw new Error('Could not get video URL. Please check the Instagram link.');
+      console.error('❌ RapidAPI error:', error.response?.status, error.response?.data || error.message);
     }
-  }
-
-  /**
-   * Extract hashtags from caption
-   */
-  extractHashtags(text) {
-    if (!text) return [];
-    const matches = text.match(/#\w+/g) || [];
-    return matches.map(tag => tag.toLowerCase());
-  }
-
-  /**
-   * Fallback: Get Instagram video URL via direct scraping
-   */
-  async getInstagramVideoUrlFallback(url) {
+    
+    // Method 2: Direct Instagram scraping
     try {
       const postId = this.extractInstagramId(url);
       const response = await axios.get(
         `https://www.instagram.com/p/${postId}/?__a=1&__d=dis`,
         {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
           },
           timeout: 10000
         }
       );
       
-      const videoUrl = response.data?.graphql?.shortcode_media?.video_url || 
-                       response.data?.items?.[0]?.video_versions?.[0]?.url;
-      const caption = response.data?.graphql?.shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
+      const videoUrl = response.data?.items?.[0]?.video_versions?.[0]?.url ||
+                       response.data?.graphql?.shortcode_media?.video_url;
+      const caption = response.data?.items?.[0]?.caption?.text ||
+                      response.data?.graphql?.shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
       
+      if (videoUrl) {
+        console.log('✅ Got video via direct scraping');
+        return {
+          videoUrl,
+          caption,
+          hashtags: this.extractHashtags(caption)
+        };
+      }
+    } catch (error) {
+      console.log('⚠️ Direct scraping failed, trying oEmbed...');
+    }
+    
+    // Method 3: oEmbed (thumbnail only, but better than nothing)
+    try {
+      const response = await axios.get(
+        `https://www.instagram.com/p/oembed/?url=${encodeURIComponent(url)}`,
+        { timeout: 10000 }
+      );
+      
+      console.log('⚠️ Using thumbnail URL (oEmbed)');
       return {
-        videoUrl,
-        caption,
-        hashtags: this.extractHashtags(caption)
+        videoUrl: response.data.thumbnail_url, // Will be an image, not video
+        caption: response.data.title || '',
+        hashtags: [],
+        isThumbna: true
       };
     } catch (error) {
-      throw new Error('Failed to get Instagram video URL');
+      console.error('❌ All methods failed');
     }
+    
+    throw new Error('Could not get video URL. Instagram may be blocking requests.');
   }
 
   /**
