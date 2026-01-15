@@ -334,6 +334,43 @@ class ApiService {
     return this.request('/suggestions');
   }
 
+  // Enhanced Activity Suggestions with AI Video Analysis
+  async analyzeInstagramPost(data: {
+    url: string;
+    description?: string;
+  }) {
+    return this.request('/suggestions/analyze-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        instagram_url: data.url,
+        description: data.description || ''
+      }),
+    });
+  }
+
+  async analyzeTikTokPost(data: {
+    url: string;
+    description?: string;
+  }) {
+    return this.request('/suggestions/analyze-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tiktok_url: data.url,
+        description: data.description || ''
+      }),
+    });
+  }
+
+  async getAnalyzedSuggestion(suggestionId: string) {
+    return this.request(`/suggestions/analyzed/${suggestionId}`);
+  }
+
   // Discount Codes APIs
   async validateDiscountCode(code: string) {
     return this.request('/discount-codes/validate', {
