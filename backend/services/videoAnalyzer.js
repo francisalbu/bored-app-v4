@@ -423,7 +423,12 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
       console.log(`⚡ Used RapidAPI + multimodal analysis!`);
       
       return {
-        ...finalAnalysis,
+        activity: finalAnalysis.activity,
+        location: finalAnalysis.location,
+        confidence: finalAnalysis.confidence,
+        landmarks: finalAnalysis.landmarks,
+        features: finalAnalysis.features,
+        votingScores: finalAnalysis.votingScores,
         processingTime,
         method: 'rapidapi_multimodal',
         userDescription: description,
