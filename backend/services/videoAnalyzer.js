@@ -157,6 +157,24 @@ class VideoAnalyzer {
   async extractFramesFromUrl(videoUrl, numFrames = 3) {
     await this.ensureTempDir();
     
+    console.log('🔍 DEBUG - Full video URL:', videoUrl);
+    
+    // Test if video URL is accessible
+    try {
+      console.log('🧪 Testing video URL accessibility...');
+      const testResponse = await axios.head(videoUrl, { 
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      console.log('✅ Video URL is accessible, status:', testResponse.status);
+    } catch (error) {
+      console.error('❌ Video URL NOT accessible:', error.response?.status, error.message);
+      console.error('💡 Link may be expired or blocked by Instagram!');
+      throw new Error('Video URL is not accessible - link may have expired');
+    }
+    
     const sessionId = Date.now();
     
     return new Promise((resolve, reject) => {
