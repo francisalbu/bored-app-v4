@@ -82,14 +82,19 @@ class VideoAnalyzer {
       
       const videoUrl = response.data?.video_url || response.data?.video_versions?.[0]?.url;
       const caption = response.data?.caption || response.data?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
+      const locationName = response.data?.location?.name || null;
       
       if (videoUrl) {
         console.log('✅ Got video via RapidAPI');
         console.log('🔗 URL length:', videoUrl.length, 'chars (NOT truncating to avoid hash errors)');
+        if (locationName) {
+          console.log('📍 Instagram location tag:', locationName);
+        }
         return {
           videoUrl, // NEVER log or truncate - contains security hash!
           caption,
-          hashtags: this.extractHashtags(caption)
+          hashtags: this.extractHashtags(caption),
+          location: locationName
         };
       }
       
@@ -453,6 +458,7 @@ Return ONLY valid JSON (no markdown):
       const videoData = await this.getDirectVideoUrl(url);
       metadata.caption = videoData.caption;
       metadata.hashtags = videoData.hashtags;
+      metadata.location = videoData.location; // Instagram location tag!
       console.log(`✅ Got video URL + metadata`);
       
       // Step 2: Download + extract frames from CDN URL (must use immediately before expiration!)
@@ -460,15 +466,19 @@ Return ONLY valid JSON (no markdown):
       framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 3);
       console.log(`✅ Extracted ${framePaths.length} frames`);
       
-      // Step 3: Analyze with multimodal AI (frames + caption + hashtags)
+      // Step 3: Analyze with multimodal AI (frames + caption + hashtags + location!)
       // Process SEQUENTIALLY to save memory!
       console.log('🤖 Step 3: Analyzing with OpenAI Vision (memory-optimized)...');
-      const frameAnalyses = await this.analyzeFramesSequentially(
+      const analysisResult = await this.analyzeFramesSequentially(
         framePaths, 
         description,
         metadata.caption,
-        metadata.hashtags
+        metadata.hashtags,
+        metadata.location // Instagram location tag!
       );
+      
+      const frameAnalyses = analysisResult.analyses;
+      const extractedFrames = analysisResult.frames;
       
       // Step 4: Combine results
       console.log('🧮 Step 4: Combining results...');
@@ -495,8 +505,16 @@ Return ONLY valid JSON (no markdown):
         userDescription: description,
         caption: metadata.caption,
         hashtags: metadata.hashtags,
+        instagramLocation: metadata.location, // Original Instagram tag
         // Include individual frame analysis to verify frames were extracted
-        detailedFrameAnalysis: finalAnalysis.frameAnalyses
+        detailedFrameAnalysis: finalAnalysis.frameAnalyses,
+        // Debug: show frame paths (frames exist in these paths)
+        _debug_framePaths: framePaths,
+        // CRITICAL: Include extracted frames as base64 to verify they're correct
+        extractedFrames: extractedFrames.map(f => ({
+          frameNumber: f.frameNumber,
+          imageBase64: `data:image/jpeg;base64,${f.base64}`
+        }))
       };
       
     } catch (error) {
@@ -512,11 +530,12 @@ Return ONLY valid JSON (no markdown):
   /**
    * Analyze frames SEQUENTIALLY to save memory (Render has 512MB limit)
    */
-  async analyzeFramesSequentially(framePaths, userDescription, caption, hashtags) {
+  async analyzeFramesSequentially(framePaths, userDescription, caption, hashtags, instagramLocation) {
     console.log(`🔍 Analyzing ${framePaths.length} frames SEQUENTIALLY (memory-optimized)...`);
     
     // Build context from all available info
     const contextInfo = [];
+    if (instagramLocation) contextInfo.push(`📍 INSTAGRAM LOCATION TAG: "${instagramLocation}" (USE THIS!)`);
     if (caption) contextInfo.push(`Caption: "${caption}"`);
     if (hashtags && hashtags.length > 0) contextInfo.push(`Hashtags: ${hashtags.join(' ')}`);
     if (userDescription) contextInfo.push(`User note: "${userDescription}"`);
@@ -524,10 +543,24 @@ Return ONLY valid JSON (no markdown):
     const fullContext = contextInfo.join('\n');
     
     const results = [];
+    const framesBase64 = []; // To return images for debugging
     
     // Process ONE frame at a time to save memory
     for (let i = 0; i < framePaths.length; i++) {
       console.log(`📊 Analyzing frame ${i + 1}/${framePaths.length}...`);
+      
+      // Read frame as base64 for debugging
+      try {
+        const frameData = await fs.readFile(framePaths[i], 'base64');
+        framesBase64.push({
+          frameNumber: i + 1,
+          base64: frameData,
+          path: framePaths[i]
+        });
+      } catch (err) {
+        console.error(`Failed to read frame ${i + 1}:`, err.message);
+      }
+      
       const analysis = await this.analyzeFrame(framePaths[i], i + 1, framePaths.length, fullContext);
       results.push(analysis);
       
@@ -544,7 +577,7 @@ Return ONLY valid JSON (no markdown):
     }
     
     console.log('✅ All frames analyzed sequentially!');
-    return results;
+    return { analyses: results, frames: framesBase64 };
   }
   
   /**
