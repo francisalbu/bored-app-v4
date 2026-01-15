@@ -15,12 +15,17 @@ class VideoAnalyzer {
     // Create temp dir synchronously to avoid race conditions
     try {
       const fsSync = require('fs');
+      console.log('🔍 Checking temp directory:', this.tempDir);
+      console.log('📂 __dirname:', __dirname);
       if (!fsSync.existsSync(this.tempDir)) {
         fsSync.mkdirSync(this.tempDir, { recursive: true });
         console.log('✅ Created temp directory:', this.tempDir);
+      } else {
+        console.log('✅ Temp directory already exists:', this.tempDir);
       }
     } catch (error) {
       console.error('❌ Error creating temp directory:', error);
+      console.error('Stack:', error.stack);
     }
   }
 
@@ -147,74 +152,38 @@ class VideoAnalyzer {
 
   /**
    * Extract multiple frames directly from video URL (NO DOWNLOAD!)
-   * FFmpeg can read from URLs directly - much faster!
+   * Using the SIMPLE ffmpeg screenshots method
    */
-  async extractFramesFromUrl(videoUrl, numFrames = 6) {
-    // Ensure temp directory exists
+  async extractFramesFromUrl(videoUrl, numFrames = 3) {
     await this.ensureTempDir();
     
+    const sessionId = Date.now();
+    
     return new Promise((resolve, reject) => {
-      const sessionId = Date.now();
       const frameFiles = [];
       
-      // First, get video duration from URL
-      ffmpeg.ffprobe(videoUrl, async (err, metadata) => {
-        if (err) {
-          console.error('❌ FFprobe error:', err);
-          return reject(err);
-        }
-        
-        const duration = metadata.format.duration;
-        console.log(`📹 Video duration: ${duration}s (analyzing from URL, no download!)`);
-        
-        // Calculate timestamps evenly distributed
-        const timestamps = [];
-        for (let i = 0; i < numFrames; i++) {
-          const position = (duration / (numFrames - 1)) * i;
-          timestamps.push(Math.max(0, position));
-        }
-        
-        console.log(`⏱️ Extracting ${numFrames} frames at: ${timestamps.map(t => t.toFixed(1)).join('s, ')}s`);
-        
-        // Extract each frame directly from URL (no download!)
-        const framePromises = [];
-        
-        for (let i = 0; i < timestamps.length; i++) {
-          const outputPath = path.join(this.tempDir, `frame_${sessionId}_${i}.jpg`);
-          frameFiles.push(outputPath);
-          
-          const framePromise = new Promise((resolveFrame, rejectFrame) => {
-            ffmpeg(videoUrl)  // ← Directly from URL!
-              .seekInput(timestamps[i])
-              .frames(1)
-              .output(outputPath)
-              .outputOptions([
-                '-q:v 2',              // High quality
-                '-vf scale=1280:-1'    // Resize for faster AI processing
-              ])
-              .on('end', () => {
-                console.log(`✅ Frame ${i+1}/${numFrames} extracted`);
-                resolveFrame(outputPath);
-              })
-              .on('error', (err) => {
-                console.error(`❌ Frame ${i+1} failed:`, err.message);
-                rejectFrame(err);
-              })
-              .run();
-          });
-          
-          framePromises.push(framePromise);
-        }
-        
-        // Wait for all frames
-        try {
-          await Promise.all(framePromises);
+      // Build expected frame filenames
+      for (let i = 1; i <= numFrames; i++) {
+        frameFiles.push(path.join(this.tempDir, `frame-${i}.jpg`));
+      }
+      
+      console.log(`📸 Extracting ${numFrames} frames automatically...`);
+      
+      ffmpeg(videoUrl)
+        .screenshots({
+          count: numFrames,
+          folder: this.tempDir,
+          size: '1280x?',
+          filename: 'frame-%i.jpg'
+        })
+        .on('end', () => {
+          console.log(`✅ ${numFrames} frames extracted!`);
           resolve(frameFiles);
-        } catch (error) {
-          console.error('❌ Frame extraction failed:', error);
-          reject(error);
-        }
-      });
+        })
+        .on('error', (err) => {
+          console.error('❌ Frame extraction failed:', err.message);
+          reject(err);
+        });
     });
   }
 
