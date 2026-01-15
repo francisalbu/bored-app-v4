@@ -141,6 +141,9 @@ class VideoAnalyzer {
    * FFmpeg can read from URLs directly - much faster!
    */
   async extractFramesFromUrl(videoUrl, numFrames = 6) {
+    // Ensure temp directory exists
+    await this.ensureTempDir();
+    
     return new Promise((resolve, reject) => {
       const sessionId = Date.now();
       const frameFiles = [];
