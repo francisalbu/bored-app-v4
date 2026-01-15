@@ -284,7 +284,7 @@ Location Tag: ${locationTag}
     
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [{
           role: "system",
           content: "You extract travel activity and location from Instagram metadata. If location tag exists, USE IT as primary location. Extract activity from hashtags and caption."
@@ -343,34 +343,54 @@ Return JSON only:
       if (metadataInfo.hashtags?.length) metadataContext += `\n#️⃣ Hashtags: ${metadataInfo.hashtags.join(' ')}`;
     }
     
-    const prompt = `You are analyzing frame ${frameNumber}/${totalFrames} from an Instagram/TikTok video.
+    const prompt = `You are a PROFESSIONAL TRAVEL DETECTIVE analyzing frame ${frameNumber}/${totalFrames} from an Instagram/TikTok video.
 
 ${metadataContext}
 
-IMPORTANT:
-- If Instagram Location Tag exists above, USE IT as primary location (it's official)
-- If Activity is already detected, CONFIRM it from visual or add details
-- Your job: COMPLEMENT metadata with visual details (text in video, landmarks, atmosphere)
+🔍 YOUR MISSION: Identify the EXACT location like a geographic expert.
 
-ANALYZE THIS FRAME FOR:
-1. Activity confirmation/details (what exactly is happening?)
-2. Visual landmarks or text visible in the frame
-3. Atmospheric details (weather, time of day, etc.)
+VISUAL CLUES TO ANALYZE:
+1. **Geographic Features**:
+   - Mountains (volcanic, Alps, Andes, Himalayas?)
+   - Vegetation type (tropical, alpine, Mediterranean, Atlantic forest?)
+   - Water features (waterfalls, ocean color, rivers, lagoons)
+   - Rock formations and geology
+   - Climate indicators (fog, rain, tropical heat, snow)
 
-${description ? `User description: ${description}` : ''}
+2. **Architecture & Culture**:
+   - Building styles (European, Asian, American?)
+   - Infrastructure (roads, signs, urban/rural)
+   - Cultural elements visible
 
-Return ONLY valid JSON (no markdown):
+3. **Specific Landmarks**:
+   - Famous mountains, waterfalls, beaches
+   - Recognizable natural formations
+   - Text/signs visible in frame
+
+4. **Activity Details**:
+   - What sport/activity is happening?
+   - Equipment being used?
+   - Skill level visible?
+
+EXAMPLES OF GOOD ANALYSIS:
+- "Volcanic mountains with lush Atlantic vegetation and dramatic waterfalls = likely Azores, Portugal (Flores or São Miguel)"
+- "Alpine skiing with specific lift system and restaurant signs = L'Alpe d'Huez, France"
+- "Tropical beach with black sand and palm trees = likely Bali or volcanic island"
+
+${description ? `Context: ${description}` : ''}
+
+Return ONLY valid JSON:
 {
-  "activity": "confirmed activity or visual details",
-  "location": "location (prefer metadata tag if exists)",
-  "landmarks": ["text/landmarks visible in frame"],
-  "features": ["visual clues"],
-  "confidence": 0.75
+  "activity": "specific activity happening",
+  "location": "MOST SPECIFIC location possible (city/island/mountain name, region, country)",
+  "landmarks": ["visible landmarks or text"],
+  "features": ["key geographic/visual clues that led to identification"],
+  "confidence": 0.0-1.0
 }`;
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
           {
             role: "user",

@@ -18,54 +18,122 @@ class GetYourGuideService {
 
   /**
    * Search experiences based on activity and location
-   * Now uses Amadeus API for REAL activities with SMART DIVERSIFICATION!
+   * Uses GPT-4o to suggest REAL, COOL activities (Bored Tourist style)
    */
-  async searchExperiences({ activity, location, limit = 5 }) {
-    console.log(`🔎 Searching experiences for: ${activity} in ${location}`);
+  async searchExperiences({ activity, location, limit = 3 }) {
+    console.log(`🔎 Searching cool activities for: ${location}`);
     
-    // Try Amadeus API first (real activities!)
-    if (process.env.AMADEUS_API_KEY) {
-      try {
-        const amadeusResults = await amadeusService.searchActivities({ 
-          location,
-          radius: 30 // 30km radius
-        });
-        
-        if (amadeusResults && amadeusResults.length > 0) {
-          console.log(`✅ Got ${amadeusResults.length} activities from Amadeus`);
-          
-          // DIVERSIFY: Pick one from each category
-          const diversified = this.diversifyActivities(amadeusResults, activity, limit);
-          
-          console.log(`🎯 Diversified to ${diversified.length} varied activities`);
-          
-          // Convert to our format (WITHOUT GetYourGuide links for now - just show Amadeus data)
-          return diversified.map(act => {
-            return {
-              id: act.id,
-              title: act.name,
-              description: act.shortDescription || act.description || `Experience ${act.name}`,
-              price: act.price,
-              rating: act.rating,
-              reviewCount: 'From Amadeus',
-              image: act.pictures?.[0] || this.getActivityImage(act.category || act.name),
-              duration: 'Check details',
-              location: act.location.name || location,
-              category: act.category,
-              bookingLink: act.bookingLink, // Direct Amadeus booking link
-              source: 'amadeus_real',
-              cta: 'View Details'
-            };
-          });
-        }
-      } catch (error) {
-        console.log('⚠️ Amadeus failed, falling back to smart links:', error.message);
-      }
+    // Use OpenAI to suggest REAL activities that exist in this location
+    return this.generateCoolActivitiesWithAI(activity, location, limit);
+  }
+
+  /**
+   * Use GPT-4o to generate REAL, authentic activities
+   * No boring stuff - only cool experiences!
+   */
+  async generateCoolActivitiesWithAI(activity, location, limit = 3) {
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    const prompt = `You are a LOCAL EXPERT for "${location}".
+
+IMPORTANT RULES:
+1. Only suggest activities that ACTUALLY EXIST in ${location}
+2. Use your knowledge of REAL places, trails, restaurants, experiences
+3. NO BORING tourist traps - we're "Bored Tourist" (cool, authentic experiences only)
+4. Focus on: hiking trails, local food spots, unique experiences, nature, adventure
+5. Each activity must be SPECIFIC (real trail names, real restaurant names, real locations)
+
+CONTEXT:
+- Primary activity detected in video: ${activity}
+- Location: ${location}
+
+SUGGEST 3 COOL ACTIVITIES:
+1. Related to ${activity} OR complementary experience
+2. Authentic local food/culture experience  
+3. Unique nature/adventure activity
+
+For each activity:
+- Use REAL names of places (verified trails, known restaurants, actual tours)
+- Be specific (don't say "hike a trail" - say "Hike the Poço da Alagoinha Trail")
+- Include WHY it's cool (what makes it special)
+
+Return ONLY valid JSON:
+{
+  "activities": [
+    {
+      "title": "Specific Activity Name",
+      "description": "Why this is cool and what you'll experience",
+      "category": "adventure|food|nature|culture",
+      "difficulty": "easy|moderate|hard",
+      "duration": "estimated time",
+      "why_not_boring": "what makes this special"
     }
-    
-    // Fallback: Generate smart affiliate links with diverse activities
-    console.log('📋 Using curated activity suggestions');
-    return this.generateSmartAffiliateLinks(activity, location, limit);
+  ]
+}`;
+
+    try {
+      console.log('🤖 Asking GPT-4o for cool activities...');
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{
+          role: "user",
+          content: prompt
+        }],
+        temperature: 0.4,
+        max_tokens: 800
+      });
+      
+      const text = response.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
+      const result = JSON.parse(text);
+      
+      console.log(`✅ Generated ${result.activities.length} cool activities with AI`);
+      
+      // Convert to our format
+      return result.activities.slice(0, limit).map((act, index) => ({
+        id: `ai-${Date.now()}-${index}`,
+        title: act.title,
+        description: act.description,
+        price: null,
+        rating: null,
+        reviewCount: `${act.difficulty} • ${act.duration}`,
+        image: this.getActivityImage(act.category || activity),
+        duration: act.duration,
+        location: location,
+        category: act.category,
+        bookingLink: null, // No booking links - just suggestions
+        source: 'ai_curated',
+        cta: null,
+        whyNotBoring: act.why_not_boring
+      }));
+      
+    } catch (error) {
+      console.error('❌ AI activity generation failed:', error.message);
+      return this.buildNoDataResponse(activity, location);
+    }
+  }
+
+  /**
+   * Build "no data" response when no activities found
+   */
+  buildNoDataResponse(activity, location) {
+    console.log('❌ No bookable activities found for this location');
+    return [{
+      id: 'no-data',
+      title: `No activities available yet`,
+      description: `We couldn't find bookable ${activity} activities in ${location}. Try a more popular destination or check back later!`,
+      price: null,
+      rating: null,
+      reviewCount: null,
+      image: this.getActivityImage(activity),
+      duration: null,
+      location: location,
+      category: null,
+      bookingLink: null,
+      source: 'no_data',
+      cta: null
+    }];
   }
 
   /**

@@ -20,6 +20,8 @@ class AmadeusService {
 
     try {
       console.log('🔑 Getting Amadeus access token...');
+      console.log(`   API Key: ${this.apiKey?.substring(0, 10)}...`);
+      console.log(`   API Secret: ${this.apiSecret?.substring(0, 10)}...`);
       
       const response = await axios.post(
         'https://test.api.amadeus.com/v1/security/oauth2/token',
@@ -43,6 +45,7 @@ class AmadeusService {
       return this.accessToken;
     } catch (error) {
       console.error('❌ Amadeus authentication failed:', error.message);
+      console.error('   Response:', error.response?.data);
       throw error;
     }
   }
@@ -51,7 +54,7 @@ class AmadeusService {
    * Search activities by location with smart categorization
    * Returns diverse activities instead of just one type
    */
-  async searchActivities({ location, latitude, longitude, radius = 30 }) {
+  async searchActivities({ location, latitude, longitude, radius = 100 }) {
     try {
       const token = await this.getAccessToken();
       
@@ -88,10 +91,12 @@ class AmadeusService {
       
       console.log(`✅ Found ${activities.length} activities from Amadeus`);
       
-      // Categorize activities for diversity
-      const categorized = this.categorizeActivities(activities);
+      // FASE 1: Diversificação - Eliminar duplicados
+      const diversified = this.filterAndDiversify(activities, 20); // Pega 20 para depois validar links
+      console.log(`🎯 Diversified to ${diversified.length} unique activities`);
       
-      return activities.map(activity => ({
+      // Map to our format first
+      const mapped = diversified.map(activity => ({
         id: activity.id,
         name: activity.name,
         shortDescription: activity.shortDescription,
@@ -109,8 +114,15 @@ class AmadeusService {
         },
         bookingLink: activity.bookingLink,
         supplier: activity.supplier?.name || 'GetYourGuide',
-        category: this.detectCategory(activity.name, activity.description) // Add category
+        category: this.detectCategory(activity.name, activity.description)
       }));
+      
+      // FASE 2: Health Check - Validar links (em paralelo)
+      console.log(`🔗 Validating ${mapped.length} booking links...`);
+      const validActivities = await this.getValidActivities(mapped);
+      console.log(`✅ ${validActivities.length} activities have working links`);
+      
+      return validActivities;
 
     } catch (error) {
       console.error('❌ Amadeus API error:', error.response?.data || error.message);
@@ -196,6 +208,90 @@ class AmadeusService {
       return null;
     }
   }
-}
+  /**
+   * FASE 1: Diversificação - Eliminar duplicados
+   */
+  filterAndDiversify(activities, maxResults = 10) {
+    const filtered = [];
+    const seenCategories = new Set();
+    const seenTitles = new Set();
+
+    for (const activity of activities) {
+      // 1. Evitar alugueres repetitivos (rental)
+      if (activity.name.toLowerCase().includes('rental') && seenCategories.has('rental')) {
+        continue; // Ignora se já temos um aluguer
+      }
+      
+      // 2. Simplificar a categoria
+      let category = 'other';
+      const nameLower = activity.name.toLowerCase();
+      
+      if (nameLower.includes('rental')) {
+        category = 'rental';
+      } else if (nameLower.includes('ski') || nameLower.includes('snowboard')) {
+        category = 'ski_snow';
+      } else if (nameLower.includes('food') || nameLower.includes('culinary')) {
+        category = 'food';
+      } else if (nameLower.includes('museum') || nameLower.includes('tour')) {
+        category = 'culture';
+      }
+
+      // 3. Evitar títulos muito parecidos (primeiros 25 caracteres)
+      const simpleTitle = activity.name.substring(0, 25).toLowerCase().trim();
+      if (seenTitles.has(simpleTitle)) {
+        continue;
+      }
+
+      // Se passou nos filtros, adiciona
+      if (category !== 'rental' || !seenCategories.has('rental')) {
+        seenCategories.add(category);
+      }
+      seenTitles.add(simpleTitle);
+      filtered.push(activity);
+
+      if (filtered.length >= maxResults) {
+        break;
+      }
+    }
+    
+    return filtered;
+  }
+
+  /**
+   * FASE 2: Health Check - Validar links em paralelo
+   */
+  async getValidActivities(activities) {
+    const validationPromises = activities.map(async (activity) => {
+      if (!activity.bookingLink) {
+        return null; // Sem link, descarta
+      }
+      
+      const isValid = await this.checkLinkHealth(activity.bookingLink);
+      return isValid ? activity : null;
+    });
+
+    const results = await Promise.all(validationPromises);
+    return results.filter(activity => activity !== null);
+  }
+
+  /**
+   * Verificar se um link está ativo (HEAD request)
+   */
+  async checkLinkHealth(url) {
+    try {
+      const response = await axios.head(url, { 
+        timeout: 3000,
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 400
+      });
+      
+      // Link válido (200-399)
+      return true;
+    } catch (error) {
+      // Link morto (404, 500, timeout, etc)
+      console.log(`❌ Dead link: ${url.substring(0, 50)}...`);
+      return false;
+    }
+  }}
 
 module.exports = new AmadeusService();

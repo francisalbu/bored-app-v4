@@ -42,6 +42,7 @@ const aiConciergeRoutes = require('./routes/aiConcierge');
 const preferencesRoutes = require('./routes/preferences');
 const suggestionsRoutes = require('./routes/suggestions');
 const discountCodesRoutes = require('./routes/discountCodes');
+const spotsRoutes = require('./routes/spots');
 
 // Initialize Express app
 const app = express();
@@ -104,6 +105,7 @@ app.use('/api/ai-concierge', aiConciergeRoutes);
 app.use('/api/preferences', preferencesRoutes); // User preferences and quiz data
 app.use('/api/suggestions', suggestionsRoutes); // Activity suggestions from users
 app.use('/api/discount-codes', discountCodesRoutes); // Discount codes validation and usage
+app.use('/api/spots', spotsRoutes); // Saved travel spots for user's map
 
 // Privacy Policy page (required for App Store)
 app.get('/privacy', (req, res) => {

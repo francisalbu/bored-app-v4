@@ -117,12 +117,60 @@ router.post('/test-analyze', async (req, res) => {
     // Step 1: Analyze video with AI
     const analysis = await videoAnalyzer.analyzeVideoUrl(url, description || '');
     
-    // Step 2: Search GetYourGuide for experiences
+    // Step 2: Get coordinates for the location
+    const axios = require('axios');
+    let coordinates = null;
+    if (analysis.location && analysis.location !== 'not specified') {
+      try {
+        const geoResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
+          params: {
+            q: analysis.location,
+            format: 'json',
+            limit: 1
+          },
+          headers: {
+            'User-Agent': 'BoredTouristApp/1.0'
+          },
+          timeout: 5000
+        });
+        
+        if (geoResponse.data && geoResponse.data.length > 0) {
+          coordinates = {
+            latitude: parseFloat(geoResponse.data[0].lat),
+            longitude: parseFloat(geoResponse.data[0].lon)
+          };
+          console.log(`📍 Coordinates: ${coordinates.latitude}, ${coordinates.longitude}`);
+        }
+      } catch (geoError) {
+        console.warn('⚠️ Geocoding failed:', geoError.message);
+      }
+    }
+    
+    // Step 3: Search for cool activities
     const experiences = await getYourGuideService.searchExperiences({
       activity: analysis.activity,
       location: analysis.location,
-      limit: 5
+      limit: 3
     });
+    
+    // Step 4: Prepare data for "Save this Spot" button
+    const spotData = {
+      spot_name: analysis.location,
+      activity: analysis.activity,
+      location_full: analysis.location,
+      country: analysis.location?.split(',').pop()?.trim() || null,
+      coordinates: coordinates,
+      instagram_url: url,
+      activities: experiences.map(exp => ({
+        title: exp.title,
+        description: exp.description,
+        category: exp.category,
+        difficulty: exp.reviewCount, // "moderate • 2-3 hours"
+        duration: exp.duration,
+        why_not_boring: exp.whyNotBoring
+      })),
+      confidence_score: analysis.confidence
+    };
     
     // Return results
     res.json({
@@ -134,9 +182,11 @@ router.post('/test-analyze', async (req, res) => {
           confidence: analysis.confidence,
           landmarks: analysis.landmarks || [],
           features: analysis.features || [],
+          visualFeatures: analysis.visualFeatures || [],
           processingTime: analysis.processingTime
         },
         experiences: experiences,
+        spot_data: spotData, // Ready to save to map!
         meta: {
           framesAnalyzed: analysis.frameAnalyses?.length || 0,
           method: analysis.method,
