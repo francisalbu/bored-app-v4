@@ -83,6 +83,7 @@ class VideoAnalyzer {
       const videoUrl = response.data?.video_url || response.data?.video_versions?.[0]?.url;
       const caption = response.data?.caption || response.data?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
       const locationName = response.data?.location?.name || null;
+      const thumbnailSrc = response.data?.thumbnail_src || response.data?.thumbnail_url || response.data?.display_url;
       
       if (videoUrl) {
         console.log('✅ Got video via RapidAPI');
@@ -90,11 +91,15 @@ class VideoAnalyzer {
         if (locationName) {
           console.log('📍 Instagram location tag:', locationName);
         }
+        if (thumbnailSrc) {
+          console.log('🖼️ Thumbnail URL:', thumbnailSrc.substring(0, 50) + '...');
+        }
         return {
           videoUrl, // NEVER log or truncate - contains security hash!
           caption,
           hashtags: this.extractHashtags(caption),
-          location: locationName
+          location: locationName,
+          thumbnailUrl: thumbnailSrc
         };
       }
       
@@ -571,6 +576,7 @@ Return ONLY valid JSON:
       metadata.caption = videoData.caption;
       metadata.hashtags = videoData.hashtags;
       metadata.location = videoData.location; // Instagram location tag!
+      metadata.thumbnailUrl = videoData.thumbnailUrl; // Thumbnail for UI
       console.log(`✅ Got video URL + metadata`);
       
       // Step 2: PRIORITY - Extract from metadata FIRST (location tag, hashtags, caption)
@@ -584,7 +590,7 @@ Return ONLY valid JSON:
       
       // Step 3: Download + extract frames from CDN URL (must use immediately before expiration!)
       console.log('🎞️ Step 3: Extracting 3 key frames to complement metadata...');
-      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 3);
+      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 2);
       console.log(`✅ Extracted ${framePaths.length} frames`);
       
       // Step 4: Analyze frames to COMPLEMENT metadata (not replace!)
@@ -641,6 +647,7 @@ Return ONLY valid JSON:
         caption: metadata.caption,
         hashtags: metadata.hashtags,
         instagramLocation: metadata.location, // Original Instagram tag
+        thumbnailUrl: metadata.thumbnailUrl, // Thumbnail for UI
         // Include individual frame analysis to verify frames were extracted
         detailedFrameAnalysis: finalAnalysis.frameAnalyses,
         // Debug: show frame paths (frames exist in these paths)

@@ -35,39 +35,50 @@ class GetYourGuideService {
     const OpenAI = require('openai');
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     
-    const prompt = `You are a LOCAL EXPERT for "${location}".
+    const prompt = `You are a LOCAL ADVENTURE EXPERT for "${location}".
 
-IMPORTANT RULES:
-1. Only suggest activities that ACTUALLY EXIST in ${location}
-2. Use your knowledge of REAL places, trails, restaurants, experiences
-3. NO BORING tourist traps - we're "Bored Tourist" (cool, authentic experiences only)
-4. Focus on: hiking trails, local food spots, unique experiences, nature, adventure
-5. Each activity must be SPECIFIC (real trail names, real restaurant names, real locations)
+🎯 MISSION: Make the world LESS BORING
+We're "Bored Tourist" - suggesting UNIQUE, OFF-THE-BEATEN-PATH experiences that tourists don't know about.
+
+STRICT RULES:
+1. ❌ NO food/restaurant suggestions (unless EXTREMELY unique, like foraging or cooking with locals)
+2. ✅ FOCUS: Adventure, nature, unique experiences, local secrets, adrenaline, exploration
+3. ✅ Only suggest activities that ACTUALLY EXIST in ${location}
+4. ✅ Use REAL place names (verified trails, known tours, actual locations)
+5. ✅ Think OUTSIDE THE BOX - what would make someone say "WOW, I didn't know you could do that there!"
 
 CONTEXT:
-- Primary activity detected in video: ${activity}
+- Primary activity in video: ${activity}
 - Location: ${location}
 
-SUGGEST 3 COOL ACTIVITIES:
-1. Related to ${activity} OR complementary experience
-2. Authentic local food/culture experience  
-3. Unique nature/adventure activity
+SUGGEST 3 ANTI-BORING ACTIVITIES:
+1. Main activity - enhanced or alternative to ${activity}
+2. Adventure/Nature - something adrenaline-pumping or mind-blowing (snowmobile, dog sledding, canyoning, paragliding, volcano trekking, ice climbing, cliff jumping, etc.)
+3. Hidden gem - secret spot, local experience, or unique perspective most tourists miss
+
+INSPIRATION (adapt to location):
+- Winter: Snowmobile tours, dog sledding, ice climbing, northern lights hunting, ice cave exploration
+- Mountains: Paragliding, via ferrata, canyoning, mountain biking extreme trails
+- Coast: Cliff diving, coasteering, sea kayaking to hidden caves, snorkeling with wildlife
+- Desert: Sandboarding, stargazing tours, 4x4 adventures, hot air balloon rides
+- Urban: Rooftop climbing, underground tunnel tours, night photography missions
+- Tropical: Waterfall rappelling, jungle canopy zip-lining, bioluminescent kayaking
 
 For each activity:
-- Use REAL names of places (verified trails, known restaurants, actual tours)
-- Be specific (don't say "hike a trail" - say "Hike the Poço da Alagoinha Trail")
-- Include WHY it's cool (what makes it special)
+- Use REAL names (e.g., "Snowmobile Safari to Svalbard Glacier", "Rappel down Fjallfoss Waterfall")
+- Be SPECIFIC and EXCITING
+- Explain WHY this makes life less boring
 
 Return ONLY valid JSON:
 {
   "activities": [
     {
       "title": "Specific Activity Name",
-      "description": "Why this is cool and what you'll experience",
-      "category": "adventure|food|nature|culture",
-      "difficulty": "easy|moderate|hard",
+      "description": "Why this is epic and what you'll experience",
+      "category": "adventure|nature|adrenaline|exploration|unique",
+      "difficulty": "easy|moderate|hard|extreme",
       "duration": "estimated time",
-      "why_not_boring": "what makes this special"
+      "why_not_boring": "what makes this ANTI-BORING"
     }
   ]
 }`;

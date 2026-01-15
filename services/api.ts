@@ -64,6 +64,17 @@ class ApiService {
       
       console.log('API Response status:', response.status);
 
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Non-JSON response:', text.substring(0, 200));
+        return {
+          success: false,
+          error: `Server error (${response.status}). The API may be starting up. Please try again in a moment.`,
+        };
+      }
+
       const data = await response.json();
       console.log('API Response data:', JSON.stringify(data, null, 2));
 
@@ -394,6 +405,47 @@ class ApiService {
 
   async getMyDiscountUsage() {
     return this.request('/discount-codes/my-usage');
+  }
+
+  // Spot Management APIs
+  async saveSpot(spotData: {
+    user_id: string;
+    spot_name: string;
+    activity: string;
+    location_full: string;
+    country: string;
+    region: string | null;
+    latitude: number;
+    longitude: number;
+    activities: Array<{
+      title: string;
+      description: string;
+      category: string;
+      difficulty: string;
+      duration: string;
+      why_not_boring: string;
+    }>;
+    confidence_score: number;
+    instagram_url: string;
+    thumbnail_url: string | null;
+  }) {
+    return this.request('/spots/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(spotData),
+    });
+  }
+
+  async getSpots(userId: string) {
+    return this.request(`/spots?user_id=${userId}`);
+  }
+
+  async deleteSpot(spotId: number) {
+    return this.request(`/spots/${spotId}`, {
+      method: 'DELETE',
+    });
   }
 }
 
