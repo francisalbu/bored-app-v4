@@ -415,8 +415,6 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
     console.log(`✅ Found ${experiences.length} experiences`);
     
     // Step 3: Save analyzed suggestion to database
-    const db = getDB();
-    
     const { data: suggestion, error } = await db
       .from('analyzed_suggestions')
       .insert({
