@@ -428,7 +428,9 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
         method: 'rapidapi_multimodal',
         userDescription: description,
         caption: metadata.caption,
-        hashtags: metadata.hashtags
+        hashtags: metadata.hashtags,
+        // Include individual frame analysis to verify frames were extracted
+        detailedFrameAnalysis: finalAnalysis.frameAnalyses
       };
       
     } catch (error) {
