@@ -1,5 +1,5 @@
 import { Tabs, useRouter, useSegments } from 'expo-router';
-import { Home, Search, Ticket, User, Sparkles } from 'lucide-react-native';
+import { Home, Search, Ticket, User, Map } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -15,8 +15,8 @@ const TAB_BAR_WIDTH = 280;
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   
-  // Define the visible tabs in order (AI in the middle!)
-  const visibleTabNames = ['index', 'explore', 'ai', 'bookings', 'profile'];
+  // Define the visible tabs in order (Map in the middle!)
+  const visibleTabNames = ['index', 'explore', 'map', 'bookings', 'profile'];
   
   // Filter and sort routes to match our order
   const visibleRoutes = visibleTabNames
@@ -59,8 +59,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             case 'explore':
               IconComponent = <Search size={24} color={color} strokeWidth={isFocused ? 2.5 : 1.5} />;
               break;
-            case 'ai':
-              IconComponent = <Sparkles size={24} color={color} fill={isFocused ? color : 'none'} strokeWidth={1.5} />;
+            case 'map':
+              IconComponent = <Map size={24} color={color} fill={isFocused ? color : 'none'} strokeWidth={1.5} />;
               break;
             case 'bookings':
               IconComponent = <Ticket size={24} color={color} fill={fill} strokeWidth={1.5} />;
@@ -143,9 +143,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="map"
+        options={{
+          title: 'My Spots',
+        }}
+      />
+      <Tabs.Screen
         name="ai"
         options={{
-          title: 'AI Concierge',
+          href: null, // Hide AI Concierge
         }}
       />
       <Tabs.Screen

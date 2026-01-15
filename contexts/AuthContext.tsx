@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('✅ Found user in public.users:', publicUser.email);
           
           const userData = {
-            id: publicUser.id.toString(),
+            id: session.user.id, // Use Supabase UUID
             email: publicUser.email,
             name: publicUser.name,
             phone: publicUser.phone || undefined,

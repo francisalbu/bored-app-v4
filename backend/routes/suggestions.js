@@ -167,6 +167,7 @@ router.post('/test-analyze', async (req, res) => {
         category: exp.category,
         difficulty: exp.reviewCount, // "moderate • 2-3 hours"
         duration: exp.duration,
+        image: exp.image, // 🖼️ UNSPLASH PHOTO
         why_not_boring: exp.whyNotBoring
       })),
       confidence_score: analysis.confidence
@@ -300,7 +301,100 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
     console.log(`\n🎬 New video analysis request from user ${userId}`);
     console.log(`🔗 URL: ${url}`);
     
-    // Step 1: Analyze video with AI
+    // ⚡ OPTIMIZATION: Check if this URL was already analyzed
+    const db = getDB();
+    const { data: existingAnalyses, error: checkError } = await db
+      .from('analyzed_suggestions')
+      .select('*')
+      .eq('source_url', url)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    const existingAnalysis = existingAnalyses && existingAnalyses.length > 0 ? existingAnalyses[0] : null;
+    
+    if (existingAnalysis && !checkError) {
+      console.log('⚡ URL already analyzed! Returning cached results instantly...');
+      console.log(`📅 Original analysis from: ${existingAnalysis.created_at}`);
+      
+      // Get experiences from the cached analysis
+      const experiences = await getYourGuideService.searchExperiences({
+        activity: existingAnalysis.detected_activity,
+        location: existingAnalysis.detected_location,
+        limit: 3
+      });
+      
+      // Get coordinates
+      const axios = require('axios');
+      let coordinates = null;
+      if (existingAnalysis.detected_location && existingAnalysis.detected_location !== 'not specified') {
+        try {
+          const geoResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
+            params: {
+              q: existingAnalysis.detected_location,
+              format: 'json',
+              limit: 1
+            },
+            headers: {
+              'User-Agent': 'BoredTouristApp/1.0'
+            },
+            timeout: 5000
+          });
+          
+          if (geoResponse.data && geoResponse.data.length > 0) {
+            coordinates = {
+              latitude: parseFloat(geoResponse.data[0].lat),
+              longitude: parseFloat(geoResponse.data[0].lon)
+            };
+          }
+        } catch (geoError) {
+          console.warn('⚠️ Geocoding failed:', geoError.message);
+        }
+      }
+      
+      // Prepare spot data
+      const spotData = {
+        spot_name: existingAnalysis.detected_location,
+        activity: existingAnalysis.detected_activity,
+        location_full: existingAnalysis.detected_location,
+        country: existingAnalysis.detected_location?.split(',').pop()?.trim() || null,
+        coordinates: coordinates,
+        instagram_url: url,
+        activities: experiences.map(exp => ({
+          title: exp.title,
+          description: exp.description,
+          category: exp.category,
+          difficulty: exp.reviewCount,
+          duration: exp.duration,
+          image: exp.image, // 🖼️ UNSPLASH PHOTO
+          why_not_boring: exp.whyNotBoring
+        })),
+        confidence_score: existingAnalysis.confidence
+      };
+      
+      return res.json({
+        success: true,
+        data: {
+          cached: true, // Flag to indicate this was cached
+          analysis: {
+            activity: existingAnalysis.detected_activity,
+            location: existingAnalysis.detected_location,
+            confidence: existingAnalysis.confidence,
+            landmarks: existingAnalysis.landmarks,
+            processingTime: 0 // Instant!
+          },
+          experiences: experiences,
+          thumbnailUrl: existingAnalysis.ai_response?.thumbnailUrl || null, // From cached data
+          spot_data: spotData,
+          meta: {
+            framesAnalyzed: 0,
+            method: 'cached',
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    }
+    
+    // Not cached - do full analysis
     console.log('🤖 Starting AI video analysis...');
     const analysis = await videoAnalyzer.analyzeVideoUrl(url, description || '');
     
@@ -362,6 +456,7 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
           processingTime: analysis.processingTime
         },
         experiences: experiences,
+        thumbnailUrl: analysis.thumbnailUrl || null, // Instagram thumbnail
         meta: {
           framesAnalyzed: analysis.frameAnalyses?.length || 0,
           method: analysis.method,

@@ -147,30 +147,42 @@ export default function SpotResultScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Only 3 Activities */}
-        {activities.slice(0, 3).map((activity, index) => (
-          <View key={index} style={styles.activityCard}>
-            <View style={styles.activityNumber}>
-              <Text style={styles.activityNumberText}>{index + 1}.</Text>
-            </View>
-            {activity.image && !activity.image.includes('placeholder') ? (
-              <Image
-                source={{ uri: activity.image }}
-                style={styles.activityThumbnail}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={styles.activityThumbnail}>
-                <Text style={styles.activityEmoji}>{getCategoryEmoji(activity.category)}</Text>
+        {activities.slice(0, 3).map((activity, index) => {
+          console.log(`🎨 Activity ${index + 1}:`, activity.title);
+          console.log(`🖼️ Image URL:`, activity.image);
+          console.log(`📦 Has image:`, !!activity.image);
+          console.log(`🚫 Is placeholder:`, activity.image?.includes('placeholder'));
+          
+          const hasValidImage = activity.image && 
+                               typeof activity.image === 'string' && 
+                               activity.image.length > 0 &&
+                               !activity.image.includes('placeholder');
+          
+          return (
+            <View key={index} style={styles.activityCard}>
+              <View style={styles.activityNumber}>
+                <Text style={styles.activityNumberText}>{index + 1}.</Text>
               </View>
-            )}
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>{activity.title}</Text>
-              <Text style={styles.activityDescription} numberOfLines={2}>
-                {activity.description}
-              </Text>
+              {hasValidImage ? (
+                <Image
+                  source={{ uri: activity.image }}
+                  style={[styles.activityThumbnail, { backgroundColor: '#f0f0f0' }]}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.activityThumbnail}>
+                  <Text style={styles.activityEmoji}>{getCategoryEmoji(activity.category)}</Text>
+                </View>
+              )}
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>{activity.title}</Text>
+                <Text style={styles.activityDescription} numberOfLines={2}>
+                  {activity.description}
+                </Text>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         <View style={{ height: 100 }} />
       </ScrollView>
