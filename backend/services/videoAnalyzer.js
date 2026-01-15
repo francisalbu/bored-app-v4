@@ -84,9 +84,10 @@ class VideoAnalyzer {
       const caption = response.data?.caption || response.data?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
       
       if (videoUrl) {
-        console.log('✅ Got video via RapidAPI:', videoUrl.substring(0, 60) + '...');
+        console.log('✅ Got video via RapidAPI');
+        console.log('🔗 URL length:', videoUrl.length, 'chars (NOT truncating to avoid hash errors)');
         return {
-          videoUrl,
+          videoUrl, // NEVER log or truncate - contains security hash!
           caption,
           hashtags: this.extractHashtags(caption)
         };
@@ -151,29 +152,36 @@ class VideoAnalyzer {
   }
 
   /**
-   * Extract multiple frames - DOWNLOAD VIDEO FIRST to avoid expired links
+   * Extract multiple frames - Download from CDN with proper headers
    */
   async extractFramesFromUrl(videoUrl, numFrames = 3) {
     await this.ensureTempDir();
     
-    console.log('🔍 DEBUG - Video URL:', videoUrl.substring(0, 100) + '...');
-    
-    // Download video first to avoid expired link issues
     const videoPath = path.join(this.tempDir, `video_${Date.now()}.mp4`);
     
     try {
-      console.log('⬇️ Downloading video first...');
+      console.log('⬇️ Downloading video from CDN (with browser headers)...');
+      console.log('🔗 URL length:', videoUrl.length, 'chars');
+      
+      // CRITICAL: Use full browser headers to avoid "Bad URL hash"
       const response = await axios({
-        method: 'get',
-        url: videoUrl,
+        url: videoUrl, // NEVER truncate this!
+        method: 'GET',
         responseType: 'stream',
         headers: {
-          // Pretend request comes from a real iPhone
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'identity',
           'Referer': 'https://www.instagram.com/',
-          'Accept': '*/*'
+          'Origin': 'https://www.instagram.com',
+          'Sec-Fetch-Dest': 'video',
+          'Sec-Fetch-Mode': 'no-cors',
+          'Sec-Fetch-Site': 'cross-site'
         },
-        timeout: 30000
+        timeout: 30000,
+        maxContentLength: 50 * 1024 * 1024, // 50MB
+        maxBodyLength: 50 * 1024 * 1024
       });
       
       const writer = require('fs').createWriteStream(videoPath);
@@ -186,8 +194,11 @@ class VideoAnalyzer {
       
       console.log('✅ Video downloaded to:', videoPath);
     } catch (error) {
-      console.error('❌ Failed to download video:', error.message);
-      throw new Error('Could not download video - link may be expired or blocked');
+      console.error('❌ CDN download failed:', error.message);
+      if (error.response?.status) {
+        console.error('HTTP Status:', error.response.status);
+      }
+      throw new Error('Could not download video from CDN - link may have expired or headers rejected');
     }
     
     return new Promise((resolve, reject) => {
@@ -227,28 +238,42 @@ class VideoAnalyzer {
   async analyzeFrame(framePath, frameNumber, totalFrames, description = '') {
     const imageBase64 = await fs.readFile(framePath, 'base64');
     
-    const prompt = `This is frame ${frameNumber} of ${totalFrames} from a travel/activity video shared on Instagram or TikTok.
+    const prompt = `You are a travel detective analyzing frame ${frameNumber}/${totalFrames} from a social media video.
 
-Extract:
-1. Activity type (e.g., surfing, scuba diving, hiking, food tour, nightlife, sightseeing, etc.)
-2. Location (city, country - be as specific as possible!)
-3. Any visible landmarks or distinctive features
-4. Key objects, scenery, or atmosphere
+YOUR MISSION: Identify the activity AND location to suggest similar GetYourGuide experiences.
 
-User description/context: ${description || 'None provided'}
+🔍 DETECTIVE RULES:
+1. ACTIVITY: Be specific (Surfing, Wine Tasting, Alpine Skiing, Snorkeling, Street Food Tour)
+2. LOCATION: You MUST make an educated guess. Use ALL clues:
+   - Architecture style (Mediterranean? Nordic? Asian?)
+   - Natural landscape (Alpine peaks? Tropical beach? Desert?)
+   - Weather/lighting (sunny Mediterranean? snowy Alps?)
+   - Visible brands, signs, language hints
+   - Mountain shapes (are these the Alps? Rockies? Andes?)
+   - Beach style (Caribbean? Bali? Australia?)
 
-Return ONLY valid JSON with this exact structure (no markdown, no extra text):
+3. CONTEXT from post metadata: ${description || 'No metadata available'}
+
+🚫 FORBIDDEN: Do NOT say "Unknown" unless the image is completely blurred or dark.
+✅ REQUIRED: If unsure of exact city, give region/country based on visual probability.
+
+Examples of GOOD answers:
+- "Alpine Skiing, Les Trois Vallées, France" (if you see classic French Alps)
+- "Beach Surfing, Bali, Indonesia" (if tropical with Hindu statues)
+- "Hiking, Scottish Highlands, UK" (if you see heather and grey skies)
+
+Return ONLY valid JSON (no markdown):
 {
-  "activity": "specific_activity_name",
-  "location": "City, Country",
-  "landmarks": ["landmark1", "landmark2"],
-  "features": ["feature1", "feature2"],
-  "confidence": 0.85
+  "activity": "Specific Activity Name",
+  "location": "Best Guess Location (City/Region, Country)",
+  "landmarks": ["any recognizable features"],
+  "features": ["visual clues used"],
+  "confidence": 0.75
 }`;
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini", // Usa o mesmo modelo que já usas
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "user",
@@ -266,8 +291,8 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
             ]
           }
         ],
-        max_tokens: 500,
-        temperature: 0.3
+        max_tokens: 600,
+        temperature: 0.4
       });
 
       const responseText = response.choices[0].message.content;
@@ -423,15 +448,15 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
       console.log(`\n🎬 Starting video analysis for: ${url}`);
       console.log('⚡ Using RapidAPI + OpenAI Vision (multimodal approach)');
       
-      // Step 1: Get direct video URL + metadata via RapidAPI
-      console.log('🔗 Step 1: Getting video via RapidAPI...');
+      // Step 1: Get video URL + metadata via RapidAPI
+      console.log('🔗 Step 1: Getting video URL via RapidAPI...');
       const videoData = await this.getDirectVideoUrl(url);
       metadata.caption = videoData.caption;
       metadata.hashtags = videoData.hashtags;
       console.log(`✅ Got video URL + metadata`);
       
-      // Step 2: Extract frames DIRECTLY from URL (no download!)
-      console.log('🎞️ Step 2: Extracting 3 key frames...');
+      // Step 2: Download + extract frames from CDN URL (must use immediately before expiration!)
+      console.log('🎞️ Step 2: Extracting 3 key frames from CDN...');
       framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 3);
       console.log(`✅ Extracted ${framePaths.length} frames`);
       
