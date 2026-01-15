@@ -151,43 +151,52 @@ class VideoAnalyzer {
   }
 
   /**
-   * Extract multiple frames directly from video URL (NO DOWNLOAD!)
-   * Using the SIMPLE ffmpeg screenshots method
+   * Extract multiple frames - DOWNLOAD VIDEO FIRST to avoid expired links
    */
   async extractFramesFromUrl(videoUrl, numFrames = 3) {
     await this.ensureTempDir();
     
-    console.log('🔍 DEBUG - Full video URL:', videoUrl);
+    console.log('🔍 DEBUG - Video URL:', videoUrl.substring(0, 100) + '...');
     
-    // Test if video URL is accessible
+    // Download video first to avoid expired link issues
+    const videoPath = path.join(this.tempDir, `video_${Date.now()}.mp4`);
+    
     try {
-      console.log('🧪 Testing video URL accessibility...');
-      const testResponse = await axios.head(videoUrl, { 
-        timeout: 10000,
+      console.log('⬇️ Downloading video first...');
+      const response = await axios({
+        method: 'get',
+        url: videoUrl,
+        responseType: 'stream',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+        },
+        timeout: 30000
       });
-      console.log('✅ Video URL is accessible, status:', testResponse.status);
+      
+      const writer = require('fs').createWriteStream(videoPath);
+      response.data.pipe(writer);
+      
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+      
+      console.log('✅ Video downloaded to:', videoPath);
     } catch (error) {
-      console.error('❌ Video URL NOT accessible:', error.response?.status, error.message);
-      console.error('💡 Link may be expired or blocked by Instagram!');
-      throw new Error('Video URL is not accessible - link may have expired');
+      console.error('❌ Failed to download video:', error.message);
+      throw new Error('Could not download video - link may be expired or blocked');
     }
-    
-    const sessionId = Date.now();
     
     return new Promise((resolve, reject) => {
       const frameFiles = [];
       
-      // Build expected frame filenames
       for (let i = 1; i <= numFrames; i++) {
         frameFiles.push(path.join(this.tempDir, `frame-${i}.jpg`));
       }
       
-      console.log(`📸 Extracting ${numFrames} frames automatically...`);
+      console.log(`📸 Extracting ${numFrames} frames from downloaded video...`);
       
-      ffmpeg(videoUrl)
+      ffmpeg(videoPath)
         .screenshots({
           count: numFrames,
           folder: this.tempDir,
@@ -196,10 +205,13 @@ class VideoAnalyzer {
         })
         .on('end', () => {
           console.log(`✅ ${numFrames} frames extracted!`);
+          // Delete video after extraction
+          require('fs').unlink(videoPath, () => {});
           resolve(frameFiles);
         })
         .on('error', (err) => {
           console.error('❌ Frame extraction failed:', err.message);
+          require('fs').unlink(videoPath, () => {});
           reject(err);
         });
     });
