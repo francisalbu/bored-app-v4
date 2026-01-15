@@ -10,11 +10,22 @@ const execAsync = promisify(exec);
 
 class VideoAnalyzer {
   constructor() {
-    this.openai = new OpenAI({ 
-      apiKey: process.env.OPENAI_API_KEY 
-    });
+    this.openaiClient = null; // Lazy load
     this.tempDir = path.join(__dirname, '../temp');
     this.ensureTempDir();
+  }
+
+  // Lazy load OpenAI client
+  get openai() {
+    if (!this.openaiClient) {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY environment variable is required for video analysis');
+      }
+      this.openaiClient = new OpenAI({ 
+        apiKey: process.env.OPENAI_API_KEY 
+      });
+    }
+    return this.openaiClient;
   }
 
   async ensureTempDir() {
