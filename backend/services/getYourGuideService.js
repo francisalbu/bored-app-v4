@@ -101,23 +101,32 @@ Return ONLY valid JSON:
       
       console.log(`✅ Generated ${result.activities.length} cool activities with AI`);
       
-      // Convert to our format
-      return result.activities.slice(0, limit).map((act, index) => ({
-        id: `ai-${Date.now()}-${index}`,
-        title: act.title,
-        description: act.description,
-        price: null,
-        rating: null,
-        reviewCount: `${act.difficulty} • ${act.duration}`,
-        image: this.getActivityImage(act.category || activity),
-        duration: act.duration,
-        location: location,
-        category: act.category,
-        bookingLink: null, // No booking links - just suggestions
-        source: 'ai_curated',
-        cta: null,
-        whyNotBoring: act.why_not_boring
-      }));
+      // Convert to our format WITH REAL IMAGES from Unsplash
+      const activitiesWithImages = await Promise.all(
+        result.activities.slice(0, limit).map(async (act, index) => {
+          // Get real image from Unsplash based on title + location
+          const realImage = await this.getActivityImageFromUnsplash(act.title, location);
+          
+          return {
+            id: `ai-${Date.now()}-${index}`,
+            title: act.title,
+            description: act.description,
+            price: null,
+            rating: null,
+            reviewCount: `${act.difficulty} • ${act.duration}`,
+            image: realImage || this.getActivityImage(act.category || activity), // Fallback to generic
+            duration: act.duration,
+            location: location,
+            category: act.category,
+            bookingLink: null,
+            source: 'ai_curated',
+            cta: null,
+            whyNotBoring: act.why_not_boring
+          };
+        })
+      );
+      
+      return activitiesWithImages;
       
     } catch (error) {
       console.error('❌ AI activity generation failed:', error.message);
@@ -517,6 +526,69 @@ Return ONLY valid JSON:
   /**
    * Get relevant stock image for activity type
    */
+  /**
+   * Get real photo from Unsplash API based on activity title
+   * FLEXIBLE: Works with any activity type and location
+   */
+  async getActivityImageFromUnsplash(title, location) {
+    try {
+      const accessKey = process.env.UNSPLASH_ACCESS_KEY;
+      
+      if (!accessKey) {
+        console.log('⚠️ UNSPLASH_ACCESS_KEY not set, using generic images');
+        return null; // Will fallback to generic images
+      }
+      
+      // Extract key search terms (remove common words)
+      const removeWords = ['the', 'a', 'an', 'in', 'at', 'to', 'for', 'with', 'from'];
+      const titleWords = title.toLowerCase()
+        .split(' ')
+        .filter(word => !removeWords.includes(word) && word.length > 2);
+      
+      // Try 3 search strategies in order of specificity
+      const searchStrategies = [
+        `${titleWords.slice(0, 2).join(' ')} ${location}`, // "kayak adventure Milford"
+        titleWords.slice(0, 3).join(' '), // "kayak adventure rosco"
+        titleWords[0] // Just "kayak"
+      ];
+      
+      for (const query of searchStrategies) {
+        console.log(`🖼️ Trying Unsplash: "${query}"`);
+        
+        try {
+          const response = await axios.get('https://api.unsplash.com/search/photos', {
+            params: {
+              query: query,
+              per_page: 1,
+              orientation: 'landscape',
+              content_filter: 'high' // Family-friendly only
+            },
+            headers: {
+              'Authorization': `Client-ID ${accessKey}`
+            },
+            timeout: 3000
+          });
+          
+          if (response.data?.results?.length > 0) {
+            const photo = response.data.results[0];
+            console.log(`✅ Found image: ${photo.urls.regular.substring(0, 60)}...`);
+            return photo.urls.regular;
+          }
+        } catch (err) {
+          console.log(`⚠️ Strategy "${query}" failed, trying next...`);
+          continue;
+        }
+      }
+      
+      console.log('⚠️ No Unsplash results after 3 attempts, using fallback');
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Unsplash error:', error.message);
+      return null;
+    }
+  }
+
   getActivityImage(activity) {
     const activityLower = activity.toLowerCase();
     

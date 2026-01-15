@@ -152,9 +152,17 @@ export default function SpotResultScreen() {
             <View style={styles.activityNumber}>
               <Text style={styles.activityNumberText}>{index + 1}.</Text>
             </View>
-            <View style={styles.activityThumbnail}>
-              <Text style={styles.activityEmoji}>{getCategoryEmoji(activity.category)}</Text>
-            </View>
+            {activity.image && !activity.image.includes('placeholder') ? (
+              <Image
+                source={{ uri: activity.image }}
+                style={styles.activityThumbnail}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.activityThumbnail}>
+                <Text style={styles.activityEmoji}>{getCategoryEmoji(activity.category)}</Text>
+              </View>
+            )}
             <View style={styles.activityContent}>
               <Text style={styles.activityTitle}>{activity.title}</Text>
               <Text style={styles.activityDescription} numberOfLines={2}>
