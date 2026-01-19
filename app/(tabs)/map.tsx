@@ -314,35 +314,23 @@ export default function MapScreen() {
         }
       }
 
-      // Navigate to spot result page
+      // Navigate to spot result page with POI data
       setAnalyzing(false);
       setShowLinkInput(false);
       setInstagramLink('');
       
-      // Debug: Log the thumbnail URL from API
-      console.log('📸 Thumbnail URL from API:', data.data.thumbnailUrl);
-      console.log('📸 Full data.data:', JSON.stringify(data.data, null, 2));
+      console.log('📍 POIs detected:', data.data.detectedSpots?.length || 0);
+      console.log('📸 Thumbnail:', data.data.analysis?.thumbnailUrl);
       
       router.push({
         pathname: '/spot-result',
         params: {
-          spotName: analysis.location,
-          activity: analysis.activity,
           location: analysis.location,
-          country: analysis.location?.split(',').pop()?.trim() || '',
+          activity: analysis.activity,
           confidence: analysis.confidence,
-          latitude: coordinates.latitude,
-          longitude: coordinates.longitude,
           instagramUrl: instagramLink,
-          thumbnailUrl: data.data.thumbnailUrl || data.thumbnailUrl || 'https://via.placeholder.com/800x400',
-          activities: JSON.stringify(experiences.map((exp: any) => ({
-            title: exp.title,
-            description: exp.description,
-            category: exp.category || 'experience',
-            difficulty: exp.reviewCount || '',
-            duration: exp.duration || '',
-            why_not_boring: exp.whyNotBoring || ''
-          })).slice(0, 3))
+          thumbnailUrl: data.data.analysis?.thumbnailUrl || '',
+          pois: JSON.stringify(data.data.detectedSpots || [])
         }
       });
     } catch (error: any) {

@@ -5,6 +5,7 @@ const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const videoAnalyzer = require('../services/videoAnalyzer');
 const grokAnalyzer = require('../services/grokAnalyzer');
 const getYourGuideService = require('../services/getYourGuideService');
+const googlePlacesService = require('../services/googlePlacesService');
 
 /**
  * POST /api/suggestions
@@ -146,32 +147,46 @@ router.post('/test-analyze', async (req, res) => {
       }
     }
     
-    // Step 3: Search for cool activities
-    const experiences = await getYourGuideService.searchExperiences({
-      activity: analysis.activity,
-      location: analysis.location,
-      limit: 3
-    });
+    // Step 3: Use Google Places to enrich POIs with exact data
+    const detectedSpots = [];
     
-    // Step 4: Prepare data for "Save this Spot" button
-    const spotData = {
-      spot_name: analysis.location,
-      activity: analysis.activity,
-      location_full: analysis.location,
-      country: analysis.location?.split(',').pop()?.trim() || null,
-      coordinates: coordinates,
-      instagram_url: url,
-      activities: experiences.map(exp => ({
-        title: exp.title,
-        description: exp.description,
-        category: exp.category,
-        difficulty: exp.reviewCount, // "moderate • 2-3 hours"
-        duration: exp.duration,
-        image: exp.image, // 🖼️ UNSPLASH PHOTO
-        why_not_boring: exp.whyNotBoring
-      })),
-      confidence_score: analysis.confidence
-    };
+    if (analysis.landmarks && analysis.landmarks.length > 0) {
+      console.log(`🗺️ Enriching ${analysis.landmarks.length} POIs with Google Places...`);
+      
+      // Get city context for queries
+      const cityContext = analysis.location; // e.g., "Rome, Italy"
+      
+      // Enrich all POIs in parallel (with rate limiting built-in)
+      const enrichedPOIs = await googlePlacesService.enrichPOIs(analysis.landmarks, cityContext);
+      
+      // Convert to spot format
+      for (const poi of enrichedPOIs) {
+        detectedSpots.push({
+          place_id: poi.place_id,
+          spot_name: poi.name, // Official Google name
+          location_full: poi.address,
+          city: analysis.location.split(',')[0]?.trim() || analysis.location,
+          country: analysis.location.split(',').pop()?.trim() || null,
+          coordinates: {
+            latitude: poi.latitude,
+            longitude: poi.longitude
+          },
+          activity: analysis.activity,
+          instagram_url: url,
+          confidence: analysis.confidence,
+          thumbnail: poi.photo_url, // Google Places photo
+          rating: poi.rating,
+          user_ratings_total: poi.user_ratings_total,
+          website: poi.website,
+          phone: poi.phone,
+          description: poi.description,
+          types: poi.types,
+          opening_hours: poi.opening_hours
+        });
+      }
+      
+      console.log(`✅ Enriched ${detectedSpots.length} POIs with Google Places data`);
+    }
     
     // Return results
     res.json({
@@ -183,15 +198,15 @@ router.post('/test-analyze', async (req, res) => {
           confidence: analysis.confidence,
           landmarks: analysis.landmarks || [],
           features: analysis.features || [],
-          visualFeatures: analysis.visualFeatures || [],
-          processingTime: analysis.processingTime
+          processingTime: analysis.processingTime,
+          contentType: analysis.contentType
         },
-        experiences: experiences,
-        spot_data: spotData, // Ready to save to map!
+        detectedSpots: detectedSpots, // NEW: Array of spots ready to save
         meta: {
           framesAnalyzed: analysis.detailedFrameAnalysis?.length || 0,
           method: analysis.method,
-          testMode: true
+          testMode: true,
+          spotsCount: detectedSpots.length
         }
       }
     });

@@ -10,19 +10,28 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, MapPin, Star, Check } from 'lucide-react-native';
+import { X, MapPin, Star, Check, CheckCircle, Circle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Image } from 'expo-image';
 import colors from '@/constants/colors';
 import api from '@/services/api';
 
-interface Activity {
-  title: string;
-  description: string;
-  category: string;
-  difficulty: string;
-  duration: string;
-  why_not_boring: string;
+interface POI {
+  place_id: string;
+  spot_name: string;
+  location_full: string;
+  city: string;
+  country: string;
+  coordinates: { latitude: number; longitude: number };
+  rating?: number;
+  user_ratings_total?: number;
+  thumbnail?: string;
+  website?: string;
+  phone?: string;
+  description?: string;
+  opening_hours?: any;
+  instagram_url: string;
+  activity: string;
 }
 
 export default function SpotResultScreen() {
@@ -32,69 +41,88 @@ export default function SpotResultScreen() {
   const params = useLocalSearchParams();
   
   // Parse the data from params
-  const spotName = params.spotName as string;
-  const activity = params.activity as string;
   const location = params.location as string;
-  const country = params.country as string;
+  const activity = params.activity as string;
   const confidence = parseFloat(params.confidence as string);
-  const latitude = parseFloat(params.latitude as string);
-  const longitude = parseFloat(params.longitude as string);
   const instagramUrl = params.instagramUrl as string;
   const thumbnailUrl = params.thumbnailUrl as string;
-  const activitiesJson = params.activities as string;
+  const poisJson = params.pois as string;
   
-  const activities: Activity[] = activitiesJson ? JSON.parse(activitiesJson) : [];
+  const allPOIs: POI[] = poisJson ? JSON.parse(poisJson) : [];
   
-  // Debug: Log the thumbnail URL received
-  console.log('📸 Thumbnail URL received in spot-result:', thumbnailUrl);
-  console.log('📸 Instagram URL:', instagramUrl);
+  console.log('📍 Received POIs:', allPOIs.length);
   
+  const [selectedPOIs, setSelectedPOIs] = useState<Set<string>>(new Set(allPOIs.map(p => p.place_id)));
   const [isSaving, setIsSaving] = useState(false);
+  
+  const togglePOI = (placeId: string) => {
+    setSelectedPOIs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(placeId)) {
+        newSet.delete(placeId);
+      } else {
+        newSet.add(placeId);
+      }
+      return newSet;
+    });
+  };
 
-  const handleSaveSpot = async () => {
+  const handleSaveSpots = async () => {
+    const selectedPOIsList = allPOIs.filter(poi => selectedPOIs.has(poi.place_id));
+    
+    if (selectedPOIsList.length === 0) {
+      Alert.alert('No POIs Selected', 'Please select at least one location to save');
+      return;
+    }
+    
     try {
       setIsSaving(true);
       
-      const spotData = {
-        user_id: user?.id,
-        spot_name: spotName,
-        activity: activity,
-        location_full: location,
-        country: country,
-        region: location?.split(',')[0]?.trim() || null,
-        latitude: latitude,
-        longitude: longitude,
-        activities: activities.map((act) => ({
-          title: act.title,
-          description: act.description,
-          category: act.category || 'experience',
-          difficulty: act.difficulty || '',
-          duration: act.duration || '',
-          why_not_boring: act.why_not_boring || ''
-        })),
-        confidence_score: confidence,
-        instagram_url: instagramUrl,
-        thumbnail_url: thumbnailUrl || null,
-      };
+      console.log(`💾 Saving ${selectedPOIsList.length} spots...`);
+      
+      const savePromises = selectedPOIsList.map(poi => {
+        const spotData = {
+          user_id: user?.id,
+          spot_name: poi.spot_name,
+          activity: poi.activity,
+          location_full: poi.location_full,
+          country: poi.country,
+          region: poi.city,
+          latitude: poi.coordinates.latitude,
+          longitude: poi.coordinates.longitude,
+          confidence_score: confidence,
+          instagram_url: poi.instagram_url,
+          thumbnail_url: poi.thumbnail || null,
+          place_id: poi.place_id,
+          rating: poi.rating,
+          user_ratings_total: poi.user_ratings_total,
+          website: poi.website,
+          phone: poi.phone,
+          description: poi.description,
+        };
+        return api.saveSpot(spotData);
+      });
 
-      console.log('💾 Saving spot:', spotData);
-
-      const result = await api.saveSpot(spotData);
-
-      if (result.success) {
-        Alert.alert('Success!', `${spotName} added to your map`, [
-          {
+      const results = await Promise.all(savePromises);
+      
+      const successCount = results.filter(r => r.success).length;
+      
+      if (successCount > 0) {
+        Alert.alert(
+          'Success!', 
+          `${successCount} location${successCount > 1 ? 's' : ''} added to your map`,
+          [{
             text: 'View on Map',
             onPress: () => router.replace('/(tabs)/map'),
-          },
-        ]);
+          }]
+        );
       } else {
-        Alert.alert('Error', result.error || 'Failed to save spot');
+        Alert.alert('Error', 'Failed to save spots');
         setIsSaving(false);
       }
     } catch (error) {
-      console.error('Error saving spot:', error);
-      Alert.alert('Error', `Failed to save spot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error saving spots:', error);
+      Alert.alert('Error', `Failed to save spots: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsSaving(false);
     }
   };
@@ -123,7 +151,7 @@ export default function SpotResultScreen() {
 
       {/* Instagram Source */}
       <View style={styles.instagramSource}>
-        {thumbnailUrl && thumbnailUrl !== 'https://via.placeholder.com/800x400' ? (
+        {thumbnailUrl ? (
           <Image
             source={{ uri: thumbnailUrl }}
             style={styles.thumbnailImage}
@@ -135,70 +163,69 @@ export default function SpotResultScreen() {
           </View>
         )}
         <View style={styles.sourceInfo}>
-          <Text style={styles.sourceTitle} numberOfLines={2}>{spotName}</Text>
+          <Text style={styles.sourceTitle} numberOfLines={2}>{location}</Text>
           <View style={styles.instagramBadge}>
-            <Text style={styles.instagramText}>📷 Saved from Instagram →</Text>
+            <Text style={styles.instagramText}>📷 Saved from Instagram</Text>
           </View>
         </View>
       </View>
+
+      <Text style={styles.subtitle}>
+        Select locations to add ({selectedPOIs.size} of {allPOIs.length})
+      </Text>
 
       <ScrollView 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Only 3 Activities */}
-        {activities.slice(0, 3).map((activity, index) => {
-          console.log(`🎨 Activity ${index + 1}:`, activity.title);
-          console.log(`🖼️ Image URL:`, activity.image);
-          console.log(`📦 Has image:`, !!activity.image);
-          console.log(`🚫 Is placeholder:`, activity.image?.includes('placeholder'));
-          
-          const hasValidImage = activity.image && 
-                               typeof activity.image === 'string' && 
-                               activity.image.length > 0 &&
-                               !activity.image.includes('placeholder');
+        {allPOIs.map((poi, index) => {
+          const isSelected = selectedPOIs.has(poi.place_id);
           
           return (
-            <View key={index} style={styles.activityCard}>
-              <View style={styles.activityNumber}>
-                <Text style={styles.activityNumberText}>{index + 1}.</Text>
+            <Pressable
+              key={poi.place_id}
+              style={[styles.poiCard, isSelected && styles.poiCardSelected]}
+              onPress={() => togglePOI(poi.place_id)}
+            >
+              {/* Checkbox */}
+              <View style={styles.checkbox}>
+                {isSelected ? (
+                  <CheckCircle size={24} color="#000" fill="#000" />
+                ) : (
+                  <Circle size={24} color="#ccc" />
+                )}
               </View>
-              {hasValidImage ? (
-                <Image
-                  source={{ uri: activity.image }}
-                  style={[styles.activityThumbnail, { backgroundColor: '#f0f0f0' }]}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={styles.activityThumbnail}>
-                  <Text style={styles.activityEmoji}>{getCategoryEmoji(activity.category)}</Text>
-                </View>
-              )}
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>{activity.title}</Text>
-                <Text style={styles.activityDescription} numberOfLines={2}>
-                  {activity.description}
-                </Text>
+              
+              {/* POI Info */}
+              <View style={styles.poiInfo}>
+                <Text style={styles.poiName}>{poi.spot_name}</Text>
+                
+                {/* Description */}
+                {poi.description && (
+                  <Text style={styles.poiDescription} numberOfLines={3}>
+                    {poi.description}
+                  </Text>
+                )}
               </View>
-            </View>
+            </Pressable>
           );
         })}
 
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Save Button - ALWAYS VISIBLE */}
+      {/* Save Button */}
       <View style={[styles.saveButtonContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <Pressable
-          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-          onPress={handleSaveSpot}
-          disabled={isSaving}
+          style={[styles.saveButton, (isSaving || selectedPOIs.size === 0) && styles.saveButtonDisabled]}
+          onPress={handleSaveSpots}
+          disabled={isSaving || selectedPOIs.size === 0}
         >
           {isSaving ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.saveButtonText}>
-              💾 Save Spot
+              Save {selectedPOIs.size} Location{selectedPOIs.size !== 1 ? 's' : ''} to Map
             </Text>
           )}
         </Pressable>
@@ -276,92 +303,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
   },
+  subtitle: {
+    fontSize: 14,
+    color: '#888',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#F5F5F5',
+  },
   scrollView: {
     flex: 1,
   },
-  locationCard: {
+  poiCard: {
     flexDirection: 'row',
-    alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
     marginBottom: 2,
+    alignItems: 'flex-start',
   },
-  locationNumber: {
-    width: 32,
-    marginRight: 8,
+  poiCardSelected: {
+    backgroundColor: '#F8F8F8',
   },
-  locationNumberText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  locationPin: {
-    width: 56,
-    height: 56,
+  checkbox: {
     marginRight: 12,
+    paddingTop: 2,
   },
-  locationInfo: {
+  poiInfo: {
     flex: 1,
   },
-  locationTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-  locationSubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  checkmarkCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    marginBottom: 2,
-  },
-  activityNumber: {
-    width: 32,
-    marginRight: 8,
-  },
-  activityNumberText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  activityThumbnail: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  activityEmoji: {
-    fontSize: 28,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityTitle: {
+  poiName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  activityDescription: {
+  poiDescription: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   saveButtonContainer: {
     paddingHorizontal: 20,
