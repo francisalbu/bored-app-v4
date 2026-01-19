@@ -3,8 +3,6 @@ const router = express.Router();
 const { getDB } = require('../config/database');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const videoAnalyzer = require('../services/videoAnalyzer');
-const grokAnalyzer = require('../services/grokAnalyzer');
-const getYourGuideService = require('../services/getYourGuideService');
 const googlePlacesService = require('../services/googlePlacesService');
 
 /**
@@ -282,7 +280,7 @@ router.post('/test-grok', async (req, res) => {
 
 /**
  * POST /api/suggestions/analyze-video
- * Analyze Instagram/TikTok video with AI and get experience recommendations
+ * Analyze Instagram/TikTok video with AI and return POIs with Google Places data
  */
 router.post('/analyze-video', authenticateSupabase, async (req, res) => {
   const { instagram_url, tiktok_url, description } = req.body;
@@ -328,82 +326,57 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
     const existingAnalysis = existingAnalyses && existingAnalyses.length > 0 ? existingAnalyses[0] : null;
     
     if (existingAnalysis && !checkError) {
-      console.log('⚡ URL already analyzed! Returning cached results instantly...');
+      console.log('⚡ URL already analyzed! Returning cached POIs instantly...');
       console.log(`📅 Original analysis from: ${existingAnalysis.created_at}`);
       
-      // Get experiences from the cached analysis
-      const experiences = await getYourGuideService.searchExperiences({
-        activity: existingAnalysis.detected_activity,
-        location: existingAnalysis.detected_location,
-        limit: 3
-      });
+      // Get city context for Google Places queries
+      const cityContext = existingAnalysis.detected_location;
       
-      // Get coordinates
-      const axios = require('axios');
-      let coordinates = null;
-      if (existingAnalysis.detected_location && existingAnalysis.detected_location !== 'not specified') {
-        try {
-          const geoResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
-            params: {
-              q: existingAnalysis.detected_location,
-              format: 'json',
-              limit: 1
-            },
-            headers: {
-              'User-Agent': 'BoredTouristApp/1.0'
-            },
-            timeout: 5000
-          });
-          
-          if (geoResponse.data && geoResponse.data.length > 0) {
-            coordinates = {
-              latitude: parseFloat(geoResponse.data[0].lat),
-              longitude: parseFloat(geoResponse.data[0].lon)
-            };
-          }
-        } catch (geoError) {
-          console.warn('⚠️ Geocoding failed:', geoError.message);
-        }
-      }
+      // Enrich landmarks with Google Places data
+      const enrichedPOIs = await googlePlacesService.enrichPOIs(existingAnalysis.landmarks || [], cityContext);
       
-      // Prepare spot data
-      const spotData = {
-        spot_name: existingAnalysis.detected_location,
+      // Convert to spot format
+      const detectedSpots = enrichedPOIs.map(poi => ({
+        place_id: poi.place_id,
+        spot_name: poi.name,
+        location_full: poi.address,
+        city: existingAnalysis.detected_location.split(',')[0]?.trim() || existingAnalysis.detected_location,
+        country: existingAnalysis.detected_location.split(',').pop()?.trim() || null,
+        coordinates: {
+          latitude: poi.latitude,
+          longitude: poi.longitude
+        },
         activity: existingAnalysis.detected_activity,
-        location_full: existingAnalysis.detected_location,
-        country: existingAnalysis.detected_location?.split(',').pop()?.trim() || null,
-        coordinates: coordinates,
         instagram_url: url,
-        activities: experiences.map(exp => ({
-          title: exp.title,
-          description: exp.description,
-          category: exp.category,
-          difficulty: exp.reviewCount,
-          duration: exp.duration,
-          image: exp.image, // 🖼️ UNSPLASH PHOTO
-          why_not_boring: exp.whyNotBoring
-        })),
-        confidence_score: existingAnalysis.confidence
-      };
+        confidence: existingAnalysis.confidence,
+        thumbnail: poi.photo_url,
+        rating: poi.rating,
+        user_ratings_total: poi.user_ratings_total,
+        website: poi.website,
+        phone: poi.phone,
+        description: poi.description,
+        types: poi.types,
+        opening_hours: poi.opening_hours
+      }));
       
       return res.json({
         success: true,
         data: {
-          cached: true, // Flag to indicate this was cached
+          cached: true,
           analysis: {
             activity: existingAnalysis.detected_activity,
             location: existingAnalysis.detected_location,
             confidence: existingAnalysis.confidence,
             landmarks: existingAnalysis.landmarks,
-            processingTime: 0 // Instant!
+            processingTime: 0,
+            contentType: existingAnalysis.ai_response?.contentType,
+            thumbnailUrl: existingAnalysis.ai_response?.thumbnailUrl
           },
-          experiences: experiences,
-          thumbnailUrl: existingAnalysis.ai_response?.thumbnailUrl || null, // From cached data
-          spot_data: spotData,
+          detectedSpots: detectedSpots,
           meta: {
             framesAnalyzed: 0,
             method: 'cached',
-            timestamp: new Date().toISOString()
+            spotsCount: detectedSpots.length
           }
         }
       });
@@ -416,18 +389,46 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
     console.log('✅ Analysis complete:', {
       activity: analysis.activity,
       location: analysis.location,
-      confidence: analysis.confidence
+      confidence: analysis.confidence,
+      landmarks: analysis.landmarks?.length || 0
     });
     
-    // Step 2: Search GetYourGuide for experiences
-    console.log('🔎 Searching for experiences...');
-    const experiences = await getYourGuideService.searchExperiences({
-      activity: analysis.activity,
-      location: analysis.location,
-      limit: 5
-    });
+    // Step 2: Enrich POIs with Google Places data
+    const detectedSpots = [];
     
-    console.log(`✅ Found ${experiences.length} experiences`);
+    if (analysis.landmarks && analysis.landmarks.length > 0) {
+      console.log(`🗺️ Enriching ${analysis.landmarks.length} POIs with Google Places...`);
+      
+      const cityContext = analysis.location;
+      const enrichedPOIs = await googlePlacesService.enrichPOIs(analysis.landmarks, cityContext);
+      
+      for (const poi of enrichedPOIs) {
+        detectedSpots.push({
+          place_id: poi.place_id,
+          spot_name: poi.name,
+          location_full: poi.address,
+          city: analysis.location.split(',')[0]?.trim() || analysis.location,
+          country: analysis.location.split(',').pop()?.trim() || null,
+          coordinates: {
+            latitude: poi.latitude,
+            longitude: poi.longitude
+          },
+          activity: analysis.activity,
+          instagram_url: url,
+          confidence: analysis.confidence,
+          thumbnail: poi.photo_url,
+          rating: poi.rating,
+          user_ratings_total: poi.user_ratings_total,
+          website: poi.website,
+          phone: poi.phone,
+          description: poi.description,
+          types: poi.types,
+          opening_hours: poi.opening_hours
+        });
+      }
+      
+      console.log(`✅ Enriched ${detectedSpots.length} POIs with Google Places data`);
+    }
     
     // Step 3: Save analyzed suggestion to database
     const { data: suggestion, error } = await db
@@ -450,12 +451,11 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
     
     if (error) {
       console.error('⚠️ Error saving suggestion (non-critical):', error);
-      // Don't fail the request if saving fails
     } else {
       console.log(`✅ Suggestion saved with ID: ${suggestion.id}`);
     }
     
-    // Step 4: Return results to client
+    // Step 4: Return results with POIs
     res.json({
       success: true,
       data: {
@@ -466,14 +466,15 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
           confidence: analysis.confidence,
           landmarks: analysis.landmarks || [],
           features: analysis.features || [],
-          processingTime: analysis.processingTime
+          processingTime: analysis.processingTime,
+          contentType: analysis.contentType,
+          thumbnailUrl: analysis.thumbnailUrl
         },
-        experiences: experiences,
-        thumbnailUrl: analysis.thumbnailUrl || null, // Instagram thumbnail
+        detectedSpots: detectedSpots,
         meta: {
           framesAnalyzed: analysis.detailedFrameAnalysis?.length || 0,
           method: analysis.method,
-          timestamp: new Date().toISOString()
+          spotsCount: detectedSpots.length
         }
       }
     });
@@ -481,7 +482,6 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
   } catch (error) {
     console.error('❌ Video analysis failed:', error);
     
-    // Return user-friendly error message
     let errorMessage = 'Failed to analyze video';
     
     if (error.message?.includes('download')) {
