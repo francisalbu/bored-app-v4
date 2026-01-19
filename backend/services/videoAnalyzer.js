@@ -108,7 +108,65 @@ class VideoAnalyzer {
       console.error('❌ RapidAPI error:', error.response?.status, error.response?.data || error.message);
     }
     
-    // Method 2: Direct Instagram scraping
+    // Method 2: Try Apify as fallback
+    if (process.env.APIFY_API_TOKEN) {
+      try {
+        console.log('🔄 Trying Apify Instagram Scraper as fallback...');
+        const apifyToken = process.env.APIFY_API_TOKEN;
+        
+        // Call Apify Instagram Scraper (supports direct reel URLs)
+        const apifyResponse = await axios.post(
+          'https://api.apify.com/v2/acts/apify~instagram-scraper/runs',
+          {
+            directUrls: [url],
+            resultsType: 'posts'
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apifyToken}`
+            },
+            params: {
+              waitForFinish: 120 // Wait up to 2 minutes
+            },
+            timeout: 150000
+          }
+        );
+        
+        const runId = apifyResponse.data.data.id;
+        const datasetId = apifyResponse.data.data.defaultDatasetId;
+        console.log('✅ Apify run completed:', runId);
+        
+        // Get results directly from dataset (waitForFinish ensures it's ready)
+        const resultsResponse = await axios.get(
+          `https://api.apify.com/v2/datasets/${datasetId}/items`,
+          {
+            headers: { 'Authorization': `Bearer ${apifyToken}` }
+          }
+        );
+        
+        if (resultsResponse.data && resultsResponse.data.length > 0) {
+          const item = resultsResponse.data[0];
+          console.log('✅ Got video URL from Apify:', item.videoUrl?.substring(0, 80));
+          
+          return {
+            videoUrl: item.videoUrl || item.displayUrl,
+            caption: item.caption || '',
+            hashtags: this.extractHashtags(item.caption || ''),
+            location: item.locationName || null,
+            thumbnailUrl: item.displayUrl || item.thumbnailUrl
+          };
+        }
+        
+        console.log('❌ Apify returned no data');
+      } catch (error) {
+        console.error('❌ Apify error:', error.response?.data || error.message);
+      }
+    } else {
+      console.log('⚠️ APIFY_API_TOKEN not set, skipping Apify fallback');
+    }
+    
+    // Method 3: Direct Instagram scraping
     try {
       const postId = this.extractInstagramId(url);
       const response = await axios.get(
@@ -348,48 +406,51 @@ Return JSON only:
       if (metadataInfo.hashtags?.length) metadataContext += `\n#️⃣ Hashtags: ${metadataInfo.hashtags.join(' ')}`;
     }
     
-    const prompt = `You are a PROFESSIONAL TRAVEL DETECTIVE analyzing frame ${frameNumber}/${totalFrames} from an Instagram/TikTok video.
+    const prompt = `You are a PROFESSIONAL TRAVEL DETECTIVE analyzing frame ${frameNumber}/${totalFrames} from an Instagram/TikTok travel video.
 
 ${metadataContext}
 
-🔍 YOUR MISSION: Identify the EXACT location like a geographic expert.
+🔍 YOUR MISSION: Identify ALL specific locations/POIs (Points of Interest) shown in this frame.
+
+⚠️ CRITICAL: If this is a travel montage video, it may show MULTIPLE different locations/POIs. List ALL of them!
 
 VISUAL CLUES TO ANALYZE:
-1. **Geographic Features**:
-   - Mountains (volcanic, Alps, Andes, Himalayas?)
-   - Vegetation type (tropical, alpine, Mediterranean, Atlantic forest?)
-   - Water features (waterfalls, ocean color, rivers, lagoons)
-   - Rock formations and geology
-   - Climate indicators (fog, rain, tropical heat, snow)
+1. **Specific Landmarks & POIs**:
+   - Churches, cathedrals, basilicas (which one specifically?)
+   - Fountains (Trevi? Neptune?)
+   - Castles, fortresses (Castel Sant'Angelo? Edinburgh Castle?)
+   - Historic monuments (Pantheon? Colosseum? Eiffel Tower?)
+   - Museums, palaces
+   - Famous statues, bridges, squares
+   - Text visible on buildings or signs
 
-2. **Architecture & Culture**:
-   - Building styles (European, Asian, American?)
-   - Infrastructure (roads, signs, urban/rural)
-   - Cultural elements visible
+2. **Geographic Features**:
+   - Mountains, rivers, coastlines
+   - Vegetation type (Mediterranean, tropical, alpine?)
+   - Climate indicators
 
-3. **Specific Landmarks**:
-   - Famous mountains, waterfalls, beaches
-   - Recognizable natural formations
-   - Text/signs visible in frame
+3. **Architecture & Culture**:
+   - Building styles (Baroque, Renaissance, Gothic?)
+   - Urban layout (piazzas, narrow streets?)
+   - Infrastructure
 
 4. **Activity Details**:
-   - What sport/activity is happening?
-   - Equipment being used?
-   - Skill level visible?
+   - What is happening? (sightseeing, walking tour, etc.)
 
-EXAMPLES OF GOOD ANALYSIS:
-- "Volcanic mountains with lush Atlantic vegetation and dramatic waterfalls = likely Azores, Portugal (Flores or São Miguel)"
-- "Alpine skiing with specific lift system and restaurant signs = L'Alpe d'Huez, France"
-- "Tropical beach with black sand and palm trees = likely Bali or volcanic island"
+EXAMPLES FOR ROME:
+Frame showing baroque fountain → "Trevi Fountain"
+Frame showing circular temple → "Pantheon"  
+Frame showing dome church → "Saint Peter's Basilica"
+Frame showing cylindrical fortress → "Castel Sant'Angelo"
 
 ${description ? `Context: ${description}` : ''}
 
 Return ONLY valid JSON:
 {
-  "activity": "specific activity happening",
-  "location": "MOST SPECIFIC location possible (city/island/mountain name, region, country)",
-  "landmarks": ["visible landmarks or text"],
-  "features": ["key geographic/visual clues that led to identification"],
+  "activity": "primary activity shown (sightseeing, surfing, etc.)",
+  "location": "City, Country (e.g., Rome, Italy)",
+  "landmarks": ["List ALL specific POIs/landmarks visible - BE SPECIFIC with names"],
+  "features": ["architectural/geographic details that helped identify POIs"],
   "confidence": 0.0-1.0
 }`;
 
@@ -460,15 +521,100 @@ Return ONLY valid JSON:
   }
 
   /**
+   * Filter generic/non-specific landmarks
+   */
+  isGenericLandmark(landmark) {
+    const genericTerms = [
+      'typical', 'traditional', 'historic', 'ancient', 'modern',
+      'street', 'road', 'alley', 'pathway', 'building', 'architecture',
+      'view', 'scene', 'area', 'district', 'neighborhood',
+      'restaurant', 'cafe', 'shop', 'store', 'market' // unless specific name
+    ];
+    
+    const landmarkLower = landmark.toLowerCase();
+    return genericTerms.some(term => landmarkLower.includes(term) && 
+                                    !landmarkLower.includes('fountain') && 
+                                    !landmarkLower.includes('basilica') &&
+                                    !landmarkLower.includes('castle') &&
+                                    !landmarkLower.includes('cathedral'));
+  }
+
+  /**
+   * Remove duplicate landmarks from consecutive frames
+   */
+  removeDuplicateLandmarks(frameAnalyses) {
+    const uniqueLandmarks = [];
+    const seen = new Set();
+    
+    frameAnalyses.forEach((frame, index) => {
+      if (frame.landmarks && frame.landmarks.length > 0) {
+        frame.landmarks.forEach(landmark => {
+          // Check if this landmark was in previous frame
+          const prevFrame = index > 0 ? frameAnalyses[index - 1] : null;
+          const isDuplicateFromPrev = prevFrame?.landmarks?.includes(landmark);
+          
+          if (!isDuplicateFromPrev && !seen.has(landmark) && !this.isGenericLandmark(landmark)) {
+            uniqueLandmarks.push(landmark);
+            seen.add(landmark);
+          }
+        });
+      }
+    });
+    
+    return uniqueLandmarks;
+  }
+
+  /**
+   * Detect content type based on analysis
+   */
+  detectContentType(frameAnalyses) {
+    const locations = frameAnalyses.map(f => f.location).filter(Boolean);
+    
+    // Extract countries and cities
+    const countries = new Set();
+    const cities = new Set();
+    
+    locations.forEach(loc => {
+      const parts = loc.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        cities.add(parts[0]); // First part is usually city
+        countries.add(parts[parts.length - 1]); // Last part is country
+      } else if (parts.length === 1) {
+        countries.add(parts[0]); // Only country mentioned
+      }
+    });
+    
+    // Get unique landmarks (non-generic, non-duplicate)
+    const landmarks = this.removeDuplicateLandmarks(frameAnalyses);
+    
+    // Decision logic
+    if (countries.size >= 3) {
+      return { type: 'multi-country', countries: Array.from(countries), landmarks: [] };
+    } else if (countries.size === 1 && cities.size >= 3) {
+      return { type: 'country-tour', country: Array.from(countries)[0], cities: Array.from(cities), landmarks: [] };
+    } else if (landmarks.length >= 3) {
+      return { type: 'city-tour', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks };
+    } else if (landmarks.length === 1) {
+      return { type: 'single-poi', city: Array.from(cities)[0] || 'Unknown', landmark: landmarks[0] };
+    } else {
+      // Default to city tour with whatever landmarks we have
+      return { type: 'city-tour', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks };
+    }
+  }
+
+  /**
    * Combine multiple frame analyses using voting + confidence
    */
   combineFrameAnalyses(frameAnalyses) {
     console.log('🧮 Combining frame analyses...');
     
+    // Detect content type first
+    const contentType = this.detectContentType(frameAnalyses);
+    console.log('📊 Content type detected:', contentType.type);
+    
     // Activity voting (weighted by confidence)
     const activityVotes = {};
     const locationVotes = {};
-    const allLandmarks = [];
     const allFeatures = [];
     
     frameAnalyses.forEach(analysis => {
@@ -478,9 +624,6 @@ Return ONLY valid JSON:
       }
       if (analysis.location) {
         locationVotes[analysis.location] = (locationVotes[analysis.location] || 0) + analysis.confidence;
-      }
-      if (analysis.landmarks) {
-        allLandmarks.push(...analysis.landmarks);
       }
       if (analysis.features) {
         allFeatures.push(...analysis.features);
@@ -497,17 +640,16 @@ Return ONLY valid JSON:
     // Calculate overall confidence
     const avgConfidence = frameAnalyses.reduce((sum, a) => sum + a.confidence, 0) / frameAnalyses.length;
     
-    // Remove duplicates
-    const uniqueLandmarks = [...new Set(allLandmarks.filter(Boolean))];
     const uniqueFeatures = [...new Set(allFeatures.filter(Boolean))];
     
     return {
       activity: topActivity ? topActivity[0] : 'unknown',
       location: topLocation ? topLocation[0] : 'unknown',
-      confidence: Math.min(avgConfidence * 1.1, 1.0), // Small boost for multiple frame consensus
-      landmarks: uniqueLandmarks,
+      confidence: Math.min(avgConfidence * 1.1, 1.0),
+      landmarks: contentType.landmarks, // Filtered, deduplicated landmarks
       features: uniqueFeatures,
       frameAnalyses: frameAnalyses,
+      contentType: contentType, // New: type of content detected
       votingScores: {
         activities: activityVotes,
         locations: locationVotes
@@ -589,8 +731,8 @@ Return ONLY valid JSON:
       console.log(`✅ Metadata analysis: activity="${metadataAnalysis.activity}", location="${metadataAnalysis.location}"`);
       
       // Step 3: Download + extract frames from CDN URL (must use immediately before expiration!)
-      console.log('🎞️ Step 3: Extracting 3 key frames to complement metadata...');
-      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 2);
+      console.log('🎞️ Step 3: Extracting 8 key frames to capture all POIs throughout the video...');
+      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 8);
       console.log(`✅ Extracted ${framePaths.length} frames`);
       
       // Step 4: Analyze frames to COMPLEMENT metadata (not replace!)
@@ -640,6 +782,7 @@ Return ONLY valid JSON:
         confidence: finalAnalysis.confidence,
         landmarks: finalAnalysis.landmarks,
         features: finalAnalysis.features,
+        contentType: finalAnalysis.contentType, // NEW: type detection (multi-country, city-tour, etc)
         votingScores: finalAnalysis.votingScores,
         processingTime,
         method: 'rapidapi_multimodal',

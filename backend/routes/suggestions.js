@@ -189,7 +189,7 @@ router.post('/test-analyze', async (req, res) => {
         experiences: experiences,
         spot_data: spotData, // Ready to save to map!
         meta: {
-          framesAnalyzed: analysis.frameAnalyses?.length || 0,
+          framesAnalyzed: analysis.detailedFrameAnalysis?.length || 0,
           method: analysis.method,
           testMode: true
         }
@@ -456,7 +456,7 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
         experiences: experiences,
         thumbnailUrl: analysis.thumbnailUrl || null, // Instagram thumbnail
         meta: {
-          framesAnalyzed: analysis.frameAnalyses?.length || 0,
+          framesAnalyzed: analysis.detailedFrameAnalysis?.length || 0,
           method: analysis.method,
           timestamp: new Date().toISOString()
         }
