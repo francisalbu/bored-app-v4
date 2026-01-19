@@ -216,7 +216,6 @@ export default function SpotResultScreen() {
                   source={{ uri: poi.photo_url }}
                   style={styles.poiThumbnail}
                   contentFit="cover"
-                  placeholder={require('@/assets/images/placeholder.png')}
                 />
               ) : (
                 <View style={[styles.poiThumbnail, styles.poiThumbnailPlaceholder]}>

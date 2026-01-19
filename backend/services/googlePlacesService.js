@@ -51,13 +51,21 @@ class GooglePlacesService {
       console.log(`✅ Found place:`, place.displayName?.text || place.displayName);
 
       // Build photo URL using NEW Place Photos API
-      // Format: https://places.googleapis.com/v1/{NAME}/media?key=API_KEY&maxWidthPx=800
+      // Format: https://places.googleapis.com/v1/{NAME}/media?key=API_KEY&maxWidthPx=800&skipHttpRedirect=true
       let photoUrl = null;
       if (place.photos && place.photos.length > 0) {
         const photoName = place.photos[0].name;
         if (photoName) {
-          photoUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${apiKey}&maxWidthPx=800`;
-          console.log(`📸 Photo URL: ${photoUrl.substring(0, 80)}...`);
+          // First, get the actual photo URI (not the redirect)
+          try {
+            const photoResponse = await axios.get(
+              `https://places.googleapis.com/v1/${photoName}/media?skipHttpRedirect=true&maxWidthPx=800&key=${apiKey}`
+            );
+            photoUrl = photoResponse.data.photoUri;
+            console.log(`📸 Photo URL: ${photoUrl.substring(0, 80)}...`);
+          } catch (photoError) {
+            console.error(`❌ Error getting photo URL:`, photoError.message);
+          }
         }
       }
 

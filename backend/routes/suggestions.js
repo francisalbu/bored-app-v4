@@ -349,7 +349,7 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
         activity: existingAnalysis.detected_activity,
         instagram_url: url,
         confidence: existingAnalysis.confidence,
-        thumbnail: poi.photo_url,
+        photo_url: poi.photo_url, // FIXED: was 'thumbnail'
         rating: poi.rating,
         user_ratings_total: poi.user_ratings_total,
         website: poi.website,
@@ -416,7 +416,7 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
           activity: analysis.activity,
           instagram_url: url,
           confidence: analysis.confidence,
-          thumbnail: poi.photo_url,
+          photo_url: poi.photo_url, // FIXED: was 'thumbnail'
           rating: poi.rating,
           user_ratings_total: poi.user_ratings_total,
           website: poi.website,
