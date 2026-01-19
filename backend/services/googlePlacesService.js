@@ -17,70 +17,64 @@ class GooglePlacesService {
   }
 
   /**
-   * Search for a place and get its details
+   * Search for a place and get its details using NEW Google Places API (v1)
    * @param {string} query - Place name (e.g., "Trevi Fountain, Rome, Italy")
    * @returns {Object} Place details with coordinates, photos, rating, etc.
    */
   async searchPlace(query) {
     try {
       const apiKey = this.getApiKey();
-      console.log(`🔍 Searching Google Places for: "${query}"`);
+      console.log(`🔍 Searching Google Places (NEW API) for: "${query}"`);
       
-      // Step 1: Find Place to get place_id
-      const searchResponse = await axios.get(`${this.baseUrl}/findplacefromtext/json`, {
-        params: {
-          input: query,
-          inputtype: 'textquery',
-          fields: 'place_id,name,formatted_address',
-          key: apiKey
+      // Use NEW Places API (v1) - Text Search
+      const searchResponse = await axios.post(
+        'https://places.googleapis.com/v1/places:searchText',
+        {
+          textQuery: query,
+          maxResultCount: 1
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.photos,places.regularOpeningHours,places.websiteUri,places.nationalPhoneNumber,places.editorialSummary,places.types'
+          }
         }
-      });
+      );
 
-      if (!searchResponse.data.candidates || searchResponse.data.candidates.length === 0) {
+      if (!searchResponse.data.places || searchResponse.data.places.length === 0) {
         console.log(`❌ No place found for: ${query}`);
         return null;
       }
 
-      const placeId = searchResponse.data.candidates[0].place_id;
-      console.log(`✅ Found place_id: ${placeId}`);
+      const place = searchResponse.data.places[0];
+      console.log(`✅ Found place:`, place.displayName?.text || place.displayName);
 
-      // Step 2: Get Place Details
-      const detailsResponse = await axios.get(`${this.baseUrl}/details/json`, {
-        params: {
-          place_id: placeId,
-          fields: 'place_id,name,formatted_address,geometry,rating,user_ratings_total,photos,opening_hours,website,formatted_phone_number,editorial_summary,types',
-          key: apiKey
-        }
-      });
-
-      const place = detailsResponse.data.result;
-      
       // Build photo URL using NEW Place Photos API
       // Format: https://places.googleapis.com/v1/{NAME}/media?key=API_KEY&maxWidthPx=800
       let photoUrl = null;
       if (place.photos && place.photos.length > 0) {
         const photoName = place.photos[0].name;
         if (photoName) {
-          // Use the NEW Place Photos API format
           photoUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${apiKey}&maxWidthPx=800`;
-          console.log(`📸 Photo URL generated: ${photoUrl.substring(0, 80)}...`);
+          console.log(`📸 Photo URL: ${photoUrl.substring(0, 80)}...`);
         }
       }
 
       return {
-        place_id: place.place_id,
-        name: place.name,
-        address: place.formatted_address,
-        latitude: place.geometry.location.lat,
-        longitude: place.geometry.location.lng,
+        place_id: place.id,
+        name: place.displayName?.text || place.displayName,
+        address: place.formattedAddress,
+        latitude: place.location.latitude,
+        longitude: place.location.longitude,
         rating: place.rating || null,
-        user_ratings_total: place.user_ratings_total || 0,
+        user_ratings_total: place.userRatingCount || 0,
         photo_url: photoUrl,
-        website: place.website || null,
-        phone: place.formatted_phone_number || null,
-        description: place.editorial_summary?.overview || null,
+        website: place.websiteUri || null,
+        phone: place.nationalPhoneNumber || null,
+        description: place.editorialSummary?.text || null,
         types: place.types || [],
-        opening_hours: place.opening_hours || null
+        opening_hours: place.regularOpeningHours || null
       };
     } catch (error) {
       console.error(`❌ Error searching place "${query}":`, error.response?.data || error.message);

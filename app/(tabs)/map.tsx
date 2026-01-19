@@ -16,6 +16,7 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,6 +57,7 @@ interface Spot {
   description?: string;
   website?: string;
   phone?: string;
+  google_photo_url?: string;
 }
 
 interface CountryStats {
@@ -477,10 +479,6 @@ export default function MapScreen() {
         showsUserLocation
         showsMyLocationButton={false}
         onRegionChangeComplete={handleRegionChange}
-        onPress={() => {
-          console.log('🗺️ Map pressed - closing bottom sheet');
-          setSelectedSpot(null);
-        }}
       >
         {/* 🌍 COUNTRY LEVEL - Zoom Out */}
         {zoomLevel === 'country' && groupByCountry().map((cluster) => (
@@ -612,31 +610,58 @@ export default function MapScreen() {
             >
               <Text style={styles.spotName}>{selectedSpot.spot_name}</Text>
 
-              {/* Quick Info */}
-              <View style={styles.quickInfo}>
-                <View style={styles.quickInfoItem}>
-                  <Text style={styles.quickInfoLabel}>📍</Text>
-                  <Text style={styles.quickInfoText}>
-                    {selectedSpot.city || 'Other'}
-                  </Text>
+              {/* Rating */}
+              {selectedSpot.rating && (
+                <View style={styles.ratingContainer}>
+                  <Text style={styles.ratingNumber}>{selectedSpot.rating.toFixed(1)}</Text>
+                  <View style={styles.starsContainer}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Text key={star} style={styles.star}>
+                        {star <= Math.round(selectedSpot.rating!) ? '⭐' : '☆'}
+                      </Text>
+                    ))}
+                  </View>
+                  <Text style={styles.reviewCount}>({selectedSpot.user_ratings_total?.toLocaleString() || 0})</Text>
                 </View>
+              )}
 
+              {/* Quick Info Badges */}
+              <View style={styles.badgesRow}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>🏛️ Attractions</Text>
+                </View>
                 {selectedSpot.instagram_url && (
                   <TouchableOpacity 
-                    style={styles.quickInfoItem}
+                    style={styles.badge}
                     onPress={() => {
-                      // Open Instagram URL
                       console.log('Open Instagram:', selectedSpot.instagram_url);
                     }}
                   >
-                    <Instagram size={16} color="#E1306C" />
-                    <Text style={styles.quickInfoText}>
-                      You saved this place {spots.filter(s => s.country === selectedSpot.country).length}x
-                    </Text>
-                    <Text style={styles.quickInfoArrow}>↗</Text>
+                    <Instagram size={14} color="#E1306C" style={{ marginRight: 4 }} />
+                    <Text style={styles.badgeText}>You saved this place {spots.filter(s => s.instagram_url === selectedSpot.instagram_url).length}x</Text>
+                    <Text style={styles.badgeArrow}>↗</Text>
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* Google Places Photo */}
+              {selectedSpot.google_photo_url && (
+                <View style={styles.photoContainer}>
+                  <Image 
+                    source={{ uri: selectedSpot.google_photo_url }}
+                    style={styles.placePhoto}
+                    resizeMode="cover"
+                  />
+                </View>
+              )}
+
+              {/* Description */}
+              {selectedSpot.description && (
+                <View style={styles.descriptionSection}>
+                  <Text style={styles.sectionTitle}>About this place</Text>
+                  <Text style={styles.descriptionText}>{selectedSpot.description}</Text>
+                </View>
+              )}
 
               {/* Activities */}
               <View style={styles.activitiesSection}>
@@ -960,6 +985,75 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginLeft: 'auto',
+  },
+  // Rating styles
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  ratingNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  star: {
+    fontSize: 16,
+  },
+  reviewCount: {
+    fontSize: 14,
+    color: '#999',
+    marginLeft: 4,
+  },
+  // Badges
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  badgeText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  badgeArrow: {
+    fontSize: 14,
+    color: '#999',
+    marginLeft: 4,
+  },
+  // Photo
+  photoContainer: {
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  placePhoto: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#F0F0F0',
+  },
+  // Description
+  descriptionSection: {
+    marginBottom: 20,
+  },
+  descriptionText: {
+    fontSize: 15,
+    color: '#666',
+    lineHeight: 22,
   },
   activitiesSection: {
     marginBottom: 32,

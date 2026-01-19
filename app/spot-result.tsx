@@ -211,12 +211,17 @@ export default function SpotResultScreen() {
               </View>
               
               {/* Google Places Photo Thumbnail */}
-              {poi.photo_url && (
+              {poi.photo_url ? (
                 <Image
                   source={{ uri: poi.photo_url }}
                   style={styles.poiThumbnail}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  placeholder={require('@/assets/images/placeholder.png')}
                 />
+              ) : (
+                <View style={[styles.poiThumbnail, styles.poiThumbnailPlaceholder]}>
+                  <MapPin size={24} color="#999" />
+                </View>
               )}
               
               {/* POI Info */}
@@ -356,6 +361,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#E0E0E0',
     marginRight: 12,
+  },
+  poiThumbnailPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   poiInfo: {
     flex: 1,
