@@ -24,6 +24,7 @@ router.post('/save', async (req, res) => {
       longitude,
       instagram_url,
       thumbnail_url,
+      google_photo_url, // Google Places photo
       activities, // Array of 3 AI-generated activities
       confidence_score,
       // Google Places metadata
@@ -59,6 +60,7 @@ router.post('/save', async (req, res) => {
         longitude: parseFloat(longitude),
         instagram_url,
         thumbnail_url,
+        google_photo_url,
         activities: activities, // JSONB array
         confidence_score: confidence_score || 0.8,
         // Google Places metadata

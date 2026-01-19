@@ -25,10 +25,12 @@ interface POI {
   coordinates: { latitude: number; longitude: number };
   rating?: number;
   user_ratings_total?: number;
+  photo_url?: string; // Google Places photo
   thumbnail?: string;
   website?: string;
   phone?: string;
   description?: string;
+  types?: string[]; // Google Places types
   opening_hours?: any;
   instagram_url: string;
   activity: string;
@@ -93,6 +95,7 @@ export default function SpotResultScreen() {
           confidence_score: confidence,
           instagram_url: instagramUrl || null,
           thumbnail_url: thumbnailUrl || null,
+          google_photo_url: poi.photo_url, // Google Places photo
           // Google Places metadata
           place_id: poi.place_id,
           rating: poi.rating,

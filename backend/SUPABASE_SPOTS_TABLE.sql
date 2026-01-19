@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS saved_spots (
   
   -- Original video
   instagram_url TEXT,
-  thumbnail_url TEXT,
+  thumbnail_url TEXT, -- Instagram video thumbnail
+  google_photo_url TEXT, -- Google Places photo of the specific POI
   
   -- Google Places metadata
   place_id VARCHAR(255), -- Google Places unique ID
@@ -109,3 +110,5 @@ COMMENT ON COLUMN saved_spots.description IS 'Google Places description';
 COMMENT ON COLUMN saved_spots.google_types IS 'Google Places types (e.g., ["tourist_attraction", "point_of_interest"])';
 COMMENT ON COLUMN saved_spots.opening_hours IS 'Google Places opening hours data (JSONB)';
 COMMENT ON COLUMN saved_spots.city IS 'City name for hierarchical map clustering';
+COMMENT ON COLUMN saved_spots.thumbnail_url IS 'Instagram video thumbnail';
+COMMENT ON COLUMN saved_spots.google_photo_url IS 'Google Places photo of the specific POI';

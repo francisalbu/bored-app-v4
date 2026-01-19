@@ -50,6 +50,12 @@ interface Spot {
   visit_status: 'want_to_go' | 'visited' | 'currently_here';
   instagram_url?: string;
   saved_at: string;
+  google_types?: any; // JSONB array of Google Places types
+  rating?: number;
+  user_ratings_total?: number;
+  description?: string;
+  website?: string;
+  phone?: string;
 }
 
 interface CountryStats {
@@ -235,6 +241,34 @@ export default function MapScreen() {
       default:
         return '#F4E04D';
     }
+  };
+
+  // 🎨 Get emoji for POI based on Google Places types
+  const getEmojiForPOI = (types?: string[]): string => {
+    if (!types || types.length === 0) return '📍';
+    
+    // Check types in priority order
+    if (types.includes('stadium')) return '🏟️';
+    if (types.includes('church') || types.includes('place_of_worship')) return '⛪';
+    if (types.includes('museum')) return '🏛️';
+    if (types.includes('restaurant')) return '🍽️';
+    if (types.includes('cafe') || types.includes('bakery')) return '☕';
+    if (types.includes('bar') || types.includes('night_club')) return '🍺';
+    if (types.includes('park')) return '🌳';
+    if (types.includes('tourist_attraction') || types.includes('point_of_interest')) return '🏛️';
+    if (types.includes('shopping_mall') || types.includes('store')) return '🛍️';
+    if (types.includes('lodging') || types.includes('hotel')) return '🏨';
+    if (types.includes('airport')) return '✈️';
+    if (types.includes('train_station') || types.includes('transit_station')) return '🚂';
+    if (types.includes('beach')) return '🏖️';
+    if (types.includes('amusement_park')) return '🎢';
+    if (types.includes('zoo')) return '🦁';
+    if (types.includes('library')) return '📚';
+    if (types.includes('movie_theater')) return '🎬';
+    if (types.includes('spa')) return '💆';
+    if (types.includes('gym')) return '🏋️';
+    
+    return '📍'; // Default marker
   };
 
   // 🗺️ Group spots by country
@@ -506,11 +540,13 @@ export default function MapScreen() {
               latitude: spot.coordinates.latitude,
               longitude: spot.coordinates.longitude,
             }}
-            pinColor={getMarkerColor(spot.visit_status)}
             tracksViewChanges={false}
-            title={spot.spot_name}
             onPress={() => onMarkerPress(spot)}
-          />
+          >
+            <View style={styles.spotMarker}>
+              <Text style={styles.spotEmoji}>{getEmojiForPOI(spot.google_types as string[])}</Text>
+            </View>
+          </Marker>
         ))}
       </MapView>
 
@@ -1306,5 +1342,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#000000',
+  },
+  spotMarker: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#000000',
+  },
+  spotEmoji: {
+    fontSize: 24,
   },
 });
