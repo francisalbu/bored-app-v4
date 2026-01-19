@@ -541,19 +541,52 @@ Return ONLY valid JSON:
 
   /**
    * Remove duplicate landmarks from consecutive frames
+   * Uses similarity matching to catch variations (e.g., "Múlafossur" vs "Mulafossur")
    */
   removeDuplicateLandmarks(frameAnalyses) {
     const uniqueLandmarks = [];
     const seen = new Set();
+    
+    // Helper function to normalize landmark names for comparison
+    const normalize = (name) => {
+      return name
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+        .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+    };
+    
+    // Helper to check if two landmarks are similar
+    const areSimilar = (landmark1, landmark2) => {
+      const norm1 = normalize(landmark1);
+      const norm2 = normalize(landmark2);
+      
+      // Exact match after normalization
+      if (norm1 === norm2) return true;
+      
+      // Check if one contains the other (for "X Waterfall" vs "Waterfall X")
+      if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+      
+      // Levenshtein-like: check character overlap
+      const shorter = norm1.length < norm2.length ? norm1 : norm2;
+      const longer = norm1.length >= norm2.length ? norm1 : norm2;
+      if (shorter.length >= 5 && longer.includes(shorter)) return true;
+      
+      return false;
+    };
     
     frameAnalyses.forEach((frame, index) => {
       if (frame.landmarks && frame.landmarks.length > 0) {
         frame.landmarks.forEach(landmark => {
           // Check if this landmark was in previous frame
           const prevFrame = index > 0 ? frameAnalyses[index - 1] : null;
-          const isDuplicateFromPrev = prevFrame?.landmarks?.includes(landmark);
+          const isDuplicateFromPrev = prevFrame?.landmarks?.some(prev => areSimilar(landmark, prev));
           
-          if (!isDuplicateFromPrev && !seen.has(landmark) && !this.isGenericLandmark(landmark)) {
+          // Check against all previously seen landmarks
+          const isDuplicateGlobal = Array.from(seen).some(seenLandmark => areSimilar(landmark, seenLandmark));
+          
+          if (!isDuplicateFromPrev && !isDuplicateGlobal && !this.isGenericLandmark(landmark)) {
             uniqueLandmarks.push(landmark);
             seen.add(landmark);
           }
@@ -730,6 +763,15 @@ Return ONLY valid JSON:
       );
       console.log(`✅ Metadata analysis: activity="${metadataAnalysis.activity}", location="${metadataAnalysis.location}"`);
       
+      // Step 2.5: Extract POIs from caption text
+      console.log('📝 Step 2.5: Extracting POIs from caption/description...');
+      const textLandmarks = await this.extractLandmarksFromText(
+        metadata.caption,
+        metadata.hashtags,
+        metadata.location
+      );
+      console.log(`✅ Found ${textLandmarks.length} POIs in text`);
+      
       // Step 3: Download + extract frames from CDN URL (must use immediately before expiration!)
       console.log('🎞️ Step 3: Extracting 8 key frames to capture all POIs throughout the video...');
       framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 8);
@@ -753,18 +795,29 @@ Return ONLY valid JSON:
       const framesCombined = this.combineFrameAnalyses(frameAnalyses);
       
       // MERGE: Metadata takes priority, frames complement
+      // CRITICAL: Combine text landmarks with frame landmarks
+      const allLandmarks = [
+        ...textLandmarks, // From caption/description
+        ...framesCombined.landmarks // From frame analysis
+      ];
+      
+      // Deduplicate using similarity matching
+      const uniqueLandmarks = this.deduplicateLandmarks(allLandmarks);
+      
       const finalAnalysis = {
         activity: metadataAnalysis.activity || framesCombined.activity,
         location: metadataAnalysis.location || framesCombined.location,
         confidence: metadataAnalysis.confidence > 0 ? 
           Math.max(metadataAnalysis.confidence, framesCombined.confidence) : 
           framesCombined.confidence,
-        landmarks: framesCombined.landmarks || [],
+        landmarks: uniqueLandmarks, // Combined + deduplicated
         features: framesCombined.features || [],
         votingScores: framesCombined.votingScores,
         frameAnalyses: frameAnalyses,
         metadataUsed: metadataAnalysis.confidence > 0,
-        source: metadataAnalysis.confidence > 0 ? 'metadata+frames' : 'frames_only'
+        source: metadataAnalysis.confidence > 0 ? 'metadata+frames+text' : 'frames_only',
+        textLandmarksCount: textLandmarks.length,
+        frameLandmarksCount: framesCombined.landmarks.length
       };
       console.log('📊 DEBUG - frameAnalyses count:', frameAnalyses.length);
       console.log('📊 DEBUG - finalAnalysis.frameAnalyses:', finalAnalysis.frameAnalyses);
@@ -809,6 +862,137 @@ Return ONLY valid JSON:
       // TEMP: Skip cleanup to verify frames are being extracted
       // await this.cleanup(null, framePaths);
       console.log('⚠️ Skipping cleanup - frames kept in temp/ for verification');
+    }
+  }
+
+  /**
+   * Deduplicate landmarks using similarity matching
+   */
+  deduplicateLandmarks(landmarks) {
+    if (!landmarks || landmarks.length === 0) return [];
+    
+    const unique = [];
+    const seen = new Set();
+    
+    for (const landmark of landmarks) {
+      const normalized = landmark.toLowerCase().trim();
+      
+      // Check if it's too similar to any existing landmark
+      let isDuplicate = false;
+      for (const existing of unique) {
+        const existingNorm = existing.toLowerCase().trim();
+        
+        // Exact match
+        if (normalized === existingNorm) {
+          isDuplicate = true;
+          break;
+        }
+        
+        // One contains the other (e.g., "Trevi Fountain" vs "Trevi")
+        if (normalized.includes(existingNorm) || existingNorm.includes(normalized)) {
+          // Keep the longer one
+          if (normalized.length > existingNorm.length) {
+            // Replace with longer version
+            const index = unique.indexOf(existing);
+            unique[index] = landmark;
+          }
+          isDuplicate = true;
+          break;
+        }
+        
+        // Levenshtein distance for typos/variations
+        const distance = this.levenshteinDistance(normalized, existingNorm);
+        const maxLen = Math.max(normalized.length, existingNorm.length);
+        const similarity = 1 - (distance / maxLen);
+        
+        if (similarity > 0.85) { // 85% similar
+          isDuplicate = true;
+          break;
+        }
+      }
+      
+      if (!isDuplicate) {
+        unique.push(landmark);
+      }
+    }
+    
+    console.log(`🔍 Deduplicated: ${landmarks.length} → ${unique.length} landmarks`);
+    return unique;
+  }
+
+  /**
+   * Calculate Levenshtein distance between two strings
+   */
+  levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            matrix[i][j - 1] + 1,     // insertion
+            matrix[i - 1][j] + 1      // deletion
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+
+  /**
+   * Extract landmarks from caption/description using GPT
+   */
+  async extractLandmarksFromText(caption, hashtags, location) {
+    if (!caption || caption.length < 20) return [];
+    
+    console.log('📝 Extracting POIs from caption text...');
+    
+    const prompt = `Extract ALL specific tourist attractions, landmarks, and POIs mentioned in this Instagram caption.
+
+CAPTION:
+${caption}
+
+${hashtags ? `HASHTAGS: ${hashtags.join(' ')}` : ''}
+${location ? `LOCATION TAG: ${location}` : ''}
+
+RULES:
+1. Extract ONLY specific places (not generic terms like "beach", "mountain")
+2. Include: National parks, cities, landmarks, attractions, viewpoints, specific beaches/bays/harbors
+3. EXCLUDE: Hotels, lodges, camps, accommodations, generic terms
+4. Return the FULL NAME of each place (e.g., "Etosha National Park" not just "Etosha")
+
+Return ONLY a JSON array of strings (place names):
+["Place Name 1", "Place Name 2", ...]`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        temperature: 0.3
+      });
+
+      const responseText = response.choices[0].message.content;
+      const jsonText = responseText.replace(/```json\n?|\n?```/g, '').trim();
+      const landmarks = JSON.parse(jsonText);
+      
+      console.log(`✅ Extracted ${landmarks.length} POIs from text:`, landmarks);
+      return landmarks;
+    } catch (error) {
+      console.error('❌ Error extracting landmarks from text:', error);
+      return [];
     }
   }
 
