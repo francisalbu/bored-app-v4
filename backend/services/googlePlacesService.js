@@ -55,14 +55,16 @@ class GooglePlacesService {
 
       const place = detailsResponse.data.result;
       
-      // Build photo URL using Place Photos API
-      // https://developers.google.com/maps/documentation/places/web-service/place-photos
+      // Build photo URL using NEW Place Photos API
+      // Format: https://places.googleapis.com/v1/{NAME}/media?key=API_KEY&maxWidthPx=800
       let photoUrl = null;
       if (place.photos && place.photos.length > 0) {
-        const photoReference = place.photos[0].photo_reference;
-        // Use the Place Photo API endpoint - this returns the actual image
-        photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photoReference}&key=${apiKey}`;
-        console.log(`📸 Photo URL generated: ${photoUrl.substring(0, 80)}...`);
+        const photoName = place.photos[0].name;
+        if (photoName) {
+          // Use the NEW Place Photos API format
+          photoUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${apiKey}&maxWidthPx=800`;
+          console.log(`📸 Photo URL generated: ${photoUrl.substring(0, 80)}...`);
+        }
       }
 
       return {
