@@ -22,10 +22,10 @@ CREATE TABLE IF NOT EXISTS saved_spots (
   -- Original video
   instagram_url TEXT,
   thumbnail_url TEXT, -- Instagram video thumbnail
-  google_photo_url TEXT, -- Google Places photo of the specific POI
   
   -- Google Places metadata
   place_id VARCHAR(255), -- Google Places unique ID
+  google_photo_url TEXT, -- Google Places photo of the specific POI
   rating DECIMAL(2, 1), -- 4.7 (0.0-5.0)
   user_ratings_total INTEGER, -- 493382 reviews
   website TEXT, -- Official website
