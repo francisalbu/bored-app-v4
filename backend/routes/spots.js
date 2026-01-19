@@ -25,7 +25,16 @@ router.post('/save', async (req, res) => {
       instagram_url,
       thumbnail_url,
       activities, // Array of 3 AI-generated activities
-      confidence_score
+      confidence_score,
+      // Google Places metadata
+      place_id,
+      rating,
+      user_ratings_total,
+      website,
+      phone,
+      description,
+      google_types,
+      opening_hours
     } = req.body;
 
     // Validation
@@ -52,6 +61,15 @@ router.post('/save', async (req, res) => {
         thumbnail_url,
         activities: activities, // JSONB array
         confidence_score: confidence_score || 0.8,
+        // Google Places metadata
+        place_id,
+        rating: rating ? parseFloat(rating) : null,
+        user_ratings_total: user_ratings_total ? parseInt(user_ratings_total) : null,
+        website,
+        phone,
+        description,
+        google_types,
+        opening_hours,
         saved_at: new Date().toISOString()
       }, {
         onConflict: 'user_id,spot_name,latitude,longitude',

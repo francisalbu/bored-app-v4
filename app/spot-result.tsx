@@ -84,21 +84,32 @@ export default function SpotResultScreen() {
         const spotData = {
           user_id: user?.id,
           spot_name: poi.spot_name,
-          activity: poi.activity,
+          activity: poi.activity || 'sightseeing',
           location_full: poi.location_full,
           country: poi.country,
           city: poi.city,
           latitude: poi.coordinates.latitude,
           longitude: poi.coordinates.longitude,
           confidence_score: confidence,
-          instagram_url: poi.instagram_url,
-          thumbnail_url: poi.thumbnail || null,
+          instagram_url: instagramUrl || null,
+          thumbnail_url: thumbnailUrl || null,
+          // Google Places metadata
           place_id: poi.place_id,
           rating: poi.rating,
           user_ratings_total: poi.user_ratings_total,
           website: poi.website,
           phone: poi.phone,
           description: poi.description,
+          google_types: poi.types,
+          opening_hours: poi.opening_hours,
+          activities: [{
+            title: `Visit ${poi.spot_name}`,
+            description: poi.description || `Explore ${poi.spot_name}`,
+            category: 'sightseeing',
+            difficulty: 'easy',
+            duration: '1-2 hours',
+            why_not_boring: `${poi.spot_name} is a must-see attraction!`
+          }]
         };
         return api.saveSpot(spotData);
       });
@@ -195,6 +206,15 @@ export default function SpotResultScreen() {
                   <Circle size={24} color="#ccc" />
                 )}
               </View>
+              
+              {/* Google Places Photo Thumbnail */}
+              {poi.photo_url && (
+                <Image
+                  source={{ uri: poi.photo_url }}
+                  style={styles.poiThumbnail}
+                  resizeMode="cover"
+                />
+              )}
               
               {/* POI Info */}
               <View style={styles.poiInfo}>
@@ -326,6 +346,13 @@ const styles = StyleSheet.create({
   checkbox: {
     marginRight: 12,
     paddingTop: 2,
+  },
+  poiThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#E0E0E0',
+    marginRight: 12,
   },
   poiInfo: {
     flex: 1,

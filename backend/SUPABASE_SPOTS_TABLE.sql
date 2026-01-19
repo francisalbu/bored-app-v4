@@ -1,6 +1,9 @@
 -- Create saved_spots table for user's travel map
 -- Run this in Supabase SQL Editor
 
+-- ⚠️ Drop existing table if you want to start fresh
+-- DROP TABLE IF EXISTS saved_spots CASCADE;
+
 CREATE TABLE IF NOT EXISTS saved_spots (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -8,7 +11,7 @@ CREATE TABLE IF NOT EXISTS saved_spots (
   -- Spot info from video analysis
   spot_name VARCHAR(255) NOT NULL,
   activity VARCHAR(255) NOT NULL,
-  location_full TEXT NOT NULL, -- "Flores Island, Azores, Portugal"
+  location_full TEXT NOT NULL, -- "Trevi Fountain, Rome, Italy"
   country VARCHAR(100),
   city VARCHAR(100),
   
@@ -20,16 +23,26 @@ CREATE TABLE IF NOT EXISTS saved_spots (
   instagram_url TEXT,
   thumbnail_url TEXT,
   
+  -- Google Places metadata
+  place_id VARCHAR(255), -- Google Places unique ID
+  rating DECIMAL(2, 1), -- 4.7 (0.0-5.0)
+  user_ratings_total INTEGER, -- 493382 reviews
+  website TEXT, -- Official website
+  phone VARCHAR(50), -- Contact phone
+  description TEXT, -- Google Places description
+  google_types JSONB, -- ["tourist_attraction", "point_of_interest"]
+  opening_hours JSONB, -- Google Places opening hours data
+  
   -- AI-generated activities (JSONB array)
   activities JSONB NOT NULL DEFAULT '[]',
   -- Example: [
   --   {
-  --     "title": "Hike Poço da Alagoinha",
-  --     "description": "...",
-  --     "category": "adventure",
-  --     "difficulty": "moderate",
-  --     "duration": "2-3 hours",
-  --     "why_not_boring": "..."
+  --     "title": "Visit Trevi Fountain",
+  --     "description": "Explore the iconic fountain",
+  --     "category": "sightseeing",
+  --     "difficulty": "easy",
+  --     "duration": "1-2 hours",
+  --     "why_not_boring": "Must-see attraction!"
   --   }
   -- ]
   
@@ -45,10 +58,12 @@ CREATE TABLE IF NOT EXISTS saved_spots (
   CONSTRAINT unique_user_spot UNIQUE(user_id, spot_name, latitude, longitude)
 );
 
--- Index for fast map queries (bounding box)
+-- Indexes for fast queries
 CREATE INDEX idx_saved_spots_coordinates ON saved_spots(latitude, longitude);
 CREATE INDEX idx_saved_spots_user ON saved_spots(user_id);
 CREATE INDEX idx_saved_spots_country ON saved_spots(country);
+CREATE INDEX idx_saved_spots_city ON saved_spots(city);
+CREATE INDEX idx_saved_spots_place_id ON saved_spots(place_id);
 
 -- RLS Policies
 ALTER TABLE saved_spots ENABLE ROW LEVEL SECURITY;
@@ -84,6 +99,13 @@ CREATE TRIGGER trigger_update_saved_spots_updated_at
   EXECUTE FUNCTION update_saved_spots_updated_at();
 
 -- Comments
-COMMENT ON TABLE saved_spots IS 'User-saved travel spots from Instagram/TikTok videos';
+COMMENT ON TABLE saved_spots IS 'User-saved travel spots from Instagram/TikTok videos with Google Places metadata';
 COMMENT ON COLUMN saved_spots.activities IS 'AI-generated cool activities for this spot (JSONB array)';
 COMMENT ON COLUMN saved_spots.visit_status IS 'want_to_go, visited, or currently_here';
+COMMENT ON COLUMN saved_spots.place_id IS 'Google Places unique identifier';
+COMMENT ON COLUMN saved_spots.rating IS 'Google Places rating (0.0-5.0)';
+COMMENT ON COLUMN saved_spots.user_ratings_total IS 'Total number of Google reviews';
+COMMENT ON COLUMN saved_spots.description IS 'Google Places description';
+COMMENT ON COLUMN saved_spots.google_types IS 'Google Places types (e.g., ["tourist_attraction", "point_of_interest"])';
+COMMENT ON COLUMN saved_spots.opening_hours IS 'Google Places opening hours data (JSONB)';
+COMMENT ON COLUMN saved_spots.city IS 'City name for hierarchical map clustering';
