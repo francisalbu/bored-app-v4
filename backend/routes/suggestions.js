@@ -184,6 +184,39 @@ router.post('/test-analyze', async (req, res) => {
       }
       
       console.log(`✅ Enriched ${detectedSpots.length} POIs with Google Places data`);
+      
+      // Remove duplicates based on place_id or similar coordinates
+      const uniqueSpots = [];
+      const seenPlaceIds = new Set();
+      
+      detectedSpots.forEach(spot => {
+        // Check if we've seen this place_id
+        if (spot.place_id && seenPlaceIds.has(spot.place_id)) {
+          console.log(`⚠️ Removed duplicate: ${spot.spot_name} (same place_id)`);
+          return;
+        }
+        
+        // Check if coordinates are too close (within ~100m)
+        const isDuplicateLocation = uniqueSpots.some(existing => {
+          const latDiff = Math.abs(existing.coordinates.latitude - spot.coordinates.latitude);
+          const lngDiff = Math.abs(existing.coordinates.longitude - spot.coordinates.longitude);
+          return latDiff < 0.001 && lngDiff < 0.001; // ~100m threshold
+        });
+        
+        if (isDuplicateLocation) {
+          console.log(`⚠️ Removed duplicate: ${spot.spot_name} (same location)`);
+          return;
+        }
+        
+        uniqueSpots.push(spot);
+        if (spot.place_id) seenPlaceIds.add(spot.place_id);
+      });
+      
+      console.log(`✅ Final unique spots: ${uniqueSpots.length} (removed ${detectedSpots.length - uniqueSpots.length} duplicates)`);
+      
+      // Replace detectedSpots with uniqueSpots
+      detectedSpots.length = 0;
+      detectedSpots.push(...uniqueSpots);
     }
     
     // Return results

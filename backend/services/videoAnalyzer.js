@@ -958,23 +958,34 @@ Return ONLY valid JSON:
     if (!caption || caption.length < 20) return [];
     
     console.log('📝 Extracting POIs from caption text...');
+    console.log(`Caption length: ${caption.length} chars`);
     
-    const prompt = `Extract ALL specific tourist attractions, landmarks, and POIs mentioned in this Instagram caption.
+    const prompt = `Extract ALL specific tourist attractions, landmarks, and POIs mentioned in this text.
 
-CAPTION:
+CAPTION/DESCRIPTION:
 ${caption}
 
 ${hashtags ? `HASHTAGS: ${hashtags.join(' ')}` : ''}
 ${location ? `LOCATION TAG: ${location}` : ''}
 
-RULES:
-1. Extract ONLY specific places (not generic terms like "beach", "mountain")
-2. Include: National parks, cities, landmarks, attractions, viewpoints, specific beaches/bays/harbors
-3. EXCLUDE: Hotels, lodges, camps, accommodations, generic terms
-4. Return the FULL NAME of each place (e.g., "Etosha National Park" not just "Etosha")
+CRITICAL RULES:
+1. Extract EVERY specific place name mentioned (cities, parks, landmarks, harbors, deserts, mountains, etc.)
+2. Include: National parks, deserts, harbors, bays, canyons, waterfalls, peaks, beaches, viewpoints
+3. EXCLUDE ONLY: Hotels, lodges, resorts, camps, accommodations
+4. Return the FULL NAME (e.g., "Sandwich Harbour Historic" NOT "Sandwich Harbour")
+5. If a place is mentioned multiple times, include it only once
+6. Extract places from "TOP THINGS TO DO" sections especially carefully
 
-Return ONLY a JSON array of strings (place names):
-["Place Name 1", "Place Name 2", ...]`;
+EXAMPLES of what to extract:
+- "Namib Desert" ✅
+- "Sandwich Harbour" ✅
+- "Etosha National Park" ✅
+- "Sossusvlei" ✅
+- "Spitzkoppe" ✅
+- "Zannier Omaanda" ❌ (accommodation)
+
+Return ONLY a JSON array of place names:
+["Place 1", "Place 2", ...]`;
 
     try {
       const response = await this.openai.chat.completions.create({
@@ -985,6 +996,7 @@ Return ONLY a JSON array of strings (place names):
       });
 
       const responseText = response.choices[0].message.content;
+      console.log('🤖 GPT response:', responseText);
       const jsonText = responseText.replace(/```json\n?|\n?```/g, '').trim();
       const landmarks = JSON.parse(jsonText);
       
