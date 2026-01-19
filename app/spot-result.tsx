@@ -87,7 +87,7 @@ export default function SpotResultScreen() {
           activity: poi.activity,
           location_full: poi.location_full,
           country: poi.country,
-          region: poi.city,
+          city: poi.city,
           latitude: poi.coordinates.latitude,
           longitude: poi.coordinates.longitude,
           confidence_score: confidence,

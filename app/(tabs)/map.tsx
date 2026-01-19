@@ -18,7 +18,6 @@ import {
   Platform,
 } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
-import ClusteredMapView from 'react-native-map-clustering';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Instagram, Plus, Share2, X } from 'lucide-react-native';
@@ -42,7 +41,7 @@ interface Spot {
   id: string;
   spot_name: string;
   country: string;
-  region?: string;
+  city?: string;
   coordinates: {
     latitude: number;
     longitude: number;
@@ -57,6 +56,23 @@ interface CountryStats {
   [country: string]: number;
 }
 
+interface CountryCluster {
+  country: string;
+  count: number;
+  center: { latitude: number; longitude: number };
+  spots: Spot[];
+}
+
+interface CityCluster {
+  city: string;
+  country: string;
+  count: number;
+  center: { latitude: number; longitude: number };
+  spots: Spot[];
+}
+
+type ZoomLevel = 'country' | 'city' | 'spot';
+
 export default function MapScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -68,6 +84,7 @@ export default function MapScreen() {
   const [instagramLink, setInstagramLink] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('country');
   
   const bottomSheetHeight = useRef(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT)).current;
   const mapRef = useRef<any>(null);
@@ -220,30 +237,77 @@ export default function MapScreen() {
     }
   };
 
-  const renderCluster = (cluster: any, onPress: any) => {
-    const { pointCount, coordinate, clusterId } = cluster;
+  // 🗺️ Group spots by country
+  const groupByCountry = (): CountryCluster[] => {
+    const countryMap = new Map<string, Spot[]>();
     
-    // Get country from first spot in region
-    const nearbySpots = spots.filter((spot) => {
-      const distance = Math.abs(spot.coordinates.latitude - coordinate.latitude) +
-                      Math.abs(spot.coordinates.longitude - coordinate.longitude);
-      return distance < 5;
+    spots.forEach(spot => {
+      const country = spot.country;
+      if (!countryMap.has(country)) {
+        countryMap.set(country, []);
+      }
+      countryMap.get(country)!.push(spot);
     });
 
-    const primaryCountry = nearbySpots[0]?.country || 'Spots';
+    return Array.from(countryMap.entries()).map(([country, countrySpots]) => {
+      // Calculate center as average of all coordinates
+      const totalLat = countrySpots.reduce((sum, s) => sum + s.coordinates.latitude, 0);
+      const totalLng = countrySpots.reduce((sum, s) => sum + s.coordinates.longitude, 0);
+      
+      return {
+        country,
+        count: countrySpots.length,
+        center: {
+          latitude: totalLat / countrySpots.length,
+          longitude: totalLng / countrySpots.length,
+        },
+        spots: countrySpots,
+      };
+    });
+  };
 
-    return (
-      <TouchableOpacity
-        key={`cluster-${clusterId}`}
-        onPress={onPress}
-        style={styles.clusterContainer}
-      >
-        <View style={styles.clusterBubble}>
-          <Text style={styles.clusterCountry}>{primaryCountry}</Text>
-          <Text style={styles.clusterCount}>{pointCount}</Text>
-        </View>
-      </TouchableOpacity>
-    );
+  // 🏙️ Group spots by city
+  const groupByCity = (): CityCluster[] => {
+    const cityMap = new Map<string, Spot[]>();
+    
+    spots.forEach(spot => {
+      const city = spot.city || spot.spot_name.split(',')[0]; // Fallback to first part of name
+      const key = `${city}, ${spot.country}`;
+      if (!cityMap.has(key)) {
+        cityMap.set(key, []);
+      }
+      cityMap.get(key)!.push(spot);
+    });
+
+    return Array.from(cityMap.entries()).map(([key, citySpots]) => {
+      const [city, country] = key.split(', ');
+      const totalLat = citySpots.reduce((sum, s) => sum + s.coordinates.latitude, 0);
+      const totalLng = citySpots.reduce((sum, s) => sum + s.coordinates.longitude, 0);
+      
+      return {
+        city,
+        country,
+        count: citySpots.length,
+        center: {
+          latitude: totalLat / citySpots.length,
+          longitude: totalLng / citySpots.length,
+        },
+        spots: citySpots,
+      };
+    });
+  };
+
+  // 🔍 Detect zoom level from map region
+  const handleRegionChange = (region: any) => {
+    const latitudeDelta = region.latitudeDelta;
+    
+    if (latitudeDelta > 20) {
+      setZoomLevel('country');
+    } else if (latitudeDelta > 1) {
+      setZoomLevel('city');
+    } else {
+      setZoomLevel('spot');
+    }
   };
 
   const handleAnalyzeLink = async () => {
@@ -271,7 +335,7 @@ export default function MapScreen() {
         return;
       }
 
-      const { analysis, experiences } = data.data;
+      const { analysis, detectedSpots } = data.data;
       
       // Validate we got location data
       if (!analysis.location || analysis.location === 'not specified') {
@@ -283,7 +347,7 @@ export default function MapScreen() {
       console.log('✅ Analysis complete:', {
         activity: analysis.activity,
         location: analysis.location,
-        experiences: experiences.length
+        detectedPOIs: detectedSpots?.length || 0
       });
 
       // Get coordinates via geocoding
@@ -366,7 +430,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <ClusteredMapView
+      <MapView
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
@@ -378,33 +442,64 @@ export default function MapScreen() {
         }}
         showsUserLocation
         showsMyLocationButton={false}
-        clusterColor="#000000"
-        clusterTextColor="#FFFFFF"
-        clusterFontFamily="System"
-        radius={60}
-        maxZoom={18}
-        extent={512}
-        nodeSize={64}
-        renderCluster={renderCluster}
+        onRegionChangeComplete={handleRegionChange}
         onPress={() => {
           console.log('🗺️ Map pressed - closing bottom sheet');
           setSelectedSpot(null);
         }}
-        onMarkerPress={(event) => {
-          console.log('🎯 ClusteredMapView onMarkerPress:', event.nativeEvent);
-          // Find the spot by coordinates
-          const { coordinate } = event.nativeEvent;
-          const spot = spots.find(s => 
-            Math.abs(s.coordinates.latitude - coordinate.latitude) < 0.0001 &&
-            Math.abs(s.coordinates.longitude - coordinate.longitude) < 0.0001
-          );
-          if (spot) {
-            console.log('✅ Found spot:', spot.spot_name);
-            onMarkerPress(spot);
-          }
-        }}
       >
-        {spots.map((spot) => (
+        {/* 🌍 COUNTRY LEVEL - Zoom Out */}
+        {zoomLevel === 'country' && groupByCountry().map((cluster) => (
+          <Marker
+            key={`country-${cluster.country}`}
+            coordinate={cluster.center}
+            tracksViewChanges={false}
+            onPress={() => {
+              // Zoom into country
+              mapRef.current?.animateToRegion({
+                latitude: cluster.center.latitude,
+                longitude: cluster.center.longitude,
+                latitudeDelta: 10,
+                longitudeDelta: 10,
+              }, 500);
+            }}
+          >
+            <View style={styles.countryBadge}>
+              <Text style={styles.countryName}>{cluster.country}</Text>
+              <View style={styles.countBubble}>
+                <Text style={styles.countText}>{cluster.count}</Text>
+              </View>
+            </View>
+          </Marker>
+        ))}
+
+        {/* 🏙️ CITY LEVEL - Medium Zoom */}
+        {zoomLevel === 'city' && groupByCity().map((cluster) => (
+          <Marker
+            key={`city-${cluster.city}-${cluster.country}`}
+            coordinate={cluster.center}
+            tracksViewChanges={false}
+            onPress={() => {
+              // Zoom into city
+              mapRef.current?.animateToRegion({
+                latitude: cluster.center.latitude,
+                longitude: cluster.center.longitude,
+                latitudeDelta: 0.5,
+                longitudeDelta: 0.5,
+              }, 500);
+            }}
+          >
+            <View style={styles.cityBadge}>
+              <Text style={styles.cityName}>{cluster.city}</Text>
+              <View style={styles.countBubble}>
+                <Text style={styles.countText}>{cluster.count}</Text>
+              </View>
+            </View>
+          </Marker>
+        ))}
+
+        {/* 📍 SPOT LEVEL - Zoomed In */}
+        {zoomLevel === 'spot' && spots.map((spot) => (
           <Marker
             key={spot.id}
             coordinate={{
@@ -414,9 +509,10 @@ export default function MapScreen() {
             pinColor={getMarkerColor(spot.visit_status)}
             tracksViewChanges={false}
             title={spot.spot_name}
+            onPress={() => onMarkerPress(spot)}
           />
         ))}
-      </ClusteredMapView>
+      </MapView>
 
       {/* Debug: Reload button */}
       <TouchableOpacity
@@ -485,7 +581,7 @@ export default function MapScreen() {
                 <View style={styles.quickInfoItem}>
                   <Text style={styles.quickInfoLabel}>📍</Text>
                   <Text style={styles.quickInfoText}>
-                    {selectedSpot.region || 'Other'}
+                    {selectedSpot.city || 'Other'}
                   </Text>
                 </View>
 
@@ -731,34 +827,6 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
-  },
-  clusterContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clusterBubble: {
-    backgroundColor: '#000000',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  clusterCountry: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  clusterCount: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   emptyState: {
     position: 'absolute',
@@ -1185,5 +1253,58 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#666',
     marginTop: 40,
+  },
+  // 🗺️ Hierarchical Cluster Badges
+  countryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    gap: 8,
+  },
+  countryName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  cityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 18,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    gap: 6,
+  },
+  cityName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  countBubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000000',
   },
 });

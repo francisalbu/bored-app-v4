@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS saved_spots (
   activity VARCHAR(255) NOT NULL,
   location_full TEXT NOT NULL, -- "Flores Island, Azores, Portugal"
   country VARCHAR(100),
-  region VARCHAR(100),
+  city VARCHAR(100),
   
   -- Geographic data
   latitude DECIMAL(10, 8) NOT NULL,
