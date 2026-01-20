@@ -16,48 +16,70 @@ class SimpleVideoAnalyzer {
     console.log('📱 Instagram URL:', instagramUrl);
     
     try {
-      // 1. Download video and get metadata (caption, hashtags, location)
+      // Step 1: Download video and get metadata
       const videoData = await this.downloadInstagramVideo(instagramUrl);
       console.log('✅ Video downloaded');
       
-      // 2. PRIORITY 1: Try to extract activity from metadata (caption/hashtags)
-      if (videoData.caption || videoData.hashtags?.length > 0) {
-        console.log('📝 Checking metadata first...');
-        const metadataResult = await this.extractFromMetadata(
-          videoData.caption,
-          videoData.hashtags,
-          videoData.location
-        );
-        
-        // If we found activity with good confidence, skip frame analysis!
-        if (metadataResult.activity && metadataResult.confidence >= 0.7) {
-          console.log(`✅ Got activity from metadata: ${metadataResult.activity} (${metadataResult.confidence})`);
-          return {
-            success: true,
-            type: 'activity',
-            activity: metadataResult.activity,
-            location: metadataResult.location,
-            confidence: metadataResult.confidence,
-            source: 'metadata'
-          };
-        }
-      }
+      const envFrames = Number.parseInt(process.env.VIDEO_ANALYSIS_FRAMES || '', 10);
+      const frameCount = Number.isFinite(envFrames) && envFrames > 0 ? envFrames : 3;
       
-      // 3. PRIORITY 2: Frame analysis if metadata didn't work
-      console.log('📸 Metadata insufficient, analyzing frames...');
-      const frames = await this.extractFrames(videoData.videoBuffer, 3);
+      // Step 2-3: Run metadata extraction and frame extraction IN PARALLEL
+      console.log('📝 Step 2: Extracting from Instagram metadata (PRIORITY 1)...');
+      console.log(`🎞️ Step 3: Extracting ${frameCount} frames...`);
+      
+      const metadataPromise = (videoData.caption || videoData.hashtags?.length > 0) 
+        ? this.extractFromMetadata(videoData.caption, videoData.hashtags, videoData.location)
+        : Promise.resolve({ activity: null, location: null, confidence: 0 });
+      
+      const framesPromise = this.extractFrames(videoData.videoBuffer, frameCount);
+      
+      const [metadataResult, frames] = await Promise.all([
+        metadataPromise,
+        framesPromise
+      ]);
+      
+      console.log(`✅ Metadata: activity="${metadataResult.activity}", confidence=${metadataResult.confidence}`);
       console.log(`✅ Extracted ${frames.length} frames`);
       
-      const analysis = await this.analyzeFramesWithVision(frames);
-      console.log('✅ Frame analysis complete:', analysis);
+      // Step 4: ALWAYS analyze frames to complement metadata (even if metadata is good)
+      console.log('🤖 Step 4: Analyzing frames to complement metadata...');
+      const frameAnalysis = await this.analyzeFramesWithVision(frames);
+      console.log('✅ Frame analysis complete:', frameAnalysis);
+      
+      // Decide which result to use based on confidence
+      let finalResult;
+      if (metadataResult.activity && metadataResult.confidence >= 0.7) {
+        console.log(`✅ Using metadata result (high confidence: ${metadataResult.confidence})`);
+        finalResult = {
+          type: 'activity',
+          activity: metadataResult.activity,
+          location: metadataResult.location || frameAnalysis.location,
+          confidence: metadataResult.confidence,
+          source: 'metadata'
+        };
+      } else if (frameAnalysis.confidence > metadataResult.confidence) {
+        console.log(`✅ Using frame analysis (higher confidence: ${frameAnalysis.confidence})`);
+        finalResult = {
+          type: frameAnalysis.type,
+          activity: frameAnalysis.activity,
+          location: frameAnalysis.location || metadataResult.location,
+          confidence: frameAnalysis.confidence,
+          source: 'frames'
+        };
+      } else {
+        console.log(`✅ Using metadata result (fallback)`);
+        finalResult = {
+          type: 'activity',
+          activity: metadataResult.activity,
+          location: metadataResult.location || frameAnalysis.location,
+          confidence: metadataResult.confidence,
+          source: 'metadata'
+        };
+      }
       
       return {
         success: true,
-        type: analysis.type,
-        activity: analysis.activity,
-        location: analysis.location,
-        confidence: analysis.confidence,
-        source: 'frames'
+        ...finalResult
       };
       
     } catch (error) {
@@ -302,17 +324,33 @@ Return JSON only:
   }
   
   /**
-   * Analyze frames with GPT-4o Vision
+   * Analyze frames with GPT-4o Vision with parallelism
    * Determine: Activity OR Landscape
    */
   async analyzeFramesWithVision(frames) {
     try {
-      const messages = [{
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: `Analyze these video frames and determine:
+      const envConcurrency = Number.parseInt(process.env.VIDEO_ANALYSIS_CONCURRENCY || '', 10);
+      const concurrency = Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : 2;
+      const visionModel = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
+      
+      console.log(`🔍 Analyzing ${frames.length} frames with concurrency=${concurrency}, model=${visionModel}`);
+      
+      const results = new Array(frames.length);
+      let nextIndex = 0;
+      
+      const processNext = async () => {
+        while (true) {
+          const index = nextIndex++;
+          if (index >= frames.length) return;
+          
+          console.log(`📊 Analyzing frame ${index + 1}/${frames.length}...`);
+          
+          const messages = [{
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Frame ${index + 1}/${frames.length} - Determine:
 
 1. Is this an ACTIVITY (person doing something: surfing, yoga, climbing, diving, etc.)?
 2. OR is this a LANDSCAPE (beautiful place: waterfall, desert, canyon, nature, etc.)?
@@ -332,31 +370,53 @@ Respond in JSON format ONLY:
   "location": "location name" or null,
   "confidence": 0.0-1.0
 }`
-          },
-          ...frames.map(frame => ({
-            type: 'image_url',
-            image_url: {
-              url: `data:image/jpeg;base64,${frame}`
-            }
-          }))
-        ]
-      }];
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${frames[index]}`
+                }
+              }
+            ]
+          }];
+          
+          const response = await openai.chat.completions.create({
+            model: visionModel,
+            messages: messages,
+            max_tokens: 300,
+            temperature: 0.3
+          });
+          
+          const content = response.choices[0].message.content;
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          
+          if (jsonMatch) {
+            results[index] = JSON.parse(jsonMatch[0]);
+          }
+          
+          if (global.gc) global.gc();
+        }
+      };
       
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: messages,
-        max_tokens: 300,
-        temperature: 0.3
-      });
+      // Run workers in parallel
+      const workers = [];
+      for (let i = 0; i < Math.min(concurrency, frames.length); i++) {
+        workers.push(processNext());
+      }
+      await Promise.all(workers);
       
-      const content = response.choices[0].message.content;
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      console.log('✅ All frames analyzed with parallelism!');
       
-      if (!jsonMatch) {
-        throw new Error('No JSON in response');
+      // Aggregate results - take most confident result
+      const validResults = results.filter(Boolean);
+      if (!validResults.length) {
+        throw new Error('No valid analysis results');
       }
       
-      return JSON.parse(jsonMatch[0]);
+      // Return the result with highest confidence
+      return validResults.reduce((best, current) => 
+        current.confidence > best.confidence ? current : best
+      );
       
     } catch (error) {
       console.error('Error in vision analysis:', error);
