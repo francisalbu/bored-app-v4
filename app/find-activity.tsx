@@ -35,10 +35,13 @@ export default function FindActivityScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   
-  const activity = params.activity as string;
+  const activity = (params.activity as string) || 'surf'; // Fallback to 'surf' if undefined
   const [selectedCity, setSelectedCity] = useState('Lisboa');
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  console.log('🎯 Activity finder params:', params);
+  console.log('🎯 Activity:', activity);
   
   const cities = ['Lisboa']; // Por agora só Lisboa
   
@@ -47,21 +50,38 @@ export default function FindActivityScreen() {
   }, [activity, selectedCity]);
   
   const fetchExperiences = async () => {
+    if (!activity || activity.trim() === '') {
+      console.error('❌ No activity provided');
+      setExperiences([]);
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
+      console.log('🔍 Fetching experiences for:', activity, 'in', selectedCity);
+      
       const response = await api.get('/experiences/find-similar', {
         params: {
-          activity: activity,
+          activity: activity.trim(),
           city: selectedCity,
           limit: 3
         }
       });
       
-      if (response.data.success) {
-        setExperiences(response.data.data);
+      console.log('📦 Response:', response);
+      console.log('📦 Response data:', response?.data);
+      
+      if (response?.data?.success) {
+        console.log('✅ Experiences found:', response.data.data?.length);
+        setExperiences(response.data.data || []);
+      } else {
+        console.log('❌ No success in response');
+        setExperiences([]);
       }
     } catch (error) {
       console.error('Error fetching experiences:', error);
+      setExperiences([]);
     } finally {
       setLoading(false);
     }

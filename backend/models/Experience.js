@@ -6,6 +6,11 @@
  */
 
 const { from } = require('../config/database');
+const OpenAI = require('openai');
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 /**
  * Get all experiences (for feed)
@@ -329,69 +334,166 @@ async function createReview({ experience_id, user_id, booking_id, rating, commen
 }
 
 /**
- * Find experiences similar to a given activity
+ * Find experiences similar to a given activity using AI semantic matching
  * @param {string} activity - Activity name (e.g., "surf", "cooking", "yoga")
  * @param {string} city - Optional city filter
  * @param {number} limit - Maximum number of results
  * @returns {Promise<Array>} Array of matching experiences
  */
 async function findSimilarActivities(activity, city = null, limit = 3) {
-  let query = from('experiences')
-    .select(`
-      *,
-      operators(company_name, logo_url),
-      reviews(rating, id)
-    `)
-    .eq('is_active', true);
-  
-  // Search in title, description, category, and tags
-  // Use ilike for case-insensitive matching
-  const searchPattern = `%${activity}%`;
-  
-  query = query.or(
-    `title.ilike.${searchPattern},description.ilike.${searchPattern},category.ilike.${searchPattern}`
-  );
-  
-  // Filter by city if provided
-  if (city) {
-    query = query.ilike('location', `%${city}%`);
-  }
-  
-  // Order by rating and limit results
-  query = query.order('rating', { ascending: false })
-    .limit(limit);
-  
-  const { data: experiences, error } = await query;
-  
-  if (error) throw error;
-  
-  // Format experiences
-  return experiences.map(exp => {
-    const reviews = exp.reviews || [];
-    const rating = reviews.length > 0 
-      ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
-      : 0;
+  try {
+    // Get all active experiences (with optional city filter)
+    let query = from('experiences')
+      .select(`
+        *,
+        operators(company_name, logo_url),
+        reviews(rating, id)
+      `)
+      .eq('is_active', true);
     
-    return {
+    // Apply city filter if provided (but more flexible - check if city is in location)
+    if (city) {
+      // Get all experiences near the city area (Lisboa includes Cascais, Carcavelos, etc.)
+      // For now, get all and we'll filter with AI
+      const regionKeywords = city.toLowerCase() === 'lisboa' 
+        ? ['lisboa', 'lisbon', 'cascais', 'carcavelos', 'ericeira', 'sintra']
+        : [city.toLowerCase()];
+      
+      // Build OR query for location matching
+      const locationQuery = regionKeywords
+        .map(keyword => `location.ilike.%${keyword}%`)
+        .join(',');
+      
+      query = query.or(locationQuery);
+    }
+    
+    const { data: allExperiences, error } = await query;
+    
+    if (error) throw error;
+    
+    if (!allExperiences || allExperiences.length === 0) {
+      return [];
+    }
+    
+    // Use OpenAI to find the best matches
+    const experiencesForAI = allExperiences.map(exp => ({
       id: exp.id,
       title: exp.title,
       description: exp.description,
-      location: exp.location,
-      price: parseFloat(exp.price),
-      currency: exp.currency,
-      duration: exp.duration,
       category: exp.category,
-      image_url: exp.image_url,
-      video_url: exp.video_url,
-      rating: rating,
-      review_count: reviews.length,
-      max_group_size: exp.max_group_size,
-      instant_booking: exp.instant_booking,
-      latitude: exp.latitude,
-      longitude: exp.longitude,
-      operator: exp.operators
-    };
-  });
+      tags: exp.tags || []
+    }));
+    
+    const prompt = `You are helping match a detected activity "${activity}" with available experiences.
+
+Here are the available experiences:
+${JSON.stringify(experiencesForAI, null, 2)}
+
+Task: Return the IDs of the top ${limit} experiences that best match the activity "${activity}".
+Consider:
+- Title relevance
+- Description content
+- Category match
+- Tags
+
+Respond with ONLY a JSON array of experience IDs in order of relevance, like: [1, 5, 3]`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: 100
+    });
+    
+    const responseText = completion.choices[0].message.content.trim();
+    const matchedIds = JSON.parse(responseText);
+    
+    // Get experiences in the order returned by AI
+    const sortedExperiences = matchedIds
+      .map(id => allExperiences.find(exp => exp.id === id))
+      .filter(exp => exp !== undefined);
+    
+    // Format experiences
+    return sortedExperiences.map(exp => {
+      const reviews = exp.reviews || [];
+      const rating = reviews.length > 0 
+        ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
+        : 0;
+      
+      return {
+        id: exp.id,
+        title: exp.title,
+        description: exp.description,
+        location: exp.location,
+        price: parseFloat(exp.price),
+        currency: exp.currency,
+        duration: exp.duration,
+        category: exp.category,
+        image_url: exp.image_url,
+        video_url: exp.video_url,
+        rating: rating,
+        review_count: reviews.length,
+        max_group_size: exp.max_group_size,
+        instant_booking: exp.instant_booking,
+        latitude: exp.latitude,
+        longitude: exp.longitude,
+        operator: exp.operators
+      };
+    });
+  } catch (error) {
+    console.error('Error in findSimilarActivities:', error);
+    
+    // Fallback to simple text search if AI fails
+    let query = from('experiences')
+      .select(`
+        *,
+        operators(company_name, logo_url),
+        reviews(rating, id)
+      `)
+      .eq('is_active', true);
+    
+    const searchPattern = `%${activity}%`;
+    query = query.or(
+      `title.ilike.${searchPattern},description.ilike.${searchPattern},category.ilike.${searchPattern}`
+    );
+    
+    if (city) {
+      query = query.ilike('location', `%${city}%`);
+    }
+    
+    query = query.order('rating', { ascending: false }).limit(limit);
+    
+    const { data: experiences, error: fallbackError } = await query;
+    
+    if (fallbackError) throw fallbackError;
+    
+    return (experiences || []).map(exp => {
+      const reviews = exp.reviews || [];
+      const rating = reviews.length > 0 
+        ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
+        : 0;
+      
+      return {
+        id: exp.id,
+        title: exp.title,
+        description: exp.description,
+        location: exp.location,
+        price: parseFloat(exp.price),
+        currency: exp.currency,
+        duration: exp.duration,
+        category: exp.category,
+        image_url: exp.image_url,
+        video_url: exp.video_url,
+        rating: rating,
+        review_count: reviews.length,
+        max_group_size: exp.max_group_size,
+        instant_booking: exp.instant_booking,
+        latitude: exp.latitude,
+        longitude: exp.longitude,
+        operator: exp.operators
+      };
+    });
+  }
 }
 
 module.exports = {
