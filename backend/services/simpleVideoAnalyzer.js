@@ -8,31 +8,56 @@ const openai = new OpenAI({
 class SimpleVideoAnalyzer {
   /**
    * Analyze video with 2-3 frames - FAST and SIMPLE
-   * Detect: Activity type OR Landscape location
+   * PRIORITY 1: Check caption/hashtags first (cheaper & faster)
+   * PRIORITY 2: Frame analysis if no metadata
    */
   async analyzeVideo(instagramUrl) {
     console.log('🎬 Simple Video Analysis Started');
     console.log('📱 Instagram URL:', instagramUrl);
     
     try {
-      // 1. Download video
-      const videoBuffer = await this.downloadInstagramVideo(instagramUrl);
+      // 1. Download video and get metadata (caption, hashtags, location)
+      const videoData = await this.downloadInstagramVideo(instagramUrl);
       console.log('✅ Video downloaded');
       
-      // 2. Extract 2-3 frames
-      const frames = await this.extractFrames(videoBuffer, 3);
+      // 2. PRIORITY 1: Try to extract activity from metadata (caption/hashtags)
+      if (videoData.caption || videoData.hashtags?.length > 0) {
+        console.log('📝 Checking metadata first...');
+        const metadataResult = await this.extractFromMetadata(
+          videoData.caption,
+          videoData.hashtags,
+          videoData.location
+        );
+        
+        // If we found activity with good confidence, skip frame analysis!
+        if (metadataResult.activity && metadataResult.confidence >= 0.7) {
+          console.log(`✅ Got activity from metadata: ${metadataResult.activity} (${metadataResult.confidence})`);
+          return {
+            success: true,
+            type: 'activity',
+            activity: metadataResult.activity,
+            location: metadataResult.location,
+            confidence: metadataResult.confidence,
+            source: 'metadata'
+          };
+        }
+      }
+      
+      // 3. PRIORITY 2: Frame analysis if metadata didn't work
+      console.log('📸 Metadata insufficient, analyzing frames...');
+      const frames = await this.extractFrames(videoData.videoBuffer, 3);
       console.log(`✅ Extracted ${frames.length} frames`);
       
-      // 3. Analyze with GPT-4o Vision
       const analysis = await this.analyzeFramesWithVision(frames);
-      console.log('✅ Analysis complete:', analysis);
+      console.log('✅ Frame analysis complete:', analysis);
       
       return {
         success: true,
-        type: analysis.type, // 'activity' or 'landscape'
-        activity: analysis.activity, // e.g., 'surfing', 'yoga', etc.
-        location: analysis.location, // e.g., 'Namibia', 'Iguazu Falls', etc.
-        confidence: analysis.confidence
+        type: analysis.type,
+        activity: analysis.activity,
+        location: analysis.location,
+        confidence: analysis.confidence,
+        source: 'frames'
       };
       
     } catch (error) {
@@ -43,11 +68,15 @@ class SimpleVideoAnalyzer {
   
   /**
    * Download Instagram video with RapidAPI + Apify fallback
+   * Returns: videoBuffer, caption, hashtags, location
    */
   async downloadInstagramVideo(url) {
     console.log('📥 Downloading Instagram video...');
     
     let videoUrl = null;
+    let caption = '';
+    let hashtags = [];
+    let location = null;
     
     // Method 1: Try RapidAPI first
     try {
@@ -62,9 +91,14 @@ class SimpleVideoAnalyzer {
       });
       
       videoUrl = response.data?.data?.video_url || response.data?.video_url;
+      caption = response.data?.data?.caption || response.data?.caption || '';
+      location = response.data?.data?.location?.name || response.data?.location?.name || null;
+      hashtags = this.extractHashtags(caption);
       
       if (videoUrl) {
         console.log('✅ Got video URL from RapidAPI');
+        if (location) console.log('📍 Location tag:', location);
+        if (hashtags.length) console.log('🏷️ Hashtags:', hashtags.join(', '));
       } else {
         console.log('⚠️ No video URL in RapidAPI response');
       }
@@ -91,7 +125,7 @@ class SimpleVideoAnalyzer {
               'Authorization': `Bearer ${apifyToken}`
             },
             params: {
-              waitForFinish: 120 // Wait up to 2 minutes
+              waitForFinish: 120
             },
             timeout: 150000
           }
@@ -112,6 +146,9 @@ class SimpleVideoAnalyzer {
         if (resultsResponse.data && resultsResponse.data.length > 0) {
           const item = resultsResponse.data[0];
           videoUrl = item.videoUrl || item.displayUrl;
+          caption = item.caption || '';
+          location = item.locationName || null;
+          hashtags = this.extractHashtags(caption);
           console.log('✅ Got video URL from Apify');
         } else {
           console.log('❌ Apify returned no data');
@@ -135,7 +172,80 @@ class SimpleVideoAnalyzer {
     });
     
     console.log('✅ Video downloaded successfully');
-    return Buffer.from(videoResponse.data);
+    return {
+      videoBuffer: Buffer.from(videoResponse.data),
+      caption,
+      hashtags,
+      location
+    };
+  }
+  
+  /**
+   * Extract activity from Instagram metadata (caption/hashtags/location)
+   * PRIORITY 1 - Always check this first before analyzing frames!
+   */
+  async extractFromMetadata(caption = '', hashtags = [], locationTag = '') {
+    console.log('📝 Analyzing Instagram metadata...');
+    
+    const metadataText = `
+Caption: ${caption}
+Hashtags: ${hashtags.join(' ')}
+Location Tag: ${locationTag || 'none'}
+`.trim();
+    
+    if (!caption && !hashtags.length && !locationTag) {
+      console.log('⚠️ No metadata available');
+      return { activity: null, location: null, confidence: 0 };
+    }
+    
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{
+          role: "system",
+          content: "Extract travel activity and location from Instagram metadata. Be specific with activities."
+        }, {
+          role: "user",
+          content: `Extract activity and location from this Instagram post:
+
+${metadataText}
+
+RULES:
+1. Extract SPECIFIC activity from hashtags and caption (e.g., #surf = surfing, #yoga = yoga, #dive = diving)
+2. If location tag exists, use it
+3. If no clear activity found, return null
+4. Return confidence 0.9 if clear hashtags, 0.5-0.7 if from caption only
+
+Return JSON only:
+{
+  "activity": "specific activity or null",
+  "location": "location or null",
+  "confidence": 0.0-1.0
+}`
+        }],
+        temperature: 0.2,
+        max_tokens: 100
+      });
+      
+      const text = response.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
+      const result = JSON.parse(text);
+      
+      console.log(`📊 Metadata: activity="${result.activity}", location="${result.location}", confidence=${result.confidence}`);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Metadata extraction failed:', error.message);
+      return { activity: null, location: null, confidence: 0 };
+    }
+  }
+  
+  /**
+   * Extract hashtags from text
+   */
+  extractHashtags(text) {
+    if (!text) return [];
+    const matches = text.match(/#[\w]+/g);
+    return matches || [];
   }
   
   /**
