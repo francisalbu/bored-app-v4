@@ -631,7 +631,7 @@ Return ONLY valid JSON:
     } else if (landmarks.length >= 3) {
       return { type: 'city-tour', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks };
     } else if (landmarks.length === 1) {
-      return { type: 'single-poi', city: Array.from(cities)[0] || 'Unknown', landmark: landmarks[0] };
+      return { type: 'single-poi', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks }; // FIX: use landmarks array
     } else {
       // Default to city tour with whatever landmarks we have
       return { type: 'city-tour', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks };
@@ -801,7 +801,7 @@ Return ONLY valid JSON:
       // CRITICAL: Combine text landmarks with frame landmarks
       const allLandmarks = [
         ...textLandmarks, // From caption/description
-        ...framesCombined.landmarks // From frame analysis
+        ...(framesCombined.landmarks || []) // From frame analysis (safe)
       ];
       
       // Deduplicate using similarity matching
