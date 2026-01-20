@@ -35,52 +35,59 @@ export default function FindActivityScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   
-  const activity = (params.activity as string) || 'surf'; // Fallback to 'surf' if undefined
+  const activity = params.activity as string;
   const [selectedCity, setSelectedCity] = useState('Lisboa');
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [loading, setLoading] = useState(true);
   
   console.log('🎯 Activity finder params:', params);
-  console.log('🎯 Activity:', activity);
+  console.log('🎯 Activity received:', activity);
   
   const cities = ['Lisboa']; // Por agora só Lisboa
   
   useEffect(() => {
-    fetchExperiences();
+    if (activity) {
+      fetchExperiences();
+    } else {
+      console.error('❌ No activity provided!');
+    }
   }, [activity, selectedCity]);
   
   const fetchExperiences = async () => {
-    if (!activity || activity.trim() === '') {
-      console.error('❌ No activity provided');
-      setExperiences([]);
+    if (!activity) {
+      console.error('❌ Cannot fetch: activity is undefined');
       setLoading(false);
       return;
     }
     
+    console.log('🔍 Fetching experiences for:', activity, 'in', selectedCity);
+    
     try {
       setLoading(true);
-      console.log('🔍 Fetching experiences for:', activity, 'in', selectedCity);
       
-      const response = await api.get('/experiences/find-similar', {
-        params: {
-          activity: activity.trim(),
-          city: selectedCity,
-          limit: 3
-        }
-      });
+      const url = `/experiences/find-similar`;
+      const queryParams = {
+        activity: activity,
+        city: selectedCity,
+        limit: 3
+      };
       
-      console.log('📦 Response:', response);
-      console.log('📦 Response data:', response?.data);
+      console.log('🌐 API URL:', url);
+      console.log('🌐 API Params:', queryParams);
       
-      if (response?.data?.success) {
-        console.log('✅ Experiences found:', response.data.data?.length);
-        setExperiences(response.data.data || []);
+      const response = await api.get(url, { params: queryParams });
+      
+      console.log('📦 Full Response:', JSON.stringify(response, null, 2));
+      
+      if (response.data && response.data.success) {
+        console.log('✅ Success! Experiences:', response.data.data);
+        setExperiences(response.data.data);
       } else {
-        console.log('❌ No success in response');
+        console.log('❌ No success in response:', response);
         setExperiences([]);
       }
     } catch (error) {
-      console.error('Error fetching experiences:', error);
+      console.error('❌ Error fetching experiences:', error);
       setExperiences([]);
     } finally {
       setLoading(false);
