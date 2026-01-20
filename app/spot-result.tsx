@@ -34,6 +34,7 @@ interface POI {
   opening_hours?: any;
   instagram_url: string;
   activity: string;
+  isActivity?: boolean; // NEW: activity vs place classification
 }
 
 export default function SpotResultScreen() {
@@ -233,6 +234,23 @@ export default function SpotResultScreen() {
                     {poi.description}
                   </Text>
                 )}
+                
+                {/* Activity Button - if this is an experience/activity */}
+                {poi.isActivity && (
+                  <Pressable 
+                    style={styles.activityButton}
+                    onPress={(e) => {
+                      e.stopPropagation(); // Prevent card selection
+                      Alert.alert(
+                        '🔍 Find in Your City',
+                        'Soon you\'ll be able to search for this activity in your city!',
+                        [{ text: 'OK' }]
+                      );
+                    }}
+                  >
+                    <Text style={styles.activityButtonText}>🔍 Find this activity in my city</Text>
+                  </Pressable>
+                )}
               </View>
             </Pressable>
           );
@@ -378,6 +396,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  activityButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#000',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  activityButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
   },
   saveButtonContainer: {
     paddingHorizontal: 20,

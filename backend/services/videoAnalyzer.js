@@ -451,7 +451,8 @@ Return ONLY valid JSON:
   "location": "City, Country (e.g., Rome, Italy)",
   "landmarks": ["List ALL specific POIs/landmarks visible - BE SPECIFIC with names"],
   "features": ["architectural/geographic details that helped identify POIs"],
-  "confidence": 0.0-1.0
+  "confidence": 0.0-1.0,
+  "content_type": "place" or "activity" (place = landmarks/monuments/scenery, activity = experiences like surf/hiking/cooking class)
 }`;
 
     try {
@@ -489,7 +490,8 @@ Return ONLY valid JSON:
         location: parsed.location || null,
         landmarks: parsed.landmarks || [],
         features: parsed.features || [],
-        confidence: parsed.confidence || 0.5
+        confidence: parsed.confidence || 0.5,
+        content_type: parsed.content_type || 'place'
       };
     } catch (error) {
       console.error(`❌ Error analyzing frame ${frameNumber}:`, error);
@@ -499,7 +501,8 @@ Return ONLY valid JSON:
         location: null,
         landmarks: [],
         features: [],
-        confidence: 0
+        confidence: 0,
+        content_type: 'place'
       };
     }
   }
@@ -804,6 +807,12 @@ Return ONLY valid JSON:
       // Deduplicate using similarity matching
       const uniqueLandmarks = this.deduplicateLandmarks(allLandmarks);
       
+      // Determine if this is an activity experience or place/landmark
+      const isActivity = this.detectActivityContent(
+        metadataAnalysis.activity || framesCombined.activity,
+        frameAnalyses
+      );
+      
       const finalAnalysis = {
         activity: metadataAnalysis.activity || framesCombined.activity,
         location: metadataAnalysis.location || framesCombined.location,
@@ -817,7 +826,8 @@ Return ONLY valid JSON:
         metadataUsed: metadataAnalysis.confidence > 0,
         source: metadataAnalysis.confidence > 0 ? 'metadata+frames+text' : 'frames_only',
         textLandmarksCount: textLandmarks.length,
-        frameLandmarksCount: framesCombined.landmarks.length
+        frameLandmarksCount: framesCombined.landmarks.length,
+        isActivity: isActivity // NEW: true if experience/activity, false if place/landmark
       };
       console.log('📊 DEBUG - frameAnalyses count:', frameAnalyses.length);
       console.log('📊 DEBUG - finalAnalysis.frameAnalyses:', finalAnalysis.frameAnalyses);
@@ -836,6 +846,7 @@ Return ONLY valid JSON:
         landmarks: finalAnalysis.landmarks,
         features: finalAnalysis.features,
         contentType: finalAnalysis.contentType, // NEW: type detection (multi-country, city-tour, etc)
+        isActivity: finalAnalysis.isActivity, // NEW: true if experience/activity, false if place/landmark
         votingScores: finalAnalysis.votingScores,
         processingTime,
         method: 'rapidapi_multimodal',
@@ -863,6 +874,72 @@ Return ONLY valid JSON:
       // await this.cleanup(null, framePaths);
       console.log('⚠️ Skipping cleanup - frames kept in temp/ for verification');
     }
+  }
+
+  /**
+   * Detect if content is an activity/experience vs a static place/landmark
+   */
+  detectActivityContent(activityString, frameAnalyses) {
+    // Activity keywords grouped by category
+    const activityKeywords = [
+      // Food & Culinary
+      'cooking', 'cook', 'wine tasting', 'food tour', 'cocktail making', 'mixology', 
+      'chocolate making', 'baking', 'brewing', 'coffee tasting', 'culinary',
+      
+      // Adventure & Adrenaline
+      'skydiving', 'paragliding', 'bungee', 'rafting', 'white water', 'climbing', 
+      'rock climbing', 'abseiling', 'zip line', 'ziplining', 'canyoning', 'via ferrata',
+      
+      // Water Sports
+      'surf', 'surfing', 'diving', 'scuba', 'snorkeling', 'kayaking', 'kayak',
+      'paddleboarding', 'paddle board', 'kitesurfing', 'kitesurf', 'wakeboard',
+      'jet ski', 'sailing', 'windsurfing',
+      
+      // Nature & Wildlife
+      'hiking', 'hike', 'safari', 'birdwatching', 'wildlife watching', 'horseback',
+      'horse riding', 'trekking', 'trek', 'nature walk', 'camping', 'glamping',
+      
+      // Winter & Snow
+      'skiing', 'ski', 'snowboarding', 'snowboard', 'dog sledding', 'ice climbing',
+      'snowshoeing', 'ice skating', 'snowmobile',
+      
+      // Wellness & Lifestyle
+      'yoga', 'meditation', 'spa', 'massage', 'dance', 'dancing', 'salsa',
+      'tango', 'martial arts', 'pilates', 'wellness retreat',
+      
+      // Additional activity indicators
+      'class', 'lesson', 'course', 'workshop', 'experience', 'tour guide',
+      'instructor', 'training', 'session'
+    ];
+    
+    // Check activity string
+    const activityLower = (activityString || '').toLowerCase();
+    const hasActivityKeyword = activityKeywords.some(keyword => 
+      activityLower.includes(keyword)
+    );
+    
+    // Check frame analyses - count how many frames detected as activity
+    if (frameAnalyses && frameAnalyses.length > 0) {
+      const activityFrames = frameAnalyses.filter(f => 
+        f.content_type === 'activity'
+      ).length;
+      
+      const activityPercentage = activityFrames / frameAnalyses.length;
+      
+      // If majority of frames or activity keyword found
+      if (activityPercentage > 0.5 || hasActivityKeyword) {
+        console.log(`🎯 Activity detected: ${activityPercentage * 100}% frames, keyword: ${hasActivityKeyword}`);
+        return true;
+      }
+    }
+    
+    // Fallback to keyword only
+    if (hasActivityKeyword) {
+      console.log(`🎯 Activity detected from keyword in: "${activityString}"`);
+      return true;
+    }
+    
+    return false;
   }
 
   /**

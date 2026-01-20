@@ -405,7 +405,8 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
         phone: poi.phone,
         description: poi.description,
         types: poi.types,
-        opening_hours: poi.opening_hours
+        opening_hours: poi.opening_hours,
+        isActivity: existingAnalysis.is_activity || false // NEW: activity vs place classification
       }));
       
       // Remove duplicates
@@ -491,7 +492,8 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
           phone: poi.phone,
           description: poi.description,
           types: poi.types,
-          opening_hours: poi.opening_hours
+          opening_hours: poi.opening_hours,
+          isActivity: analysis.isActivity || false // NEW: activity vs place classification
         });
       }
       
@@ -545,7 +547,8 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
         ai_response: analysis,
         processing_time_ms: analysis.processingTime,
         landmarks: analysis.landmarks,
-        features: analysis.features
+        features: analysis.features,
+        is_activity: analysis.isActivity || false // NEW: activity classification
       })
       .select()
       .single();
@@ -569,7 +572,8 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
           features: analysis.features || [],
           processingTime: analysis.processingTime,
           contentType: analysis.contentType,
-          thumbnailUrl: analysis.thumbnailUrl
+          thumbnailUrl: analysis.thumbnailUrl,
+          isActivity: analysis.isActivity || false // NEW: activity classification
         },
         detectedSpots: detectedSpots,
         meta: {
