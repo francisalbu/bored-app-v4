@@ -235,21 +235,22 @@ export default function SpotResultScreen() {
                   </Text>
                 )}
                 
-                {/* Activity Button - if this is an experience/activity */}
+                {/* Activity Detection - if this is an experience/activity */}
                 {poi.isActivity && (
-                  <Pressable 
-                    style={styles.activityButton}
-                    onPress={(e) => {
-                      e.stopPropagation(); // Prevent card selection
-                      Alert.alert(
-                        '🔍 Find in Your City',
-                        'Soon you\'ll be able to search for this activity in your city!',
-                        [{ text: 'OK' }]
-                      );
-                    }}
-                  >
-                    <Text style={styles.activityButtonText}>🔍 Find this activity in my city</Text>
-                  </Pressable>
+                  <View style={styles.activitySection}>
+                    <Text style={styles.activityDetectedText}>
+                      We detected <Text style={styles.activityName}>{poi.activity}</Text> in this reel!
+                    </Text>
+                    <Pressable 
+                      style={styles.activityButton}
+                      onPress={(e) => {
+                        e.stopPropagation(); // Prevent card selection
+                        router.push(`/find-activity?activity=${encodeURIComponent(poi.activity)}`);
+                      }}
+                    >
+                      <Text style={styles.activityButtonText}>🔍 Find this activity in my city</Text>
+                    </Pressable>
+                  </View>
                 )}
               </View>
             </Pressable>
@@ -397,18 +398,35 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
   },
+  activitySection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  activityDetectedText: {
+    fontSize: 15,
+    color: '#666',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  activityName: {
+    fontWeight: '700',
+    color: '#000',
+  },
   activityButton: {
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: '#000',
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+    marginTop: 0,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: colors.dark.primary, // Yellow/lime for attention (#CFFF04)
+    borderRadius: 12,
+    alignSelf: 'stretch',
   },
   activityButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: '#000', // Black text on yellow
+    textAlign: 'center',
   },
   saveButtonContainer: {
     paddingHorizontal: 20,

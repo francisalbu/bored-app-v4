@@ -290,4 +290,47 @@ router.post('/:id/reviews', authenticateSupabase, async (req, res, next) => {
   }
 );
 
+/**
+ * GET /api/experiences/find-similar
+ * Find experiences similar to a given activity (e.g., surf, cooking, yoga)
+ * Query params: activity, city, limit
+ */
+router.get('/find-similar', optionalAuth, async (req, res, next) => {
+  try {
+    const { activity, city, limit = 3 } = req.query;
+    
+    if (!activity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Activity parameter is required'
+      });
+    }
+    
+    console.log(`🔍 Finding experiences similar to "${activity}" in ${city || 'any city'}...`);
+    
+    // Find experiences matching the activity
+    const experiences = await Experience.findSimilarActivities(
+      activity,
+      city,
+      parseInt(limit)
+    );
+    
+    console.log(`✅ Found ${experiences.length} similar experiences`);
+    
+    res.json({
+      success: true,
+      data: experiences,
+      meta: {
+        activity,
+        city: city || 'all',
+        count: experiences.length
+      }
+    });
+  } catch (error) {
+    console.error('Error finding similar experiences:', error);
+    next(error);
+  }
+});
+
 module.exports = router;
+
