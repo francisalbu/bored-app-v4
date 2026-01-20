@@ -395,8 +395,8 @@ Return JSON only:
    * Analyze single frame with GPT-4 Vision (OpenAI)
    * NOW includes metadata context for better accuracy
    */
-  async analyzeFrame(framePath, frameNumber, totalFrames, description = '', metadataInfo = null) {
-    const imageBase64 = await fs.readFile(framePath, 'base64');
+  async analyzeFrame(framePath, frameNumber, totalFrames, description = '', metadataInfo = null, imageBase64Override = null) {
+    const imageBase64 = imageBase64Override || await fs.readFile(framePath, 'base64');
     
     // Build context from metadata
     let metadataContext = '';
@@ -456,8 +456,9 @@ Return ONLY valid JSON:
 }`;
 
     try {
+      const visionModel = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: visionModel,
         messages: [
           {
             role: "user",
@@ -757,27 +758,35 @@ Return ONLY valid JSON:
       metadata.thumbnailUrl = videoData.thumbnailUrl; // Thumbnail for UI
       console.log(`✅ Got video URL + metadata`);
       
-      // Step 2: PRIORITY - Extract from metadata FIRST (location tag, hashtags, caption)
+      const envFrames = Number.parseInt(process.env.VIDEO_ANALYSIS_FRAMES || '', 10);
+      const frameCount = Number.isFinite(envFrames) && envFrames > 0 ? envFrames : 8;
+
+      // Step 2-3: Run metadata/text extraction and frame extraction in parallel
       console.log('📝 Step 2: Extracting from Instagram metadata (PRIORITY 1)...');
-      const metadataAnalysis = await this.extractFromMetadata(
-        metadata.caption,
-        metadata.hashtags,
-        metadata.location
-      );
-      console.log(`✅ Metadata analysis: activity="${metadataAnalysis.activity}", location="${metadataAnalysis.location}"`);
-      
-      // Step 2.5: Extract POIs from caption text
       console.log('📝 Step 2.5: Extracting POIs from caption/description...');
-      const textLandmarks = await this.extractLandmarksFromText(
+      console.log(`🎞️ Step 3: Extracting ${frameCount} key frames to capture all POIs throughout the video...`);
+
+      const metadataPromise = this.extractFromMetadata(
         metadata.caption,
         metadata.hashtags,
         metadata.location
       );
+      const textLandmarksPromise = this.extractLandmarksFromText(
+        metadata.caption,
+        metadata.hashtags,
+        metadata.location
+      );
+      const framesPromise = this.extractFramesFromUrl(videoData.videoUrl, frameCount);
+
+      const [metadataAnalysis, textLandmarks, extractedFramePaths] = await Promise.all([
+        metadataPromise,
+        textLandmarksPromise,
+        framesPromise
+      ]);
+
+      framePaths = extractedFramePaths;
+      console.log(`✅ Metadata analysis: activity="${metadataAnalysis.activity}", location="${metadataAnalysis.location}"`);
       console.log(`✅ Found ${textLandmarks.length} POIs in text`);
-      
-      // Step 3: Download + extract frames from CDN URL (must use immediately before expiration!)
-      console.log('🎞️ Step 3: Extracting 8 key frames to capture all POIs throughout the video...');
-      framePaths = await this.extractFramesFromUrl(videoData.videoUrl, 8);
       console.log(`✅ Extracted ${framePaths.length} frames`);
       
       // Step 4: Analyze frames to COMPLEMENT metadata (not replace!)
@@ -1086,10 +1095,19 @@ Return ONLY a JSON array of place names:
   }
 
   /**
-   * Analyze frames SEQUENTIALLY to save memory (Render has 512MB limit)
+   * Analyze frames with limited concurrency to balance speed and memory usage
    */
-  async analyzeFramesSequentially(framePaths, userDescription, caption, hashtags, instagramLocation) {
-    console.log(`🔍 Analyzing ${framePaths.length} frames SEQUENTIALLY (memory-optimized)...`);
+  async analyzeFramesSequentially(framePaths, userDescription, caption, hashtags, instagramLocation, options = {}) {
+    const envConcurrency = Number.parseInt(process.env.VIDEO_ANALYSIS_CONCURRENCY || '', 10);
+    const defaultConcurrency = Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : 2;
+    const requestedConcurrency = Number.isFinite(options.concurrency) && options.concurrency > 0 ? options.concurrency : defaultConcurrency;
+    const concurrency = Math.max(1, Math.min(requestedConcurrency, framePaths.length));
+
+    const debugFramesEnv = (process.env.VIDEO_ANALYSIS_DEBUG_FRAMES || '').toLowerCase();
+    const defaultIncludeFrameData = debugFramesEnv === '1' || debugFramesEnv === 'true' || debugFramesEnv === 'yes';
+    const includeFrameData = typeof options.includeFrameData === 'boolean' ? options.includeFrameData : defaultIncludeFrameData;
+
+    console.log(`🔍 Analyzing ${framePaths.length} frames with concurrency=${concurrency}...`);
     
     // Build context from all available info
     const contextInfo = [];
@@ -1100,48 +1118,64 @@ Return ONLY a JSON array of place names:
     
     const fullContext = contextInfo.join('\n');
     
-    const results = [];
-    const framesBase64 = []; // To return images for debugging
-    
-    // Process ONE frame at a time to save memory
-    for (let i = 0; i < framePaths.length; i++) {
-      console.log(`📊 Analyzing frame ${i + 1}/${framePaths.length}...`);
-      
-      // Read frame as base64 for debugging
-      try {
-        const frameData = await fs.readFile(framePaths[i], 'base64');
-        framesBase64.push({
-          frameNumber: i + 1,
-          base64: frameData,
-          path: framePaths[i]
-        });
-      } catch (err) {
-        console.error(`Failed to read frame ${i + 1}:`, err.message);
+    const results = new Array(framePaths.length);
+    const framesBase64 = includeFrameData ? new Array(framePaths.length) : [];
+    let nextIndex = 0;
+
+    const processNext = async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= framePaths.length) return;
+
+        console.log(`📊 Analyzing frame ${index + 1}/${framePaths.length}...`);
+        let frameData = null;
+
+        if (includeFrameData) {
+          try {
+            frameData = await fs.readFile(framePaths[index], 'base64');
+            framesBase64[index] = {
+              frameNumber: index + 1,
+              base64: frameData,
+              path: framePaths[index]
+            };
+          } catch (err) {
+            console.error(`Failed to read frame ${index + 1}:`, err.message);
+          }
+        }
+
+        const analysis = await this.analyzeFrame(
+          framePaths[index],
+          index + 1,
+          framePaths.length,
+          fullContext,
+          { location: instagramLocation, hashtags: hashtags },
+          frameData
+        );
+        results[index] = analysis;
+
+        // TEMP: Keep frames to verify extraction is working
+        // try {
+        //   await fs.unlink(framePaths[index]);
+        //   console.log(`🗑️ Cleaned frame ${index + 1}`);
+        // } catch (e) {
+        //   console.error(`Failed to cleanup frame ${index + 1}:`, e.message);
+        // }
+
+        if (global.gc) global.gc();
       }
-      
-      const analysis = await this.analyzeFrame(
-        framePaths[i], 
-        i + 1, 
-        framePaths.length, 
-        fullContext,
-        { location: instagramLocation, hashtags: hashtags } // Pass metadata to frame analysis
-      );
-      results.push(analysis);
-      
-      // TEMP: Keep frames to verify extraction is working
-      // try {
-      //   await fs.unlink(framePaths[i]);
-      //   console.log(`🗑️ Cleaned frame ${i + 1}`);
-      // } catch (e) {
-      //   console.error(`Failed to cleanup frame ${i + 1}:`, e.message);
-      // }
-      
-      // Force garbage collection hint
-      if (global.gc) global.gc();
+    };
+
+    const workers = [];
+    for (let i = 0; i < concurrency; i++) {
+      workers.push(processNext());
     }
-    
-    console.log('✅ All frames analyzed sequentially!');
-    return { analyses: results, frames: framesBase64 };
+    await Promise.all(workers);
+
+    console.log('✅ All frames analyzed!');
+    return {
+      analyses: results.filter(Boolean),
+      frames: includeFrameData ? framesBase64.filter(Boolean) : []
+    };
   }
   
   /**
