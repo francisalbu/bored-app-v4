@@ -6,11 +6,6 @@
  */
 
 const { from } = require('../config/database');
-const OpenAI = require('openai');
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 /**
  * Get all experiences (for feed)
@@ -334,15 +329,17 @@ async function createReview({ experience_id, user_id, booking_id, rating, commen
 }
 
 /**
- * Find experiences similar to a given activity using AI semantic matching
+ * Find experiences similar to a given activity
  * @param {string} activity - Activity name (e.g., "surf", "cooking", "yoga")
- * @param {string} city - Optional city filter
+ * @param {string} city - Optional city filter  
  * @param {number} limit - Maximum number of results
  * @returns {Promise<Array>} Array of matching experiences
  */
 async function findSimilarActivities(activity, city = null, limit = 3) {
   try {
-    // Get all active experiences (with optional city filter)
+    console.log(`🔍 Finding experiences for activity: "${activity}", city: "${city || 'any'}"`);
+    
+    // Get all active experiences with optional region filter
     let query = from('experiences')
       .select(`
         *,
@@ -351,15 +348,12 @@ async function findSimilarActivities(activity, city = null, limit = 3) {
       `)
       .eq('is_active', true);
     
-    // Apply city filter if provided (but more flexible - check if city is in location)
+    // Apply flexible city filter (Lisboa includes surrounding areas)
     if (city) {
-      // Get all experiences near the city area (Lisboa includes Cascais, Carcavelos, etc.)
-      // For now, get all and we'll filter with AI
       const regionKeywords = city.toLowerCase() === 'lisboa' 
-        ? ['lisboa', 'lisbon', 'cascais', 'carcavelos', 'ericeira', 'sintra']
+        ? ['lisboa', 'lisbon', 'cascais', 'carcavelos', 'ericeira', 'sintra', 'costa']
         : [city.toLowerCase()];
       
-      // Build OR query for location matching
       const locationQuery = regionKeywords
         .map(keyword => `location.ilike.%${keyword}%`)
         .join(',');
@@ -369,52 +363,70 @@ async function findSimilarActivities(activity, city = null, limit = 3) {
     
     const { data: allExperiences, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ DB error:', error);
+      throw error;
+    }
     
     if (!allExperiences || allExperiences.length === 0) {
+      console.log('⚠️ No experiences found in database');
       return [];
     }
     
-    // Use OpenAI to find the best matches
-    const experiencesForAI = allExperiences.map(exp => ({
-      id: exp.id,
-      title: exp.title,
-      description: exp.description,
-      category: exp.category,
-      tags: exp.tags || []
-    }));
+    console.log(`📊 Found ${allExperiences.length} total experiences in region`);
     
-    const prompt = `You are helping match a detected activity "${activity}" with available experiences.
-
-Here are the available experiences:
-${JSON.stringify(experiencesForAI, null, 2)}
-
-Task: Return the IDs of the top ${limit} experiences that best match the activity "${activity}".
-Consider:
-- Title relevance
-- Description content
-- Category match
-- Tags
-
-Respond with ONLY a JSON array of experience IDs in order of relevance, like: [1, 5, 3]`;
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 100
+    // Simple text matching on title, description, category, tags
+    const searchTerm = activity.toLowerCase().trim();
+    const scoredExperiences = allExperiences.map(exp => {
+      let score = 0;
+      const title = (exp.title || '').toLowerCase();
+      const description = (exp.description || '').toLowerCase();
+      const category = (exp.category || '').toLowerCase();
+      const tags = (exp.tags || []).map(t => t.toLowerCase());
+      
+      // Exact match in title = highest priority
+      if (title.includes(searchTerm)) score += 10;
+      
+      // Match in category
+      if (category.includes(searchTerm)) score += 8;
+      
+      // Match in tags
+      if (tags.some(tag => tag.includes(searchTerm))) score += 7;
+      
+      // Match in description
+      if (description.includes(searchTerm)) score += 5;
+      
+      // Partial word matches
+      const searchWords = searchTerm.split(' ');
+      searchWords.forEach(word => {
+        if (word.length > 3) {
+          if (title.includes(word)) score += 3;
+          if (category.includes(word)) score += 2;
+          if (description.includes(word)) score += 1;
+        }
+      });
+      
+      return { ...exp, matchScore: score };
     });
     
-    const responseText = completion.choices[0].message.content.trim();
-    const matchedIds = JSON.parse(responseText);
+    // Filter out experiences with no match and sort by score
+    const matchedExperiences = scoredExperiences
+      .filter(exp => exp.matchScore > 0)
+      .sort((a, b) => {
+        // First by match score, then by rating
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        const ratingA = a.rating || 0;
+        const ratingB = b.rating || 0;
+        return ratingB - ratingA;
+      })
+      .slice(0, limit);
     
-    // Get experiences in the order returned by AI
-    const sortedExperiences = matchedIds
-      .map(id => allExperiences.find(exp => exp.id === id))
-      .filter(exp => exp !== undefined);
+    console.log(`✅ Matched ${matchedExperiences.length} experiences:`, 
+      matchedExperiences.map(e => ({ title: e.title, score: e.matchScore }))
+    );
     
     // Format experiences
-    return sortedExperiences.map(exp => {
+    return matchedExperiences.map(exp => {
       const reviews = exp.reviews || [];
       const rating = reviews.length > 0 
         ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
@@ -441,58 +453,8 @@ Respond with ONLY a JSON array of experience IDs in order of relevance, like: [1
       };
     });
   } catch (error) {
-    console.error('Error in findSimilarActivities:', error);
-    
-    // Fallback to simple text search if AI fails
-    let query = from('experiences')
-      .select(`
-        *,
-        operators(company_name, logo_url),
-        reviews(rating, id)
-      `)
-      .eq('is_active', true);
-    
-    const searchPattern = `%${activity}%`;
-    query = query.or(
-      `title.ilike.${searchPattern},description.ilike.${searchPattern},category.ilike.${searchPattern}`
-    );
-    
-    if (city) {
-      query = query.ilike('location', `%${city}%`);
-    }
-    
-    query = query.order('rating', { ascending: false }).limit(limit);
-    
-    const { data: experiences, error: fallbackError } = await query;
-    
-    if (fallbackError) throw fallbackError;
-    
-    return (experiences || []).map(exp => {
-      const reviews = exp.reviews || [];
-      const rating = reviews.length > 0 
-        ? Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length * 10) / 10
-        : 0;
-      
-      return {
-        id: exp.id,
-        title: exp.title,
-        description: exp.description,
-        location: exp.location,
-        price: parseFloat(exp.price),
-        currency: exp.currency,
-        duration: exp.duration,
-        category: exp.category,
-        image_url: exp.image_url,
-        video_url: exp.video_url,
-        rating: rating,
-        review_count: reviews.length,
-        max_group_size: exp.max_group_size,
-        instant_booking: exp.instant_booking,
-        latitude: exp.latitude,
-        longitude: exp.longitude,
-        operator: exp.operators
-      };
-    });
+    console.error('❌ Error in findSimilarActivities:', error);
+    return [];
   }
 }
 
