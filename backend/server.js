@@ -43,6 +43,8 @@ const preferencesRoutes = require('./routes/preferences');
 const suggestionsRoutes = require('./routes/suggestions');
 const discountCodesRoutes = require('./routes/discountCodes');
 const spotsRoutes = require('./routes/spots');
+const analyzeExperienceRoutes = require('./routes/analyzeExperience'); // NEW: Simplified experience analysis
+const experienceRecommendationsRoutes = require('./routes/experienceRecommendations'); // NEW: Get experience recommendations from video
 
 // Initialize Express app
 const app = express();
@@ -106,6 +108,8 @@ app.use('/api/preferences', preferencesRoutes); // User preferences and quiz dat
 app.use('/api/suggestions', suggestionsRoutes); // Activity suggestions from users
 app.use('/api/discount-codes', discountCodesRoutes); // Discount codes validation and usage
 app.use('/api/spots', spotsRoutes); // Saved travel spots for user's map
+app.use('/api/analyze-experience', analyzeExperienceRoutes); // NEW: Simplified experience analysis from video
+app.use('/api/experience-recommendations', experienceRecommendationsRoutes); // NEW: Get experience recommendations from video
 
 // Privacy Policy page (required for App Store)
 app.get('/privacy', (req, res) => {
