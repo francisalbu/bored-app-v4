@@ -663,6 +663,38 @@ export default function MapScreen() {
                 </View>
               )}
 
+              {/* Contact Info */}
+              {(selectedSpot.website || selectedSpot.phone) && (
+                <View style={styles.contactSection}>
+                  {selectedSpot.website && (
+                    <TouchableOpacity 
+                      style={styles.contactItem}
+                      onPress={() => {
+                        console.log('Open website:', selectedSpot.website);
+                        // TODO: Open in browser
+                      }}
+                    >
+                      <Text style={styles.contactIcon}>🌐</Text>
+                      <Text style={styles.contactText} numberOfLines={1}>{selectedSpot.website}</Text>
+                      <Text style={styles.contactArrow}>→</Text>
+                    </TouchableOpacity>
+                  )}
+                  {selectedSpot.phone && (
+                    <TouchableOpacity 
+                      style={styles.contactItem}
+                      onPress={() => {
+                        console.log('Call:', selectedSpot.phone);
+                        // TODO: Open dialer
+                      }}
+                    >
+                      <Text style={styles.contactIcon}>📞</Text>
+                      <Text style={styles.contactText}>{selectedSpot.phone}</Text>
+                      <Text style={styles.contactArrow}>→</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
               {/* Activities */}
               <View style={styles.activitiesSection}>
                 <Text style={styles.sectionTitle}>
@@ -1054,6 +1086,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666',
     lineHeight: 22,
+  },
+  // Contact info
+  contactSection: {
+    marginBottom: 20,
+    gap: 12,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  contactIcon: {
+    fontSize: 20,
+  },
+  contactText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+  },
+  contactArrow: {
+    fontSize: 18,
+    color: '#999',
   },
   activitiesSection: {
     marginBottom: 32,

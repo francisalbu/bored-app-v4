@@ -4,7 +4,23 @@ const { getDB } = require('../config/database');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const videoAnalyzer = require('../services/videoAnalyzer');
 const googlePlacesService = require('../services/googlePlacesService');
-
+// Helper: Extract country from location string (handles "City, Country" or "City, Country, Continent")
+function extractCountry(locationString) {
+  const continents = ['Africa', 'Europe', 'Asia', 'North America', 'South America', 'Oceania', 'Antarctica'];
+  const parts = locationString.split(',').map(p => p.trim());
+  
+  if (parts.length === 1) return parts[0]; // Just country
+  
+  const lastPart = parts[parts.length - 1];
+  const secondLastPart = parts.length > 1 ? parts[parts.length - 2] : null;
+  
+  // If last part is a continent, use second-to-last as country
+  if (continents.includes(lastPart) && secondLastPart) {
+    return secondLastPart;
+  }
+  
+  return lastPart; // Otherwise use last part
+}
 /**
  * POST /api/suggestions
  * Create a new activity suggestion (authenticated users only)
@@ -164,7 +180,7 @@ router.post('/test-analyze', async (req, res) => {
           spot_name: poi.name, // Official Google name
           location_full: poi.address,
           city: analysis.location.split(',')[0]?.trim() || analysis.location,
-          country: analysis.location.split(',').pop()?.trim() || null,
+          country: extractCountry(analysis.location),
           coordinates: {
             latitude: poi.latitude,
             longitude: poi.longitude
@@ -374,7 +390,7 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
         spot_name: poi.name,
         location_full: poi.address,
         city: existingAnalysis.detected_location.split(',')[0]?.trim() || existingAnalysis.detected_location,
-        country: existingAnalysis.detected_location.split(',').pop()?.trim() || null,
+        country: extractCountry(existingAnalysis.detected_location),
         coordinates: {
           latitude: poi.latitude,
           longitude: poi.longitude
@@ -460,7 +476,7 @@ router.post('/analyze-video', authenticateSupabase, async (req, res) => {
           spot_name: poi.name,
           location_full: poi.address,
           city: analysis.location.split(',')[0]?.trim() || analysis.location,
-          country: analysis.location.split(',').pop()?.trim() || null,
+          country: extractCountry(analysis.location),
           coordinates: {
             latitude: poi.latitude,
             longitude: poi.longitude
