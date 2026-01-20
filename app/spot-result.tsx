@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, MapPin, Star, Check, CheckCircle, Circle } from 'lucide-react-native';
+import { X, MapPin, Star, Check } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Image } from 'expo-image';
 import colors from '@/constants/colors';
@@ -203,11 +203,13 @@ export default function SpotResultScreen() {
               onPress={() => togglePOI(poi.place_id)}
             >
               {/* Checkbox */}
-              <View style={styles.checkbox}>
+              <View style={styles.checkboxContainer}>
                 {isSelected ? (
-                  <CheckCircle size={24} color="#000" fill="#000" />
+                  <View style={styles.checkboxSelected}>
+                    <Check size={16} color="#000" strokeWidth={3} />
+                  </View>
                 ) : (
-                  <Circle size={24} color="#ccc" />
+                  <View style={styles.checkboxUnselected} />
                 )}
               </View>
               
@@ -228,12 +230,10 @@ export default function SpotResultScreen() {
               <View style={styles.poiInfo}>
                 <Text style={styles.poiName}>{poi.spot_name}</Text>
                 
-                {/* Description */}
-                {poi.description && (
-                  <Text style={styles.poiDescription} numberOfLines={3}>
-                    {poi.description}
-                  </Text>
-                )}
+                {/* Auto-generated description (like Roamy) */}
+                <Text style={styles.poiDescription} numberOfLines={2}>
+                  {poi.description || `${poi.spot_name} is located in ${poi.city}${poi.country && poi.city !== poi.country ? `, ${poi.country}` : ''}.`}
+                </Text>
                 
                 {/* Activity Detection - if this is an experience/activity */}
                 {poi.isActivity && (
@@ -369,9 +369,27 @@ const styles = StyleSheet.create({
   poiCardSelected: {
     backgroundColor: '#F8F8F8',
   },
-  checkbox: {
+  checkboxContainer: {
     marginRight: 12,
     paddingTop: 2,
+  },
+  checkboxSelected: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  checkboxUnselected: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
   },
   poiThumbnail: {
     width: 60,
@@ -391,7 +409,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 6,
+    marginBottom: 4,
+  },
+  poiLocation: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
   },
   poiDescription: {
     fontSize: 14,
