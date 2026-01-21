@@ -3,18 +3,110 @@ const router = express.Router();
 const simpleVideoAnalyzer = require('../services/simpleVideoAnalyzer');
 const viatorService = require('../services/viatorService');
 const Experience = require('../models/Experience');
+const { pool } = require('../db');
+
+/**
+ * Helper: Parse images field from database (can be JSON string or array)
+ * PostgreSQL JSONB can come as string that needs parsing
+ */
+function parseImages(images) {
+  if (!images) return [];
+  if (Array.isArray(images)) return images;
+  if (typeof images === 'string') {
+    try {
+      const parsed = JSON.parse(images);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.warn('Failed to parse images:', e.message);
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * Check if video analysis is cached
+ */
+async function getCachedAnalysis(instagramUrl) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM video_analysis_cache 
+       WHERE instagram_url = $1 
+       AND expires_at > NOW()
+       LIMIT 1`,
+      [instagramUrl]
+    );
+    
+    if (result.rows.length > 0) {
+      // Increment hit count
+      await pool.query(
+        'UPDATE video_analysis_cache SET hit_count = hit_count + 1 WHERE id = $1',
+        [result.rows[0].id]
+      );
+      
+      console.log('✅ Cache HIT for:', instagramUrl, '(hits:', result.rows[0].hit_count + 1, ')');
+      return result.rows[0];
+    }
+    
+    console.log('❌ Cache MISS for:', instagramUrl);
+    return null;
+  } catch (error) {
+    console.error('⚠️ Cache lookup error:', error.message);
+    return null; // Continue without cache on error
+  }
+}
+
+/**
+ * Save video analysis to cache
+ */
+async function saveCachedAnalysis(instagramUrl, analysis, experiences, thumbnailUrl) {
+  try {
+    await pool.query(
+      `INSERT INTO video_analysis_cache 
+       (instagram_url, thumbnail_url, analysis_type, activity, location, confidence, experiences)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (instagram_url) 
+       DO UPDATE SET 
+         thumbnail_url = EXCLUDED.thumbnail_url,
+         analysis_type = EXCLUDED.analysis_type,
+         activity = EXCLUDED.activity,
+         location = EXCLUDED.location,
+         confidence = EXCLUDED.confidence,
+         experiences = EXCLUDED.experiences,
+         created_at = NOW(),
+         expires_at = NOW() + INTERVAL '30 days',
+         hit_count = 0`,
+      [
+        instagramUrl,
+        thumbnailUrl,
+        analysis.type,
+        analysis.activity,
+        analysis.location,
+        analysis.confidence,
+        JSON.stringify(experiences)
+      ]
+    );
+    
+    console.log('💾 Cached analysis for:', instagramUrl);
+  } catch (error) {
+    console.error('⚠️ Failed to save cache:', error.message);
+    // Don't fail the request if cache save fails
+  }
+}
 
 /**
  * POST /api/experience-recommendations
  * Analyze video and recommend experiences from database + Viator
  * 
  * Strategy:
- * 1. Analyze video to detect activity/location
- * 2. Search our DB first
- * 3. If we have results: add 2-3 from Viator for variety
- * 4. If we don't have results: use only Viator as fallback
+ * 1. Check cache first (avoid re-analyzing same video)
+ * 2. If not cached: Analyze video to detect activity/location
+ * 3. Search our DB first
+ * 4. If we have results: add 2-3 from Viator for variety
+ * 5. If we don't have results: use only Viator as fallback
+ * 6. Save to cache for future requests
  * 
- * Body: { instagramUrl: string }
+ * Body: { instagramUrl: string, userLocation?: string }
  */
 router.post('/', async (req, res) => {
   try {
@@ -34,10 +126,31 @@ router.post('/', async (req, res) => {
     console.log('🎯 Starting experience recommendation flow...');
     console.log('📍 User location:', userCity);
     
-    // 1. Analyze video (2-3 frames only)
-    const analysis = await simpleVideoAnalyzer.analyzeVideo(instagramUrl);
+    // 1. Check cache first
+    const cached = await getCachedAnalysis(instagramUrl);
+    let analysis;
+    let thumbnailUrl;
     
-    console.log('📊 Analysis result:', analysis);
+    if (cached) {
+      // Use cached analysis
+      analysis = {
+        type: cached.analysis_type,
+        activity: cached.activity,
+        location: cached.location,
+        confidence: parseFloat(cached.confidence),
+        thumbnailUrl: cached.thumbnail_url
+      };
+      thumbnailUrl = cached.thumbnail_url;
+      
+      console.log('📦 Using cached analysis:', analysis);
+    } else {
+      // 2. Analyze video (2-3 frames only)
+      const analysisResult = await simpleVideoAnalyzer.analyzeVideo(instagramUrl);
+      analysis = analysisResult;
+      thumbnailUrl = analysisResult.thumbnailUrl;
+      
+      console.log('📊 Fresh analysis result:', analysis);
+    }
     
     let experiences = [];
     let viatorExperiences = [];
@@ -55,9 +168,10 @@ router.post('/', async (req, res) => {
         TARGET_COUNT
       );
       
-      // Mark all DB experiences with source field
+      // Mark all DB experiences with source field AND parse images
       experiences = experiences.map(exp => ({
         ...exp,
+        images: parseImages(exp.images), // Parse images correctly from JSONB
         source: 'database'
       }));
       
@@ -116,6 +230,7 @@ router.post('/', async (req, res) => {
       // Mark all DB experiences with source field
       experiences = experiences.map(exp => ({
         ...exp,
+        images: parseImages(exp.images), // Parse images correctly
         source: 'database'
       }));
       
@@ -133,6 +248,11 @@ router.post('/', async (req, res) => {
     // Ensure we always return exactly TARGET_COUNT (or less if unavailable)
     experiences = experiences.slice(0, TARGET_COUNT);
     
+    // Save to cache if this was a fresh analysis (not from cache)
+    if (!cached) {
+      await saveCachedAnalysis(instagramUrl, analysis, experiences, thumbnailUrl);
+    }
+    
     res.json({
       success: true,
       data: {
@@ -140,7 +260,8 @@ router.post('/', async (req, res) => {
           type: analysis.type,
           activity: analysis.activity,
           location: analysis.location,
-          confidence: analysis.confidence
+          confidence: analysis.confidence,
+          thumbnailUrl: thumbnailUrl
         },
         experiences: experiences,
         message: message,
@@ -197,6 +318,7 @@ router.post('/by-activity', async (req, res) => {
     // Mark all DB experiences with source field
     experiences = experiences.map(exp => ({
       ...exp,
+      images: parseImages(exp.images), // Parse images correctly
       source: 'database'
     }));
     

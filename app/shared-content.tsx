@@ -185,6 +185,24 @@ interface SocialMediaMetadata {
   matchMethod?: 'ai' | 'keywords' | 'suggested';
 }
 
+// Activity icons from Google Cloud Storage
+const ACTIVITY_ICONS = [
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_surfing.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_diving.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_yoga.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_kayak.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_hiking.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_quadbike.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_skydiving.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_horse_riding.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_wine_tasting.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_cave_tour.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_fishing.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_snowboarding.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_golf.png',
+  'https://storage.googleapis.com/bored_tourist_media/images/Icons_Activities/icon_grape_harvest.png',
+];
+
 interface SmartMatchResponse {
   success: boolean;
   metadata: SocialMediaMetadata;
@@ -209,6 +227,7 @@ export default function SharedContentScreen() {
   const [paramsReady, setParamsReady] = useState(false); // Track if params are loaded
   const [scanProgress] = useState(new Animated.Value(0));
   const [scanLineAnim] = useState(new Animated.Value(0));
+  const [iconScrollAnim] = useState(new Animated.Value(0));
   const [socialMetadata, setSocialMetadata] = useState<SocialMediaMetadata | null>(null);
   const [matchMethod, setMatchMethod] = useState<string>('');
 
@@ -242,6 +261,18 @@ export default function SharedContentScreen() {
         easing: Easing.linear,
         useNativeDriver: false,
       }).start();
+      
+      // Animate icon carousel - smooth continuous loop
+      iconScrollAnim.setValue(0);
+      Animated.loop(
+        Animated.timing(iconScrollAnim, {
+          toValue: 1,
+          duration: 12000, // Slower for smoother movement
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        { iterations: -1 } // Infinite loop
+      ).start();
     }
   }, [analyzing]);
 
@@ -383,69 +414,34 @@ export default function SharedContentScreen() {
         );
         
         if (isSocialMedia) {
-          // Try the smart-match API first (uses Apify + Gemini AI)
-          const smartMatchResult = await smartMatchExperiences(url);
+          // Call experience recommendations API to get activity + experiences
+          console.log('🎯 Calling experience-recommendations API...');
           
-          if (smartMatchResult?.success && smartMatchResult.matchedExperiences?.length > 0) {
-            // DEBUG: Log raw API response
-            console.log('🖼️ RAW API RESPONSE:', JSON.stringify(smartMatchResult.matchedExperiences[0], null, 2));
-            
-            // Transform API response to frontend format
-            const matches = smartMatchResult.matchedExperiences.map(exp => {
-              // Parse images if it's a string (JSONB from database)
-              let imagesArray = exp.images;
-              if (typeof exp.images === 'string') {
-                try {
-                  imagesArray = JSON.parse(exp.images);
-                } catch (e) {
-                  imagesArray = [];
-                }
-              }
-              
-              // Get the first real image from images array
-              const firstImage = Array.isArray(imagesArray) && imagesArray.length > 0 
-                ? imagesArray[0] 
-                : null;
-              
-              console.log('🖼️ Experience:', exp.title);
-              console.log('   - exp.images:', exp.images);
-              console.log('   - imagesArray:', imagesArray);
-              console.log('   - firstImage:', firstImage);
-              console.log('   - exp.image:', exp.image);
-              console.log('   - exp.image_url:', exp.image_url);
-              console.log('   - exp.provider_logo:', exp.provider_logo);
-              
-              return {
-              experience: {
-                id: exp.id,
-                title: exp.title,
-                description: exp.description,
-                category: exp.category,
-                tags: exp.tags,
-                location: exp.location,
-                price: exp.price,
-                currency: exp.currency,
-                duration: exp.duration,
-                rating: exp.rating,
-                reviewCount: exp.reviewCount,
-                image: firstImage || exp.image_url || exp.image, // USE firstImage from parsed array!
-                images: imagesArray,
-                provider: exp.provider,
-              },
-              score: 100, // AI matched
-              matchedKeywords: smartMatchResult.matchMethod === 'suggested' ? ['suggested'] : ['ai-matched'],
-            }});
-            
-            // Navigate directly to find-activity screen with Instagram URL
-            console.log('🎯 Navigating to find-activity with URL:', url);
-            router.replace({
-              pathname: '/find-activity',
-              params: {
-                instagramUrl: url,
-                thumbnail: smartMatchResult.metadata?.thumbnail_url || '',
-              }
+          try {
+            const response = await apiService.post('/experience-recommendations', {
+              instagramUrl: url,
+              userLocation: 'Lisboa' // Default location
             });
-            return;
+            
+            if (response.success && response.data) {
+              console.log('✅ Got recommendations:', response.data);
+              
+              // Navigate to find-activity with all data ready
+              router.replace({
+                pathname: '/find-activity',
+                params: {
+                  instagramUrl: url,
+                  thumbnail: response.data.analysis?.thumbnailUrl || '',
+                  activity: response.data.analysis.activity,
+                  // Pass experiences as JSON string
+                  experiences: JSON.stringify(response.data.experiences),
+                  analysis: JSON.stringify(response.data.analysis)
+                }
+              });
+              return;
+            }
+          } catch (error) {
+            console.error('❌ Error calling experience-recommendations:', error);
           }
         }
         
@@ -511,12 +507,35 @@ export default function SharedContentScreen() {
 
         {/* Scanning visual */}
         <View style={styles.scanContainer}>
-          {/* Emojis around the scan area */}
-          <Text style={styles.emojiLeft}>🏛️</Text>
-          
           <View style={styles.scanBox}>
-            {/* Main image/icon */}
-            <Text style={styles.scanEmoji}>🗺️</Text>
+            {/* Animated icon carousel INSIDE the scan box */}
+            <View style={styles.iconCarouselWrapper}>
+              <Animated.View 
+                style={[
+                  styles.iconCarousel,
+                  {
+                    transform: [{
+                      translateX: iconScrollAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [
+                          ACTIVITY_ICONS.length * 90, // Start far right (outside)
+                          -ACTIVITY_ICONS.length * 90  // End far left (outside)
+                        ],
+                      })
+                    }]
+                  }
+                ]}
+              >
+                {/* Render icons 4x for perfect seamless loop */}
+                {[...ACTIVITY_ICONS, ...ACTIVITY_ICONS, ...ACTIVITY_ICONS, ...ACTIVITY_ICONS].map((iconUrl, index) => (
+                  <Image
+                    key={`icon-${index}`}
+                    source={{ uri: iconUrl }}
+                    style={styles.activityIcon}
+                  />
+                ))}
+              </Animated.View>
+            </View>
             
             {/* Scanning line animation */}
             <Animated.View 
@@ -539,8 +558,6 @@ export default function SharedContentScreen() {
             <View style={[styles.scanCorner, styles.scanCornerBL]} />
             <View style={[styles.scanCorner, styles.scanCornerBR]} />
           </View>
-          
-          <Text style={styles.emojiRight}>🎭</Text>
         </View>
 
         {/* Progress bar */}
@@ -562,7 +579,7 @@ export default function SharedContentScreen() {
         </View>
 
         {/* Status text */}
-        <Text style={styles.detectingText}>Detecting....</Text>
+        <Text style={styles.detectingText}>Analyzing video & finding activities...</Text>
       </View>
     );
   }
@@ -924,27 +941,36 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_800ExtraBold',
   },
   scanContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
     marginBottom: 40,
   },
-  emojiLeft: {
-    fontSize: 40,
-  },
-  emojiRight: {
-    fontSize: 40,
-  },
   scanBox: {
-    width: 140,
-    height: 140,
+    width: 180,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'visible', // Allow icons to be visible outside the box
   },
-  scanEmoji: {
-    fontSize: 70,
+  iconCarouselWrapper: {
+    position: 'absolute',
+    width: '300%', // Extended to allow icons to start outside and exit
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    left: '-100%', // Center the extended wrapper
+    overflow: 'visible', // Allow icons to be visible outside scanBox
+  },
+  iconCarousel: {
+    flexDirection: 'row',
+    gap: 20,
+    alignItems: 'center',
+  },
+  activityIcon: {
+    width: 70,
+    height: 70,
   },
   scanLine: {
     position: 'absolute',

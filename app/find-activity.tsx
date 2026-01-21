@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, MapPin, ChevronDown, Heart, Star } from 'lucide-react-native';
+import { Image as ExpoImage } from 'expo-image';
 import * as Linking from 'expo-linking';
 import colors from '@/constants/colors';
 import api from '@/services/api';
@@ -23,6 +24,7 @@ interface Experience {
   price: number;
   currency: string;
   duration?: string;
+  images?: string[];
   imageUrl?: string;
   image_url?: string;
   productUrl?: string;
@@ -56,28 +58,32 @@ export default function FindActivityScreen() {
   const instagramUrl = params.instagramUrl as string;
   const thumbnailUrl = params.thumbnail as string;
   
+  // Check if data was passed from shared-content
+  const preloadedExperiences = params.experiences ? JSON.parse(params.experiences as string) : null;
+  const preloadedAnalysis = params.analysis ? JSON.parse(params.analysis as string) : null;
+  
   const [userLocation, setUserLocation] = useState('Lisboa');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const [experiences, setExperiences] = useState<Experience[]>([]);
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []);
+  const [analysis, setAnalysis] = useState<Analysis | null>(preloadedAnalysis);
+  const [loading, setLoading] = useState(false); // Never show loading - data must be preloaded
+  const [hasAnalyzed, setHasAnalyzed] = useState(!!preloadedExperiences);
   const [favorites, setFavorites] = useState<Set<string | number>>(new Set());
   
   const cities = ['Lisboa', 'Porto', 'Barcelona', 'Madrid', 'Paris', 'London', 'Rome', 'Amsterdam'];
   
   console.log('🎯 Find Activity params:', params);
+  console.log('📦 Preloaded experiences:', preloadedExperiences?.length);
+  console.log('📊 Preloaded analysis:', preloadedAnalysis);
   
-  // Initial analysis on mount
+  // Only fetch if no preloaded data - but DON'T navigate back, just fetch
   useEffect(() => {
-    if (instagramUrl && !hasAnalyzed) {
-      console.log('🎬 First time: analyzing video...');
-      fetchRecommendations();
-    } else if (!instagramUrl) {
-      console.error('❌ No Instagram URL provided!');
-      setLoading(false);
+    if (!preloadedExperiences && instagramUrl) {
+      console.log('⚠️ No preloaded data, but we have URL - will fetch on location change');
+      // Don't navigate back - user came here intentionally
+      // Data will be fetched when location changes or on mount via fetchRecommendations
     }
-  }, [instagramUrl]);
+  }, []);
   
   // Re-fetch experiences when location changes (but don't re-analyze)
   useEffect(() => {
@@ -210,8 +216,13 @@ export default function FindActivityScreen() {
       
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B00" />
-          <Text style={styles.loadingText}>Analyzing video & finding activities...</Text>
+          <Text style={styles.emptyText}>Loading...</Text>
+        </View>
+      ) : !analysis || experiences.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
+            No experiences found. Please try again.
+          </Text>
         </View>
       ) : (
         <ScrollView 
@@ -219,11 +230,25 @@ export default function FindActivityScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Instagram Video Thumbnail - Large at top (centered, rounded) */}
+          {thumbnailUrl && (
+            <View style={styles.videoSection}>
+              <Image
+                source={{ uri: thumbnailUrl }}
+                style={styles.videoThumbnail}
+                resizeMode="cover"
+              />
+            </View>
+          )}
+
+          {/* Instagram source label */}
+          <Text style={styles.savedFromInstagram}>Saved from Instagram</Text>
+          
           {/* Activity Detection Title */}
           {analysis && (
             <View style={styles.titleSection}>
               <Text style={styles.titleText}>
-                We detected <Text style={styles.titleBold}>{analysis.activity}</Text> in this reel!
+                We detected <Text style={styles.titleBold}>{analysis.activity}</Text> in this reel
               </Text>
             </View>
           )}
@@ -234,9 +259,9 @@ export default function FindActivityScreen() {
               style={styles.locationDropdown}
               onPress={() => setShowLocationPicker(!showLocationPicker)}
             >
-              <MapPin size={16} color="#666" />
-              <Text style={styles.locationText}>Nearby - {userLocation}</Text>
-              <ChevronDown size={16} color="#666" />
+              <MapPin size={18} color="#666" />
+              <Text style={styles.locationText}>Nearby</Text>
+              <ChevronDown size={18} color="#666" />
             </Pressable>
             
             {/* Location Picker Modal */}
@@ -269,16 +294,41 @@ export default function FindActivityScreen() {
               </Text>
             </View>
           ) : (
-            experiences.map((experience, index) => (
+            experiences.map((experience, index) => {
+              // Get correct image URL
+              const getImageUrl = () => {
+                if (experience.source === 'database') {
+                  // Database: images is an array - use first image
+                  if (experience.images && Array.isArray(experience.images) && experience.images.length > 0) {
+                    console.log(`✅ Using image from DB array for ${experience.title}:`, experience.images[0]);
+                    return experience.images[0];
+                  }
+                  // Fallback to image_url if images array is empty
+                  if (experience.image_url) {
+                    console.log(`⚠️ Using image_url fallback for ${experience.title}:`, experience.image_url);
+                    return experience.image_url;
+                  }
+                } else {
+                  // Viator: use imageUrl
+                  return experience.imageUrl || experience.image_url;
+                }
+                console.warn(`❌ No image found for ${experience.title}`);
+                return null;
+              };
+              
+              const imageUrl = getImageUrl();
+              
+              return (
               <Pressable
                 key={`${experience.source}-${experience.id}-${index}`}
                 style={styles.experienceCard}
                 onPress={() => handleExperiencePress(experience)}
               >
-                <View style={styles.cardImageContainer}>
-                  {(experience.imageUrl || experience.image_url) ? (
+                {/* Image on the left */}
+                <View style={styles.cardImageWrapper}>
+                  {imageUrl ? (
                     <Image
-                      source={{ uri: experience.imageUrl || experience.image_url }}
+                      source={{ uri: imageUrl }}
                       style={styles.cardImage}
                       resizeMode="cover"
                     />
@@ -287,37 +337,35 @@ export default function FindActivityScreen() {
                       <Text style={styles.placeholderEmoji}>🏄</Text>
                     </View>
                   )}
-                  <Pressable
-                    style={styles.favoriteButton}
-                    onPress={() => toggleFavorite(experience.id)}
-                  >
-                    <Heart
-                      size={20}
-                      color={favorites.has(experience.id) ? '#FF6B00' : '#fff'}
-                      fill={favorites.has(experience.id) ? '#FF6B00' : 'transparent'}
-                    />
-                  </Pressable>
                 </View>
                 
+                {/* Content on the right */}
                 <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>
-                    {experience.title}
-                  </Text>
-                  
-                  <View style={styles.cardLocation}>
-                    <MapPin size={14} color="#999" />
-                    <Text style={styles.cardLocationText}>{experience.location}</Text>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {experience.title}
+                    </Text>
+                    <Pressable
+                      style={styles.favoriteButton}
+                      onPress={() => toggleFavorite(experience.id)}
+                    >
+                      <Heart
+                        size={20}
+                        color={favorites.has(experience.id) ? '#FF6B00' : '#ccc'}
+                        fill={favorites.has(experience.id) ? '#FF6B00' : 'transparent'}
+                      />
+                    </Pressable>
                   </View>
                   
-                  <View style={styles.cardBottom}>
-                    <View style={styles.cardPriceRow}>
-                      <Text style={styles.cardPrice}>
-                        {experience.currency === 'EUR' ? '€' : '$'}{experience.price}
-                      </Text>
-                      {experience.duration && (
-                        <Text style={styles.cardDuration}>• {experience.duration}</Text>
-                      )}
-                    </View>
+                  <View style={styles.cardLocation}>
+                    <MapPin size={12} color="#999" />
+                    <Text style={styles.cardLocationText} numberOfLines={1}>{experience.location}</Text>
+                  </View>
+                  
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.cardPrice}>
+                      {experience.price}€
+                    </Text>
                     
                     {(experience.rating || 0) > 0 && (
                       <View style={styles.cardRating}>
@@ -325,22 +373,14 @@ export default function FindActivityScreen() {
                         <Text style={styles.cardRatingText}>
                           {(experience.rating || 0).toFixed(1)}
                         </Text>
-                        {(experience.reviewCount || experience.review_count) && (
-                          <Text style={styles.cardReviewCount}>
-                            ({experience.reviewCount || experience.review_count})
-                          </Text>
-                        )}
+                        <Text style={styles.cardRatingLabel}>stars</Text>
                       </View>
                     )}
                   </View>
-                  
-                  {/* Source indicator (subtle) */}
-                  <Text style={styles.sourceText}>
-                    {experience.source === 'database' ? '✓ Bored App' : '⚡ Viator'}
-                  </Text>
                 </View>
               </Pressable>
-            ))
+            );
+            })
           )}
         </ScrollView>
       )}
@@ -408,41 +448,65 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+    alignItems: 'center',
+  },
+  videoSection: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+  videoThumbnail: {
+    width: 140,
+    height: 200,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+  },
+  savedFromInstagram: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 16,
   },
   titleSection: {
     paddingHorizontal: 20,
-    paddingTop: 24,
     paddingBottom: 16,
+    width: '100%',
   },
   titleText: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#333',
-    lineHeight: 32,
+    lineHeight: 36,
+    textAlign: 'center',
+    fontWeight: '400',
   },
   titleBold: {
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#000',
   },
   locationSection: {
     paddingHorizontal: 20,
     paddingBottom: 16,
+    width: '100%',
+    alignItems: 'center',
   },
   locationDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
     backgroundColor: '#f5f5f5',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    alignSelf: 'flex-start',
+    minWidth: 160,
+    justifyContent: 'center',
   },
   locationText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#333',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   locationPicker: {
     marginTop: 8,
@@ -494,21 +558,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   experienceCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 12,
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
     backgroundColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
     overflow: 'hidden',
+    padding: 12,
   },
-  cardImageContainer: {
-    position: 'relative',
-    width: '100%',
-    height: 180,
+  cardImageWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
   },
   cardImage: {
     width: '100%',
@@ -520,76 +588,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   placeholderEmoji: {
-    fontSize: 48,
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontSize: 32,
   },
   cardContent: {
-    padding: 16,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 8,
-    lineHeight: 24,
+    flex: 1,
+    marginRight: 8,
+    lineHeight: 20,
+  },
+  favoriteButton: {
+    padding: 4,
   },
   cardLocation: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   cardLocationText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
+    flex: 1,
   },
-  cardBottom: {
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
+    marginTop: 4,
   },
   cardPrice: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#000',
-  },
-  cardDuration: {
-    fontSize: 14,
-    color: '#666',
   },
   cardRating: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   cardRatingText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#000',
   },
-  cardReviewCount: {
-    fontSize: 12,
+  cardRatingLabel: {
+    fontSize: 13,
     color: '#999',
-  },
-  sourceText: {
-    fontSize: 11,
-    color: '#999',
-    fontStyle: 'italic',
   },
 });
