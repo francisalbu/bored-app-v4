@@ -55,6 +55,12 @@ router.post('/', async (req, res) => {
         TARGET_COUNT
       );
       
+      // Mark all DB experiences with source field
+      experiences = experiences.map(exp => ({
+        ...exp,
+        source: 'database'
+      }));
+      
       // CRITICAL: Always fetch Viator for user's location
       // Use user's city (not video location) because we need local experiences
       const viatorPromise = viatorService.smartSearch(
@@ -106,6 +112,12 @@ router.post('/', async (req, res) => {
       );
       
       [experiences, viatorExperiences] = await Promise.all([dbPromise, viatorPromise]);
+      
+      // Mark all DB experiences with source field
+      experiences = experiences.map(exp => ({
+        ...exp,
+        source: 'database'
+      }));
       
       // Complete to 5 with Viator if needed
       if (experiences.length < TARGET_COUNT) {

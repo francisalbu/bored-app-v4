@@ -61,20 +61,31 @@ export default function FindActivityScreen() {
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [favorites, setFavorites] = useState<Set<string | number>>(new Set());
   
   const cities = ['Lisboa', 'Porto', 'Barcelona', 'Madrid', 'Paris', 'London', 'Rome', 'Amsterdam'];
   
   console.log('🎯 Find Activity params:', params);
   
+  // Initial analysis on mount
   useEffect(() => {
-    if (instagramUrl) {
+    if (instagramUrl && !hasAnalyzed) {
+      console.log('🎬 First time: analyzing video...');
       fetchRecommendations();
-    } else {
+    } else if (!instagramUrl) {
       console.error('❌ No Instagram URL provided!');
       setLoading(false);
     }
-  }, [instagramUrl, userLocation]);
+  }, [instagramUrl]);
+  
+  // Re-fetch experiences when location changes (but don't re-analyze)
+  useEffect(() => {
+    if (hasAnalyzed && analysis) {
+      console.log('📍 Location changed to:', userLocation, '- fetching new experiences...');
+      fetchRecommendations();
+    }
+  }, [userLocation]);
   
   const fetchRecommendations = async () => {
     if (!instagramUrl) {
@@ -97,9 +108,16 @@ export default function FindActivityScreen() {
       console.log('📦 Recommendations Response:', response.data);
       
       if (response.data && response.data.experiences) {
-        console.log('✅ Success! Experiences:', response.data.experiences);
+        console.log('✅ Success! Experiences:', response.data.experiences.length);
+        
+        // Debug: log sources
+        response.data.experiences.forEach((exp, i) => {
+          console.log(`   ${i+1}. ${exp.title} - source: ${exp.source}`);
+        });
+        
         setAnalysis(response.data.analysis);
         setExperiences(response.data.experiences);
+        setHasAnalyzed(true);
       } else {
         console.log('❌ No experiences in response');
         setExperiences([]);
@@ -125,8 +143,11 @@ export default function FindActivityScreen() {
   };
   
   const handleExperiencePress = async (experience: Experience) => {
+    console.log('🎯 Experience pressed:', experience.title, 'source:', experience.source);
+    
     // Navigate to experience details
     if (experience.source === 'database') {
+      console.log('✅ Opening database experience in app:', experience.id);
       router.push(`/experience/${experience.id}`);
     } else {
       // For Viator experiences, open in browser
@@ -141,6 +162,7 @@ export default function FindActivityScreen() {
         }
       } else {
         console.error('No product URL for Viator experience');
+      }
       }
     }
   };
