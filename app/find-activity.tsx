@@ -88,24 +88,38 @@ export default function FindActivityScreen() {
   }, [userLocation]);
   
   const fetchRecommendations = async () => {
-    if (!instagramUrl) {
-      console.error('❌ Cannot fetch: instagramUrl is undefined');
+    if (!instagramUrl && !analysis) {
+      console.error('❌ Cannot fetch: no instagramUrl or analysis');
       setLoading(false);
       return;
     }
     
-    console.log('🔍 Fetching recommendations for:', instagramUrl);
-    console.log('📍 User location:', userLocation);
+    console.log('🔍 Fetching recommendations...');
+    console.log('   Has analyzed:', hasAnalyzed);
+    console.log('   User location:', userLocation);
     
     try {
       setLoading(true);
       
-      const response = await api.post<ApiResponse>('/experience-recommendations', {
-        instagramUrl: instagramUrl,
-        userLocation: userLocation
-      });
+      let response;
       
-      console.log('📦 Recommendations Response:', response.data);
+      if (hasAnalyzed && analysis) {
+        // Already analyzed - just search by activity in new location
+        console.log('⚡ Using existing analysis, searching by activity only');
+        response = await api.post('/experience-recommendations/by-activity', {
+          activity: analysis.activity,
+          userLocation: userLocation
+        });
+      } else {
+        // First time - analyze video
+        console.log('🎬 First time: analyzing video...');
+        response = await api.post<ApiResponse>('/experience-recommendations', {
+          instagramUrl: instagramUrl,
+          userLocation: userLocation
+        });
+      }
+      
+      console.log('📦 Response:', response.data);
       
       if (response.data && response.data.experiences) {
         console.log('✅ Success! Experiences:', response.data.experiences.length);
@@ -115,7 +129,11 @@ export default function FindActivityScreen() {
           console.log(`   ${i+1}. ${exp.title} - source: ${exp.source}`);
         });
         
-        setAnalysis(response.data.analysis);
+        // Set analysis only on first fetch
+        if (response.data.analysis) {
+          setAnalysis(response.data.analysis);
+        }
+        
         setExperiences(response.data.experiences);
         setHasAnalyzed(true);
       } else {
@@ -162,7 +180,6 @@ export default function FindActivityScreen() {
         }
       } else {
         console.error('No product URL for Viator experience');
-      }
       }
     }
   };

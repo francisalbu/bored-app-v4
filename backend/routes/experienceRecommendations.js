@@ -161,4 +161,83 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/experience-recommendations/by-activity
+ * Search experiences by activity and location WITHOUT re-analyzing video
+ * 
+ * Body: { activity: string, userLocation: string }
+ */
+router.post('/by-activity', async (req, res) => {
+  try {
+    const { activity, userLocation } = req.body;
+    
+    if (!activity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Activity is required'
+      });
+    }
+    
+    const userCity = userLocation || 'Lisbon';
+    
+    console.log('🔍 Searching experiences by activity...');
+    console.log('   Activity:', activity);
+    console.log('   Location:', userCity);
+    
+    const TARGET_COUNT = 5;
+    let experiences = [];
+    
+    // Get from our DB
+    experiences = await Experience.findSimilarActivities(
+      activity,
+      userCity,
+      TARGET_COUNT
+    );
+    
+    // Mark all DB experiences with source field
+    experiences = experiences.map(exp => ({
+      ...exp,
+      source: 'database'
+    }));
+    
+    // Get from Viator
+    const viatorExperiences = await viatorService.smartSearch(
+      activity,
+      userCity,
+      'EUR',
+      TARGET_COUNT
+    );
+    
+    // Combine: DB first, complete with Viator to reach 5 total
+    if (experiences.length >= TARGET_COUNT) {
+      experiences = experiences.slice(0, TARGET_COUNT);
+    } else {
+      const needed = TARGET_COUNT - experiences.length;
+      const viatorToAdd = viatorExperiences.slice(0, needed);
+      experiences = [...experiences, ...viatorToAdd];
+    }
+    
+    console.log(`✅ Found ${experiences.length} experiences (${experiences.filter(e => e.source === 'database').length} DB + ${experiences.filter(e => e.source === 'viator').length} Viator)`);
+    
+    res.json({
+      success: true,
+      data: {
+        experiences: experiences.slice(0, TARGET_COUNT),
+        sources: {
+          database: experiences.filter(e => e.source === 'database').length,
+          viator: experiences.filter(e => e.source === 'viator').length
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error searching by activity:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error searching experiences',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
