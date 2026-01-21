@@ -1,17 +1,17 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
 
+// Load environment variables if not already loaded
+if (!process.env.VIATOR_API_KEY) {
+  require('dotenv').config();
+}
+
 class ViatorService {
   constructor() {
     this.apiKey = process.env.VIATOR_API_KEY;
-    this.baseUrl = process.env.VIATOR_API_URL || 'https://api.viator.com/partner';
-    this.sandboxUrl = 'https://api.sandbox.viator.com/partner';
+    this.apiUrl = 'https://api.viator.com/partner';
     
-    // Use sandbox if no API key (development) or if explicitly set
-    this.isProduction = this.apiKey && !process.env.VIATOR_USE_SANDBOX;
-    this.apiUrl = this.isProduction ? this.baseUrl : this.sandboxUrl;
-    
-    logger.info(`ViatorService initialized - Mode: ${this.isProduction ? 'PRODUCTION' : 'SANDBOX'}`);
+    logger.info(`ViatorService initialized - API Key: ${this.apiKey ? '✓' : '✗'}`);
   }
 
   /**
@@ -285,9 +285,7 @@ class ViatorService {
   }
 
   /**
-   * Search with smart fallback:
-   * 1. Try by destination ID if location is provided
-   * 2. Fallback to free text search
+   * Search with smart fallback - use free text search instead
    */
   async smartSearch(activity, location, currency = 'EUR', maxResults = 5) {
     if (!this.apiKey) {
@@ -295,20 +293,60 @@ class ViatorService {
       return [];
     }
 
-    // If location provided, try to get destination ID first
-    if (location) {
-      const destinationId = await this.getDestinationId(location);
-      if (destinationId) {
-        logger.info(`Found Viator destination ID ${destinationId} for "${location}"`);
-        const results = await this.searchByDestinationId(destinationId, activity, currency, maxResults);
-        if (results.length > 0) {
-          return results;
+    try {
+      // Use /search/freetext endpoint - more flexible
+      const searchTerm = location ? `${activity} ${location}` : activity;
+      
+      const response = await axios.post(
+        `${this.apiUrl}/search/freetext`,
+        {
+          searchTerm: searchTerm,
+          searchTypes: [
+            {
+              searchType: 'PRODUCTS',
+              pagination: {
+                start: 1,
+                count: maxResults
+              }
+            }
+          ],
+          productFiltering: {
+            includeAutomaticTranslations: true
+          },
+          currency: currency
+        },
+        {
+          headers: {
+            'exp-api-key': this.apiKey,
+            'Accept': 'application/json;version=2.0',
+            'Accept-Language': 'en-US',
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
         }
-      }
-    }
+      );
 
-    // Fallback: search by location name directly
-    return await this.searchProducts(activity, location, currency, maxResults);
+      if (!response.data?.products?.results) {
+        logger.info('Viator free text search returned no products');
+        return [];
+      }
+
+      const products = response.data.products.results;
+      logger.info(`Viator found ${products.length} products for "${searchTerm}"`);
+
+      return this.transformViatorProducts(products, activity);
+
+    } catch (error) {
+      if (error.response) {
+        logger.error('Viator free text search error:', {
+          status: error.response.status,
+          message: error.response.data?.message || error.message
+        });
+      } else {
+        logger.error('Viator search error:', error.message);
+      }
+      return [];
+    }
   }
 }
 
