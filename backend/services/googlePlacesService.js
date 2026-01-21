@@ -123,6 +123,31 @@ class GooglePlacesService {
     console.log(`✅ Enriched ${enrichedPOIs.length}/${poiNames.length} POIs`);
     return enrichedPOIs;
   }
+
+  /**
+   * Autocomplete city search
+   * @param {string} input - User input for city search
+   * @returns {Object} Autocomplete predictions
+   */
+  async autocompleteCity(input) {
+    try {
+      const apiKey = this.getApiKey();
+      console.log(`🔍 Autocomplete search for: "${input}"`);
+      
+      const response = await axios.get(`${this.baseUrl}/autocomplete/json`, {
+        params: {
+          input: input,
+          types: '(cities)',
+          key: apiKey
+        }
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error in autocomplete:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = new GooglePlacesService();

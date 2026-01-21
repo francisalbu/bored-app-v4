@@ -106,6 +106,7 @@ export default function SpotResultScreen() {
           description: poi.description,
           google_types: poi.types,
           opening_hours: poi.opening_hours,
+          region: null,
           activities: [{
             title: `Visit ${poi.spot_name}`,
             description: poi.description || `Explore ${poi.spot_name}`,
