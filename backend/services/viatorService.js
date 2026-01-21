@@ -184,13 +184,36 @@ class ViatorService {
         rating: product.reviews?.combinedAverageRating || 0,
         reviewCount: product.reviews?.totalReviews || 0,
         
-        // Booking
-        productUrl: product.productUrl || null,
+        // Booking - add affiliate tracking parameters
+        productUrl: this.addAffiliateParams(product.productUrl),
         
         // Additional metadata
         tags: product.tags || [],
         flags: product.flags || []
       }));
+  }
+
+  /**
+   * Add affiliate tracking parameters to Viator product URLs
+   * Partner ID: P00285354
+   * Marketing Campaign ID: 42383
+   */
+  addAffiliateParams(productUrl) {
+    if (!productUrl) return null;
+    
+    try {
+      const url = new URL(productUrl);
+      
+      // Add affiliate parameters
+      url.searchParams.set('pid', 'P00285354');
+      url.searchParams.set('mcid', '42383');
+      url.searchParams.set('medium', 'link');
+      
+      return url.toString();
+    } catch (error) {
+      logger.warn('Failed to add affiliate params to URL:', productUrl);
+      return productUrl; // Return original if parsing fails
+    }
   }
 
   /**
