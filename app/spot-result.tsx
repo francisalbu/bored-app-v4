@@ -234,28 +234,37 @@ export default function SpotResultScreen() {
                 <Text style={styles.poiDescription} numberOfLines={2}>
                   {poi.description || `${poi.spot_name} is located in ${poi.city}${poi.country && poi.city !== poi.country ? `, ${poi.country}` : ''}.`}
                 </Text>
-                
-                {/* Activity Detection - if this is an experience/activity */}
-                {poi.isActivity && (
-                  <View style={styles.activitySection}>
-                    <Text style={styles.activityDetectedText}>
-                      We detected <Text style={styles.activityName}>{poi.activity}</Text> in this reel!
-                    </Text>
-                    <Pressable 
-                      style={styles.activityButton}
-                      onPress={(e) => {
-                        e.stopPropagation(); // Prevent card selection
-                        router.push(`/find-activity?activity=${encodeURIComponent(poi.activity)}`);
-                      }}
-                    >
-                      <Text style={styles.activityButtonText}>🔍 Find this activity in my city</Text>
-                    </Pressable>
-                  </View>
-                )}
               </View>
             </Pressable>
           );
         })}
+
+        {/* Activity Detection Section - Positioned AFTER the POIs list */}
+        {activity && (
+          <View style={styles.activityDetectionContainer}>
+            <Text style={styles.activityDetectedText}>
+              We detected <Text style={styles.activityName}>{activity}</Text> in this reel!
+            </Text>
+            <Pressable 
+              style={styles.activityButton}
+              onPress={() => {
+                // Navigate to find activity screen with analysis data
+                router.push({
+                  pathname: '/find-activity',
+                  params: {
+                    instagramUrl: instagramUrl,
+                    thumbnail: thumbnailUrl,
+                    activity: activity,
+                    location: location,
+                    confidence: confidence
+                  }
+                });
+              }}
+            >
+              <Text style={styles.activityButtonText}>🔍 Find this activity in my city</Text>
+            </Pressable>
+          </View>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -421,16 +430,17 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
   },
-  activitySection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+  // Activity Detection Section (after POI list)
+  activityDetectionContainer: {
+    backgroundColor: '#fff',
+    marginTop: 8,
+    padding: 24,
+    alignItems: 'center',
   },
   activityDetectedText: {
-    fontSize: 15,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 12,
+    marginBottom: 16,
     textAlign: 'center',
   },
   activityName: {
@@ -438,17 +448,17 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   activityButton: {
-    marginTop: 0,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: colors.dark.primary, // Yellow/lime for attention (#CFFF04)
-    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    backgroundColor: colors.dark.primary, // Yellow/lime (#CFFF04)
+    borderRadius: 50,
     alignSelf: 'stretch',
+    maxWidth: 400,
   },
   activityButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#000', // Black text on yellow
+    color: '#000',
     textAlign: 'center',
   },
   saveButtonContainer: {

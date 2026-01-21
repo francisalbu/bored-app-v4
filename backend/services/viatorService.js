@@ -176,8 +176,8 @@ class ViatorService {
         // Location - use extracted location or fallback to search location
         location: this.extractLocation(product, searchLocation),
         
-        // Media
-        image: product.images?.[0]?.variants?.[0]?.url || null,
+        // Media - use imageUrl for consistency with frontend
+        imageUrl: product.images?.[0]?.variants?.[0]?.url || null,
         images: product.images?.map(img => img.variants?.[0]?.url).filter(Boolean) || [],
         
         // Rating

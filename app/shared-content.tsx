@@ -436,26 +436,40 @@ export default function SharedContentScreen() {
               matchedKeywords: smartMatchResult.matchMethod === 'suggested' ? ['suggested'] : ['ai-matched'],
             }});
             
-            setSocialMetadata(smartMatchResult.metadata);
-            setMatchedExperiences(matches);
-            setMatchMethod(smartMatchResult.matchMethod);
-            setAnalyzing(false);
+            // Navigate directly to find-activity screen with Instagram URL
+            console.log('🎯 Navigating to find-activity with URL:', url);
+            router.replace({
+              pathname: '/find-activity',
+              params: {
+                instagramUrl: url,
+                thumbnail: smartMatchResult.metadata?.thumbnail_url || '',
+              }
+            });
             return;
           }
         }
         
-        // No fallback - if AI match fails, show empty state
-        // The user can try again or go back
-        setMatchedExperiences([]);
-        setMatchMethod('none');
+        // No fallback - if AI match fails or not social media, navigate to find-activity anyway
+        console.log('🎯 No matches found, but navigating to find-activity with URL:', url);
+        router.replace({
+          pathname: '/find-activity',
+          params: {
+            instagramUrl: url || text || '',
+            thumbnail: '',
+          }
+        });
         
       } catch (error) {
         console.error('Error processing shared content:', error);
-        // No fallback on error - show empty state
-        setMatchedExperiences([]);
-        setMatchMethod('none');
-      } finally {
-        setAnalyzing(false);
+        // On error, still try to navigate to find-activity
+        console.log('❌ Error occurred, but navigating to find-activity');
+        router.replace({
+          pathname: '/find-activity',
+          params: {
+            instagramUrl: url || text || '',
+            thumbnail: '',
+          }
+        });
       }
     };
     
