@@ -18,7 +18,7 @@ const Experience = require('../models/Experience');
  */
 router.post('/', async (req, res) => {
   try {
-    const { instagramUrl } = req.body;
+    const { instagramUrl, userLocation } = req.body;
     
     if (!instagramUrl) {
       return res.status(400).json({
@@ -27,7 +27,12 @@ router.post('/', async (req, res) => {
       });
     }
     
+    // User location (city name or coordinates)
+    // Examples: "Porto", "Barcelona", "Lisbon"
+    const userCity = userLocation?.city || userLocation || 'Lisbon';
+    
     console.log('🎯 Starting experience recommendation flow...');
+    console.log('📍 User location:', userCity);
     
     // 1. Analyze video (2-3 frames only)
     const analysis = await simpleVideoAnalyzer.analyzeVideo(instagramUrl);
@@ -37,43 +42,53 @@ router.post('/', async (req, res) => {
     let experiences = [];
     let viatorExperiences = [];
     let message = '';
-    const defaultCity = 'Lisbon';
+    const TARGET_COUNT = 5; // Always show 5 activities
     
     if (analysis.type === 'activity' && analysis.activity) {
       // Activity detected - find similar experiences in DB
       console.log(`🏄 Activity detected: ${analysis.activity}`);
       
+      // Get up to 5 from our DB (filtered by user's city)
       experiences = await Experience.findSimilarActivities(
         analysis.activity,
-        defaultCity,
-        5 // Get more from our DB
+        userCity,
+        TARGET_COUNT
       );
       
-      // Always try to fetch Viator results in parallel
+      // CRITICAL: Always fetch Viator for user's location
+      // Use user's city (not video location) because we need local experiences
       const viatorPromise = viatorService.smartSearch(
         analysis.activity,
-        analysis.location || defaultCity,
+        userCity, // ← User's city, not video location!
         'EUR',
-        5
+        TARGET_COUNT
       );
       
       viatorExperiences = await viatorPromise;
       
-      if (experiences.length > 0) {
-        // We have our own experiences - add 2-3 from Viator for variety
-        console.log(`✅ Found ${experiences.length} in our DB + ${viatorExperiences.length} from Viator`);
+      if (experiences.length >= TARGET_COUNT) {
+        // We have enough from our DB - use only ours
+        console.log(`✅ Found ${experiences.length} in our DB (enough)`);
+        experiences = experiences.slice(0, TARGET_COUNT);
+        message = `We found ${TARGET_COUNT} ${analysis.activity} experiences near you!`;
         
-        const viatorToAdd = viatorExperiences.slice(0, 2);
+      } else if (experiences.length > 0) {
+        // We have some, but not enough - complete with Viator
+        const needed = TARGET_COUNT - experiences.length;
+        console.log(`✅ Found ${experiences.length} in our DB, adding ${needed} from Viator`);
+        
+        const viatorToAdd = viatorExperiences.slice(0, needed);
         experiences = [...experiences, ...viatorToAdd];
         
         message = `We found ${experiences.length} ${analysis.activity} experiences for you!`;
+        
       } else {
         // No results in our DB - use Viator as fallback
         console.log(`🌐 No results in DB - using ${viatorExperiences.length} Viator experiences as fallback`);
         
-        experiences = viatorExperiences;
-        message = viatorExperiences.length > 0
-          ? `We found ${viatorExperiences.length} ${analysis.activity} experiences from our partners!`
+        experiences = viatorExperiences.slice(0, TARGET_COUNT);
+        message = experiences.length > 0
+          ? `We found ${experiences.length} ${analysis.activity} experiences from our partners!`
           : `No ${analysis.activity} experiences found. Try a different activity!`;
       }
       
@@ -81,25 +96,30 @@ router.post('/', async (req, res) => {
       // Landscape detected - suggest generic activities
       console.log(`🏔️ Landscape detected: ${analysis.location}`);
       
-      // Get diverse activities from both sources
-      const dbPromise = Experience.getAllExperiences(5, 0);
+      // Get diverse activities from both sources (user's location!)
+      const dbPromise = Experience.getAllExperiences(TARGET_COUNT, 0);
       const viatorPromise = viatorService.smartSearch(
         'activities', // Generic search
-        analysis.location || defaultCity,
+        userCity, // ← User's city for local activities
         'EUR',
-        3
+        TARGET_COUNT
       );
       
       [experiences, viatorExperiences] = await Promise.all([dbPromise, viatorPromise]);
       
-      // Combine: our DB + Viator
-      experiences = [...experiences, ...viatorExperiences.slice(0, 2)];
+      // Complete to 5 with Viator if needed
+      if (experiences.length < TARGET_COUNT) {
+        const needed = TARGET_COUNT - experiences.length;
+        experiences = [...experiences, ...viatorExperiences.slice(0, needed)];
+      } else {
+        experiences = experiences.slice(0, TARGET_COUNT);
+      }
       
       message = `${analysis.location} looks amazing! Here are some activities you can do:`;
     }
     
-    // Deduplicate and limit to max 8 experiences
-    experiences = experiences.slice(0, 8);
+    // Ensure we always return exactly TARGET_COUNT (or less if unavailable)
+    experiences = experiences.slice(0, TARGET_COUNT);
     
     res.json({
       success: true,

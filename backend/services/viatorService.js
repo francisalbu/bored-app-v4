@@ -68,7 +68,7 @@ class ViatorService {
       logger.info(`Viator API returned ${products.length} products for activity "${activity}" in "${location}"`);
 
       // Transform Viator products to our format
-      return this.transformViatorProducts(products, activity);
+      return this.transformViatorProducts(products, activity, location);
 
     } catch (error) {
       if (error.response) {
@@ -141,7 +141,7 @@ class ViatorService {
         return [];
       }
 
-      return this.transformViatorProducts(response.data.products, activity);
+      return this.transformViatorProducts(response.data.products, activity, destinationId);
 
     } catch (error) {
       logger.error('Viator searchByDestinationId error:', error.message);
@@ -152,14 +152,11 @@ class ViatorService {
   /**
    * Transform Viator product format to our experience format
    */
-  transformViatorProducts(viatorProducts, activity) {
-    return viatorProducts
-      .filter(product => {
-        // Filter by activity relevance in title/description
-        const searchText = `${product.title} ${product.description || ''}`.toLowerCase();
-        return searchText.includes(activity.toLowerCase());
-      })
-      .map(product => ({
+  transformViatorProducts(viatorProducts, activity, searchLocation = null) {
+    // Note: We don't filter here because Viator's search already does semantic matching
+    // Their API is smart enough to return relevant results for "food tour" even if
+    // the product is called "Culinary Experience" or "Tapas Tasting"
+    return viatorProducts.map(product => ({
         // Mark as external source
         id: `viator_${product.productCode}`,
         source: 'viator',
@@ -176,8 +173,8 @@ class ViatorService {
         // Duration
         duration: this.formatDuration(product.duration),
         
-        // Location
-        location: this.extractLocation(product),
+        // Location - use extracted location or fallback to search location
+        location: this.extractLocation(product, searchLocation),
         
         // Media
         image: product.images?.[0]?.variants?.[0]?.url || null,
@@ -225,22 +222,47 @@ class ViatorService {
   }
 
   /**
-   * Extract location from Viator product
+   * Extract location from Viator product in format "City, Country"
+   * @param {object} product - Viator product object
+   * @param {string} searchLocation - Fallback location used in search
    */
-  extractLocation(product) {
+  extractLocation(product, searchLocation = null) {
+    // Try to build "City, Country" format
+    let city = null;
+    let country = null;
+    
     // Try logistics redemption location first
     if (product.logistics?.redemption?.[0]?.location?.name) {
-      return product.logistics.redemption[0].location.name;
+      city = product.logistics.redemption[0].location.name;
     }
     
-    // Try traveler pickup
-    if (product.logistics?.travelerPickup?.locations?.[0]?.name) {
-      return product.logistics.travelerPickup.locations[0].name;
+    // Try traveler pickup as fallback
+    if (!city && product.logistics?.travelerPickup?.locations?.[0]?.name) {
+      city = product.logistics.travelerPickup.locations[0].name;
     }
     
-    // Try destination
-    if (product.destinations?.[0]?.destinationName) {
-      return product.destinations[0].destinationName;
+    // Try destination for city/country info
+    if (product.destinations?.[0]) {
+      const dest = product.destinations[0];
+      if (!city && dest.destinationName) {
+        city = dest.destinationName;
+      }
+      // Try to get country from parent destination
+      if (dest.parentDestinationName) {
+        country = dest.parentDestinationName;
+      }
+    }
+    
+    // Format as "City, Country" if we have both
+    if (city && country) {
+      return `${city}, ${country}`;
+    } else if (city) {
+      return city;
+    }
+    
+    // FALLBACK: Use the search location if provided
+    if (searchLocation) {
+      return searchLocation;
     }
     
     return 'Location varies';
@@ -334,7 +356,7 @@ class ViatorService {
       const products = response.data.products.results;
       logger.info(`Viator found ${products.length} products for "${searchTerm}"`);
 
-      return this.transformViatorProducts(products, activity);
+      return this.transformViatorProducts(products, activity, location);
 
     } catch (error) {
       if (error.response) {
