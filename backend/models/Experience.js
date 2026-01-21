@@ -405,8 +405,8 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         throw new Error('OpenAI API key not configured');
       }
     } catch (aiError) {
-      // Fallback to simple text matching
-      console.log('⚠️ AI matching failed, using text search:', aiError.message);
+      // Fallback to STRICT text matching - curated experience!
+      console.log('⚠️ AI matching failed, using strict text search:', aiError.message);
       
       const searchTerm = activity.toLowerCase().trim();
       const scoredExperiences = allExperiences.map(exp => {
@@ -416,30 +416,51 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         const category = (exp.category || '').toLowerCase();
         const tags = (exp.tags || []).map(t => t.toLowerCase());
         
-        // Exact matches
-        if (title.includes(searchTerm)) score += 10;
-        if (category.includes(searchTerm)) score += 8;
-        if (tags.some(tag => tag.includes(searchTerm))) score += 7;
-        if (description.includes(searchTerm)) score += 5;
+        // STRICT MATCHING - High quality only!
+        // Title exact match (most important)
+        if (title.includes(searchTerm)) score += 50;
         
-        // Partial matches
+        // Category/Tag exact match (very important)
+        if (category.includes(searchTerm)) score += 40;
+        if (tags.some(tag => tag.includes(searchTerm))) score += 35;
+        
+        // Description match (less important)
+        if (description.includes(searchTerm)) score += 15;
+        
+        // Word-by-word matching (bonus for multi-word activities)
         const searchWords = searchTerm.split(' ');
         searchWords.forEach(word => {
           if (word.length > 3) {
-            if (title.includes(word)) score += 3;
-            if (category.includes(word)) score += 2;
+            if (title.includes(word)) score += 10;
+            if (category.includes(word)) score += 8;
+            if (tags.some(tag => tag.includes(word))) score += 7;
           }
         });
+        
+        // Penalty for irrelevant experiences
+        // If activity is "surfing" but exp has "tour" or "visit" without surf-related words
+        if (searchTerm === 'surfing' || searchTerm === 'surf') {
+          const hasIrrelevantWords = (title.includes('tour') || title.includes('visit')) && 
+                                    !title.includes('surf') && 
+                                    !description.includes('surf') &&
+                                    !description.includes('wave');
+          if (hasIrrelevantWords) score = Math.max(0, score - 30);
+        }
         
         return { ...exp, matchScore: score };
       });
       
+      // STRICT FILTER: Only return experiences with score >= 30 (strong match)
+      const MINIMUM_SCORE = 30;
       sortedExperiences = scoredExperiences
-        .filter(exp => exp.matchScore > 0)
+        .filter(exp => exp.matchScore >= MINIMUM_SCORE)
         .sort((a, b) => b.matchScore - a.matchScore)
         .slice(0, limit);
       
-      console.log(`✅ Text search found ${sortedExperiences.length} matches`);
+      console.log(`✅ Strict search found ${sortedExperiences.length} HIGH-QUALITY matches (min score: ${MINIMUM_SCORE})`);
+      if (sortedExperiences.length > 0) {
+        console.log('   Top matches:', sortedExperiences.map(e => `${e.title} (score: ${e.matchScore})`));
+      }
     }
     
     // Format and return

@@ -7,14 +7,18 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, MapPin, ChevronDown, Heart, Star } from 'lucide-react-native';
+import { X, MapPin, ChevronDown, Heart, Star, Search } from 'lucide-react-native';
 import { Image as ExpoImage } from 'expo-image';
 import * as Linking from 'expo-linking';
 import colors from '@/constants/colors';
 import api from '@/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Experience {
   id: string | number;
@@ -64,6 +68,8 @@ export default function FindActivityScreen() {
   
   const [userLocation, setUserLocation] = useState('Lisboa');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []);
   const [analysis, setAnalysis] = useState<Analysis | null>(preloadedAnalysis);
   const [loading, setLoading] = useState(false); // Never show loading - data must be preloaded
@@ -71,6 +77,72 @@ export default function FindActivityScreen() {
   const [favorites, setFavorites] = useState<Set<string | number>>(new Set());
   
   const cities = ['Lisboa', 'Porto', 'Barcelona', 'Madrid', 'Paris', 'London', 'Rome', 'Amsterdam'];
+  
+  // Popular destinations by activity - shown automatically!
+  const popularDestinations: { [key: string]: string[] } = {
+    // Water Sports
+    surfing: ['Peniche', 'Ericeira', 'Nazaré', 'Costa da Caparica', 'Carcavelos', 'Algarve'],
+    diving: ['Sesimbra', 'Berlengas', 'Madeira', 'Açores', 'Algarve'],
+    snorkeling: ['Sesimbra', 'Berlengas', 'Madeira', 'Açores', 'Algarve'],
+    sailing: ['Cascais', 'Sesimbra', 'Algarve', 'Lisboa', 'Porto'],
+    kayaking: ['Sesimbra', 'Arrábida', 'Peniche', 'Algarve', 'Gerês'],
+    paddleboarding: ['Cascais', 'Lisboa', 'Algarve', 'Porto', 'Peniche'],
+    kitesurfing: ['Costa da Caparica', 'Guincho', 'Algarve', 'Peniche'],
+    
+    // Mountain & Adventure
+    climbing: ['Sintra', 'Cascais', 'Monsanto', 'Arrábida', 'Gerês'],
+    hiking: ['Sintra', 'Arrábida', 'Gerês', 'Madeira', 'Açores', 'Serra da Estrela'],
+    skiing: ['Serra da Estrela', 'Spain (Pyrenees)', 'Andorra', 'Switzerland', 'Austria'],
+    snowboarding: ['Serra da Estrela', 'Spain (Pyrenees)', 'Andorra', 'Switzerland'],
+    mountaineering: ['Serra da Estrela', 'Gerês', 'Madeira', 'Swiss Alps'],
+    
+    // Cycling & Urban
+    cycling: ['Cascais', 'Lisboa', 'Porto', 'Algarve', 'Sintra', 'Alentejo'],
+    biking: ['Cascais', 'Lisboa', 'Porto', 'Algarve', 'Sintra', 'Alentejo'],
+    running: ['Lisboa', 'Porto', 'Cascais', 'Sintra', 'Algarve'],
+    
+    // Wellness & Culture
+    yoga: ['Lisboa', 'Porto', 'Algarve', 'Cascais', 'Sintra', 'Comporta'],
+    meditation: ['Sintra', 'Comporta', 'Alentejo', 'Gerês', 'Madeira'],
+    cooking: ['Lisboa', 'Porto', 'Sintra', 'Évora', 'Algarve'],
+    wine: ['Douro', 'Alentejo', 'Lisboa', 'Setúbal', 'Dão'],
+    
+    // Extreme Sports
+    paragliding: ['Madeira', 'Algarve', 'Sintra', 'Arrábida'],
+    skydiving: ['Algarve', 'Évora', 'Lisboa'],
+    bungee: ['Algarve', 'Porto', 'Lisboa'],
+    
+    // Nature & Wildlife
+    birdwatching: ['Algarve', 'Comporta', 'Berlengas', 'Açores', 'Madeira'],
+    dolphin: ['Sesimbra', 'Setúbal', 'Algarve', 'Madeira', 'Açores'],
+    whale: ['Açores', 'Madeira', 'Algarve'],
+  };
+  
+  // Load recent searches
+  useEffect(() => {
+    loadRecentSearches();
+  }, []);
+  
+  const loadRecentSearches = async () => {
+    try {
+      const searches = await AsyncStorage.getItem('recentSearches');
+      if (searches) {
+        setRecentSearches(JSON.parse(searches));
+      }
+    } catch (error) {
+      console.error('Failed to load recent searches:', error);
+    }
+  };
+  
+  const saveRecentSearch = async (location: string) => {
+    try {
+      const updated = [location, ...recentSearches.filter(s => s !== location)].slice(0, 5);
+      setRecentSearches(updated);
+      await AsyncStorage.setItem('recentSearches', JSON.stringify(updated));
+    } catch (error) {
+      console.error('Failed to save recent search:', error);
+    }
+  };
   
   console.log('🎯 Find Activity params:', params);
   console.log('📦 Preloaded experiences:', preloadedExperiences?.length);
@@ -242,30 +314,116 @@ export default function FindActivityScreen() {
               onPress={() => setShowLocationPicker(!showLocationPicker)}
             >
               <MapPin size={18} color="#666" />
-              <Text style={styles.locationText}>Nearby</Text>
+              <Text style={styles.locationText}>{userLocation}</Text>
               <ChevronDown size={18} color="#666" />
             </Pressable>
             
-            {/* Location Picker Modal */}
+            {/* Enhanced Location Picker Modal */}
             {showLocationPicker && (
-              <View style={styles.locationPicker}>
-                {cities.map(city => (
-                  <Pressable
-                    key={city}
-                    style={[styles.cityOption, city === userLocation && styles.cityOptionSelected]}
-                    onPress={() => {
-                      setUserLocation(city);
-                      setShowLocationPicker(false);
-                    }}
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoid}
+              >
+                <View style={styles.locationPicker}>
+                  {/* Search Input */}
+                  <View style={styles.searchContainer}>
+                    <Search size={18} color="#999" style={styles.searchIcon} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Type city name"
+                      placeholderTextColor="#999"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      autoFocus
+                      returnKeyType="search"
+                      onSubmitEditing={() => {
+                        if (searchQuery.trim()) {
+                          setUserLocation(searchQuery.trim());
+                          saveRecentSearch(searchQuery.trim());
+                          setShowLocationPicker(false);
+                          setSearchQuery('');
+                        }
+                      }}
+                    />
+                  </View>
+
+                  <ScrollView 
+                    style={styles.locationScrollView} 
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                   >
-                    <Text style={[styles.cityOptionText, city === userLocation && styles.cityOptionTextSelected]}>
-                      {city}
-                    </Text>
-                    {city === userLocation && <Text style={styles.checkmark}>✓</Text>}
-                  </Pressable>
-                ))}
-              </View>
-            )}
+                  {/* Recent Searches */}
+                  {recentSearches.length > 0 && !searchQuery && (
+                    <View style={styles.locationGroup}>
+                      <Text style={styles.locationGroupTitle}>Recent searches</Text>
+                      {recentSearches.map((city, index) => (
+                        <Pressable
+                          key={`recent-${index}`}
+                          style={styles.cityOption}
+                          onPress={() => {
+                            setUserLocation(city);
+                            setShowLocationPicker(false);
+                            setSearchQuery('');
+                          }}
+                        >
+                          <MapPin size={16} color="#007AFF" style={styles.locationIcon} />
+                          <Text style={styles.cityOptionText}>{city}</Text>
+                          {city === userLocation && <Text style={styles.checkmark}>✓</Text>}
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Popular for Activity */}
+                  {analysis?.activity && popularDestinations[analysis.activity.toLowerCase()] && !searchQuery && (
+                    <View style={styles.locationGroup}>
+                      <Text style={styles.locationGroupTitle}>Popular for {analysis.activity}</Text>
+                      {popularDestinations[analysis.activity.toLowerCase()].map((city, index) => (
+                        <Pressable
+                          key={`popular-${index}`}
+                          style={styles.cityOption}
+                          onPress={() => {
+                            setUserLocation(city);
+                            saveRecentSearch(city);
+                            setShowLocationPicker(false);
+                            setSearchQuery('');
+                          }}
+                        >
+                          <MapPin size={16} color="#007AFF" style={styles.locationIcon} />
+                          <Text style={styles.cityOptionText}>{city}</Text>
+                          {city === userLocation && <Text style={styles.checkmark}>✓</Text>}
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* All Cities or Filtered */}
+                  {(searchQuery || !analysis?.activity) && (
+                    <View style={styles.locationGroup}>
+                      {cities
+                        .filter(city => city.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map(city => (
+                          <Pressable
+                            key={city}
+                            style={[styles.cityOption, city === userLocation && styles.cityOptionSelected]}
+                            onPress={() => {
+                              setUserLocation(city);
+                              saveRecentSearch(city);
+                              setShowLocationPicker(false);
+                              setSearchQuery('');
+                            }}
+                          >
+                            <Text style={[styles.cityOptionText, city === userLocation && styles.cityOptionTextSelected]}>
+                              {city}
+                            </Text>
+                            {city === userLocation && <Text style={styles.checkmark}>✓</Text>}
+                          </Pressable>
+                        ))}
+                    </View>
+                  )}
+                  </ScrollView>
+                </View>
+              </KeyboardAvoidingView>
           </View>
           
           {/* Experience Cards */}
@@ -469,32 +627,73 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
+  keyboardAvoid: {
+    width: '100%',
+  },
   locationPicker: {
     marginTop: 8,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    maxHeight: 500,
+    overflow: 'hidden',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fafafa',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 0,
+  },
+  locationScrollView: {
+    maxHeight: 400,
+  },
+  locationGroup: {
+    paddingVertical: 8,
+  },
+  locationGroupTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#666',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  locationIcon: {
+    marginRight: 12,
   },
   cityOption: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#f5f5f5',
   },
   cityOptionSelected: {
     backgroundColor: '#f5f5f5',
   },
   cityOptionText: {
-    fontSize: 15,
+    flex: 1,
+    fontSize: 16,
     color: '#333',
   },
   cityOptionTextSelected: {
@@ -502,7 +701,7 @@ const styles = StyleSheet.create({
     color: '#FF6B00',
   },
   checkmark: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#FF6B00',
     fontWeight: '700',
   },
