@@ -192,25 +192,10 @@ export default function FindActivityScreen() {
   
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header with Instagram thumbnail */}
+      {/* Simple header with close button */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          {thumbnailUrl && (
-            <Image
-              source={{ uri: thumbnailUrl }}
-              style={styles.thumbnailImage}
-              resizeMode="cover"
-            />
-          )}
-          <View>
-            <Text style={styles.savedFromText}>Saved from Instagram</Text>
-            <Text style={styles.instagramUrl} numberOfLines={1}>
-              {instagramUrl}
-            </Text>
-          </View>
-        </View>
         <Pressable onPress={() => router.back()} style={styles.closeButton}>
-          <X size={20} color="#666" />
+          <X size={24} color="#333" />
         </Pressable>
       </View>
       
@@ -230,7 +215,7 @@ export default function FindActivityScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Instagram Video Thumbnail - Large at top (centered, rounded) */}
+          {/* Video Frame Thumbnail - Large at top (centered, rounded) */}
           {thumbnailUrl && (
             <View style={styles.videoSection}>
               <Image
@@ -240,9 +225,6 @@ export default function FindActivityScreen() {
               />
             </View>
           )}
-
-          {/* Instagram source label */}
-          <Text style={styles.savedFromInstagram}>Saved from Instagram</Text>
           
           {/* Activity Detection Title */}
           {analysis && (
@@ -295,28 +277,31 @@ export default function FindActivityScreen() {
             </View>
           ) : (
             experiences.map((experience, index) => {
-              // Get correct image URL
+              // CRITICAL: Use images[0] for database experiences (NOT image_url which is logo)
               const getImageUrl = () => {
+                console.log(`🔍 Experience: ${experience.title}`);
+                console.log(`   Source: ${experience.source}`);
+                console.log(`   images:`, experience.images);
+                console.log(`   imageUrl:`, experience.imageUrl);
+                console.log(`   image_url:`, experience.image_url);
+                
                 if (experience.source === 'database') {
-                  // Database: images is an array - use first image
+                  // Database: MUST use images array (images[0] is experience photo)
                   if (experience.images && Array.isArray(experience.images) && experience.images.length > 0) {
-                    console.log(`✅ Using image from DB array for ${experience.title}:`, experience.images[0]);
-                    return experience.images[0];
+                    console.log(`   ✅ Using images[0]:`, experience.images[0]);
+                    return experience.images[0]; // ✅ Experience photo
                   }
-                  // Fallback to image_url if images array is empty
-                  if (experience.image_url) {
-                    console.log(`⚠️ Using image_url fallback for ${experience.title}:`, experience.image_url);
-                    return experience.image_url;
-                  }
+                  console.error(`   ❌ NO IMAGES ARRAY FOR DATABASE EXPERIENCE!`);
                 } else {
                   // Viator: use imageUrl
                   return experience.imageUrl || experience.image_url;
                 }
-                console.warn(`❌ No image found for ${experience.title}`);
                 return null;
               };
               
               const imageUrl = getImageUrl();
+              const sourceBadge = experience.source === 'database' ? 'Bored Tourist' : 'Viator';
+              const isOurApp = experience.source === 'database';
               
               return (
               <Pressable
@@ -334,13 +319,20 @@ export default function FindActivityScreen() {
                     />
                   ) : (
                     <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-                      <Text style={styles.placeholderEmoji}>🏄</Text>
+                      <Text style={styles.placeholderText}>No Image</Text>
                     </View>
                   )}
                 </View>
                 
                 {/* Content on the right */}
                 <View style={styles.cardContent}>
+                  {/* Source Badge */}
+                  <View style={[styles.sourceBadge, isOurApp && styles.sourceBadgeOurs]}>
+                    <Text style={[styles.sourceBadgeText, isOurApp && styles.sourceBadgeTextOurs]}>
+                      {sourceBadge}
+                    </Text>
+                  </View>
+                  
                   <View style={styles.cardHeader}>
                     <Text style={styles.cardTitle} numberOfLines={2}>
                       {experience.title}
@@ -395,39 +387,15 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  thumbnailImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  savedFromText: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '500',
-  },
-  instagramUrl: {
-    fontSize: 11,
-    color: '#666',
-    maxWidth: 200,
+    paddingVertical: 8,
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
@@ -460,13 +428,6 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 16,
     backgroundColor: '#f0f0f0',
-  },
-  savedFromInstagram: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 16,
   },
   titleSection: {
     paddingHorizontal: 20,
@@ -587,8 +548,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  placeholderEmoji: {
-    fontSize: 32,
+  placeholderText: {
+    fontSize: 11,
+    color: '#999',
   },
   cardContent: {
     flex: 1,
@@ -646,5 +608,25 @@ const styles = StyleSheet.create({
   cardRatingLabel: {
     fontSize: 13,
     color: '#999',
+  },
+  sourceBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 6,
+  },
+  sourceBadgeOurs: {
+    backgroundColor: '#FFF500',
+  },
+  sourceBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+  },
+  sourceBadgeTextOurs: {
+    color: '#000',
   },
 });

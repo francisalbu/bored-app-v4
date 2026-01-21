@@ -352,96 +352,20 @@ export default function MapScreen() {
       return;
     }
 
-    setAnalyzing(true);
-
-    try {
-      console.log('🎬 Analyzing Instagram video:', instagramLink);
-      
-      // API service already has auth token from AuthContext
-      const data = await api.analyzeInstagramPost({
+    console.log('🎬 Navigating to shared-content with URL:', instagramLink);
+    
+    // Close modal and navigate directly to shared-content
+    // shared-content will handle all the analysis
+    setShowLinkInput(false);
+    setInstagramLink('');
+    
+    router.push({
+      pathname: '/shared-content',
+      params: {
         url: instagramLink,
-        description: ''
-      });
-      
-      console.log('📊 Analysis response:', data);
-
-      if (!data.success || !data.data?.analysis) {
-        Alert.alert('Error', 'Could not analyze this video. Please try another one.');
-        setAnalyzing(false);
-        return;
+        text: ''
       }
-
-      const { analysis, detectedSpots } = data.data;
-      
-      // Validate we got location data
-      if (!analysis.location || analysis.location === 'not specified') {
-        Alert.alert('Error', 'Could not determine location from this video');
-        setAnalyzing(false);
-        return;
-      }
-
-      console.log('✅ Analysis complete:', {
-        activity: analysis.activity,
-        location: analysis.location,
-        detectedPOIs: detectedSpots?.length || 0
-      });
-
-      // Get coordinates via geocoding
-      const axios = require('axios');
-      let coordinates = { latitude: 0, longitude: 0 };
-      
-      if (analysis.location && analysis.location !== 'not specified') {
-        try {
-          const geoResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
-            params: {
-              q: analysis.location,
-              format: 'json',
-              limit: 1
-            },
-            headers: {
-              'User-Agent': 'BoredTouristApp/1.0'
-            },
-            timeout: 5000
-          });
-          
-          if (geoResponse.data && geoResponse.data[0]) {
-            coordinates.latitude = parseFloat(geoResponse.data[0].lat);
-            coordinates.longitude = parseFloat(geoResponse.data[0].lon);
-            console.log('📍 Geocoded coordinates:', coordinates);
-          }
-        } catch (geoError) {
-          console.error('Geocoding error:', geoError);
-        }
-      }
-
-      // Navigate to spot result page with POI data
-      setAnalyzing(false);
-      setShowLinkInput(false);
-      setInstagramLink('');
-      
-      console.log('📍 POIs detected:', data.data.detectedSpots?.length || 0);
-      console.log('📸 Thumbnail:', data.data.analysis?.thumbnailUrl);
-      
-      router.push({
-        pathname: '/spot-result',
-        params: {
-          location: analysis.location,
-          activity: analysis.activity,
-          confidence: analysis.confidence,
-          instagramUrl: instagramLink,
-          thumbnailUrl: data.data.analysis?.thumbnailUrl || '',
-          pois: JSON.stringify(data.data.detectedSpots || [])
-        }
-      });
-    } catch (error: any) {
-      console.error('❌ Error analyzing link:', error);
-      Alert.alert(
-        'Error', 
-        error.message || 'Failed to analyze video. Please check your internet connection.'
-      );
-    } finally {
-      setAnalyzing(false);
-    }
+    });
   };
 
   const handleShowTutorial = () => {

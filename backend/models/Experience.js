@@ -458,6 +458,7 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         currency: exp.currency,
         duration: exp.duration,
         category: exp.category,
+        images: Array.isArray(exp.images) ? exp.images : (exp.images ? JSON.parse(exp.images) : []), // Parse JSONB
         image_url: exp.image_url,
         video_url: exp.video_url,
         rating,

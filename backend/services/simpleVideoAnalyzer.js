@@ -77,8 +77,12 @@ class SimpleVideoAnalyzer {
         };
       }
       
+      // Use first frame as thumbnail if no thumbnail from provider
+      const finalThumbnail = videoData.thumbnailUrl || (frames.length > 0 ? frames[0] : null);
+      
       return {
         success: true,
+        thumbnailUrl: finalThumbnail,
         ...finalResult
       };
       
@@ -99,6 +103,7 @@ class SimpleVideoAnalyzer {
     let caption = '';
     let hashtags = [];
     let location = null;
+    let thumbnailUrl = null;
     
     // Method 1: Try RapidAPI first
     try {
@@ -115,12 +120,14 @@ class SimpleVideoAnalyzer {
       videoUrl = response.data?.data?.video_url || response.data?.video_url;
       caption = response.data?.data?.caption || response.data?.caption || '';
       location = response.data?.data?.location?.name || response.data?.location?.name || null;
+      thumbnailUrl = response.data?.data?.thumbnail_url || response.data?.thumbnail_url || response.data?.data?.display_url || response.data?.display_url;
       hashtags = this.extractHashtags(caption);
       
       if (videoUrl) {
         console.log('✅ Got video URL from RapidAPI');
         if (location) console.log('📍 Location tag:', location);
         if (hashtags.length) console.log('🏷️ Hashtags:', hashtags.join(', '));
+        if (thumbnailUrl) console.log('🖼️ Thumbnail URL:', thumbnailUrl);
       } else {
         console.log('⚠️ No video URL in RapidAPI response');
       }
@@ -170,8 +177,10 @@ class SimpleVideoAnalyzer {
           videoUrl = item.videoUrl || item.displayUrl;
           caption = item.caption || '';
           location = item.locationName || null;
+          thumbnailUrl = item.displayUrl || item.thumbnailUrl;
           hashtags = this.extractHashtags(caption);
           console.log('✅ Got video URL from Apify');
+          if (thumbnailUrl) console.log('🖼️ Thumbnail URL from Apify:', thumbnailUrl);
         } else {
           console.log('❌ Apify returned no data');
         }
@@ -198,7 +207,8 @@ class SimpleVideoAnalyzer {
       videoBuffer: Buffer.from(videoResponse.data),
       caption,
       hashtags,
-      location
+      location,
+      thumbnailUrl
     };
   }
   
