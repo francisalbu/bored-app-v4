@@ -3,7 +3,7 @@ const router = express.Router();
 const simpleVideoAnalyzer = require('../services/simpleVideoAnalyzer');
 const viatorService = require('../services/viatorService');
 const Experience = require('../models/Experience');
-const { pool } = require('../db');
+const { from } = require('../config/database');
 
 /**
  * Helper: Parse images field from database (can be JSON string or array)
@@ -29,23 +29,25 @@ function parseImages(images) {
  */
 async function getCachedAnalysis(instagramUrl) {
   try {
-    const result = await pool.query(
-      `SELECT * FROM video_analysis_cache 
-       WHERE instagram_url = $1 
-       AND expires_at > NOW()
-       LIMIT 1`,
-      [instagramUrl]
-    );
+    const { data, error } = await from('video_analysis_cache')
+      .select('*')
+      .eq('instagram_url', instagramUrl)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+      .single();
     
-    if (result.rows.length > 0) {
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      throw error;
+    }
+    
+    if (data) {
       // Increment hit count
-      await pool.query(
-        'UPDATE video_analysis_cache SET hit_count = hit_count + 1 WHERE id = $1',
-        [result.rows[0].id]
-      );
+      await from('video_analysis_cache')
+        .update({ hit_count: (data.hit_count || 0) + 1 })
+        .eq('id', data.id);
       
-      console.log('✅ Cache HIT for:', instagramUrl, '(hits:', result.rows[0].hit_count + 1, ')');
-      return result.rows[0];
+      console.log('✅ Cache HIT for:', instagramUrl, '(hits:', (data.hit_count || 0) + 1, ')');
+      return data;
     }
     
     console.log('❌ Cache MISS for:', instagramUrl);
@@ -61,31 +63,26 @@ async function getCachedAnalysis(instagramUrl) {
  */
 async function saveCachedAnalysis(instagramUrl, analysis, experiences, thumbnailUrl) {
   try {
-    await pool.query(
-      `INSERT INTO video_analysis_cache 
-       (instagram_url, thumbnail_url, analysis_type, activity, location, confidence, experiences)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (instagram_url) 
-       DO UPDATE SET 
-         thumbnail_url = EXCLUDED.thumbnail_url,
-         analysis_type = EXCLUDED.analysis_type,
-         activity = EXCLUDED.activity,
-         location = EXCLUDED.location,
-         confidence = EXCLUDED.confidence,
-         experiences = EXCLUDED.experiences,
-         created_at = NOW(),
-         expires_at = NOW() + INTERVAL '30 days',
-         hit_count = 0`,
-      [
-        instagramUrl,
-        thumbnailUrl,
-        analysis.type,
-        analysis.activity,
-        analysis.location,
-        analysis.confidence,
-        JSON.stringify(experiences)
-      ]
-    );
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
+    
+    const { error } = await from('video_analysis_cache')
+      .upsert({
+        instagram_url: instagramUrl,
+        thumbnail_url: thumbnailUrl,
+        analysis_type: analysis.type,
+        activity: analysis.activity,
+        location: analysis.location,
+        confidence: analysis.confidence,
+        experiences: JSON.stringify(experiences),
+        created_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
+        hit_count: 0
+      }, {
+        onConflict: 'instagram_url'
+      });
+    
+    if (error) throw error;
     
     console.log('💾 Cached analysis for:', instagramUrl);
   } catch (error) {
