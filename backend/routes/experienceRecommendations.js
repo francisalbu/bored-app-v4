@@ -554,9 +554,13 @@ router.post('/by-activity', async (req, res) => {
     }
     
     // Get from Viator (strict match only)
+    // For "Near You" (prioritizeBored=true): Search in userCity (Lisboa)
+    // For "As Seen on Reel" (prioritizeBored=false): Search in reel location (Bali)
+    const viatorSearchLocation = prioritizeBored ? userCity : null; // Global search for reel location
+    
     let viatorExperiences = await viatorService.smartSearch(
       activity,
-      userCity,
+      viatorSearchLocation,
       'EUR',
       TARGET_COUNT,
       true // strict matching
@@ -564,7 +568,7 @@ router.post('/by-activity', async (req, res) => {
     
     console.log(`   📦 Viator returned ${viatorExperiences.length} experiences`);
     
-    // CRITICAL: Filter Viator results to ONLY show experiences in user's city
+    // CRITICAL: Filter Viator results to ONLY show experiences in user's city for Near You
     // Never show Rio de Janeiro when user is in Lisboa!
     if (prioritizeBored && userCity) {
       const cityLower = userCity.toLowerCase();
