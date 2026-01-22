@@ -578,63 +578,50 @@ router.post('/by-activity', async (req, res) => {
       console.log('   ⚠️ Skipping Bored Tourist DB (As Seen on Reel mode)');
     }
     
-    // Get from Viator (strict match only)
-    // For "Near You" (prioritizeBored=true): Search activity in LISBON only
-    // For "As Seen on Reel" (prioritizeBored=false): Search activity + SPECIFIC location from reel
-    let viatorSearchQuery;
-    let viatorSearchLocation;
+    // Get from Viator
+    // For "Near You" (prioritizeBored=true): Use destination ID filter (GUARANTEED location!)
+    // For "As Seen on Reel" (prioritizeBored=false): Use freetext search with location
+    let viatorExperiences = [];
     
     if (prioritizeBored) {
-      // NEAR YOU: Search for the activity in Lisboa
-      viatorSearchQuery = activity;
-      viatorSearchLocation = NEAR_YOU_CITY;
-      console.log(`   🔍 Viator Near You search: "${viatorSearchQuery}" in "${viatorSearchLocation}"`);
+      // NEAR YOU: Use destination ID to GUARANTEE Lisboa results
+      // Lisboa destination ID in Viator = 538 (Lisbon, Portugal)
+      const LISBON_DESTINATION_ID = 538;
+      console.log(`   🔍 Viator Near You: Using destination ID ${LISBON_DESTINATION_ID} for Lisboa`);
+      
+      viatorExperiences = await viatorService.searchByDestinationId(
+        LISBON_DESTINATION_ID,
+        activity,
+        'EUR',
+        TARGET_COUNT * 2 // Get more, we'll filter by title
+      );
+      
+      console.log(`   📦 Viator destination search returned ${viatorExperiences.length} experiences`);
     } else {
-      // AS SEEN ON REEL: Search for activity + EXACT location from the reel
-      // Keep the full location (e.g., "Huacachina, Ica, Peru") for the most accurate results
-      viatorSearchQuery = fullActivity || activity;
-      viatorSearchLocation = location || null;
+      // AS SEEN ON REEL: Use freetext search with exact location
+      const viatorSearchQuery = fullActivity || activity;
+      const viatorSearchLocation = location || null;
       console.log(`   🔍 Viator Reel search: "${viatorSearchQuery}" in "${viatorSearchLocation || 'global'}"`);
+      
+      viatorExperiences = await viatorService.smartSearch(
+        viatorSearchQuery,
+        viatorSearchLocation,
+        'EUR',
+        TARGET_COUNT,
+        true // strict matching
+      );
+      
+      console.log(`   📦 Viator freetext returned ${viatorExperiences.length} experiences`);
     }
     
-    let viatorExperiences = await viatorService.smartSearch(
-      viatorSearchQuery,
-      viatorSearchLocation,
-      'EUR',
-      TARGET_COUNT,
-      true // strict matching
-    );
-    
-    console.log(`   📦 Viator returned ${viatorExperiences.length} experiences`);
-    
-    // CRITICAL: For Near You, filter Viator to ONLY Lisboa experiences
-    // AND they must actually be about the activity (not random tours)
+    // For Near You: Filter to ONLY experiences that mention the activity in title
+    // Location is GUARANTEED by searchByDestinationId(538) - Lisboa only
     if (prioritizeBored) {
       viatorExperiences = viatorExperiences.filter(exp => {
-        const expLocation = (exp.location || '').toLowerCase();
         const expTitle = (exp.title || '').toLowerCase();
         
-        // Must be in Lisboa/Lisbon area - very strict!
-        const isLisbon = expLocation.includes('lisbo') || 
-                         expLocation.includes('lisbon') ||
-                         expLocation.includes('sintra') ||
-                         expLocation.includes('cascais') ||
-                         expLocation.includes('sesimbra') ||
-                         expLocation.includes('setúbal') ||
-                         expLocation.includes('setubal') ||
-                         expLocation.includes('arrábida') ||
-                         expLocation.includes('arrabida') ||
-                         expLocation.includes('location varies'); // Viator sometimes uses this
-        
         // CRITICAL: TITLE MUST CONTAIN the activity or related terms
-        // No more "Templar's Castle" - even if description mentions surf
-        // We only want tours that are ABOUT the activity, not tours that mention it
         const titleHasActivity = searchTerms.some(term => expTitle.includes(term));
-        
-        if (!isLisbon) {
-          console.log(`   ❌ Filtered out (not Lisboa area): ${exp.title} (${exp.location})`);
-          return false;
-        }
         
         if (!titleHasActivity) {
           console.log(`   ❌ Filtered out (title doesn't mention ${activity}): ${exp.title}`);
@@ -645,7 +632,7 @@ router.post('/by-activity', async (req, res) => {
         return true;
       });
       
-      console.log(`   📍 After Lisboa + title filter: ${viatorExperiences.length} Viator experiences`);
+      console.log(`   📍 After title filter: ${viatorExperiences.length} Viator experiences`);
     }
     
     // Combine: 
