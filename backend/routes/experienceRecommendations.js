@@ -4,6 +4,42 @@ const simpleVideoAnalyzer = require('../services/simpleVideoAnalyzer');
 const viatorService = require('../services/viatorService');
 const Experience = require('../models/Experience');
 const { from } = require('../config/database');
+const axios = require('axios');
+
+/**
+ * Reverse geocoding: Convert GPS coordinates to city name
+ * Uses Nominatim (OpenStreetMap) - FREE, no API key required!
+ */
+async function reverseGeocode(latitude, longitude) {
+  try {
+    // Nominatim (OpenStreetMap) - FREE reverse geocoding
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`;
+    
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'BoredTouristApp/1.0' // Required by Nominatim
+      }
+    });
+
+    if (response.data && response.data.address) {
+      const address = response.data.address;
+      
+      // Extract city - try multiple fields in order of preference
+      const city = address.city || address.town || address.village || 
+                   address.municipality || address.county || address.state;
+      const country = address.country;
+
+      const location = city ? `${city}${country ? ', ' + country : ''}` : null;
+      console.log(`   🌍 Reverse geocoded: ${latitude}, ${longitude} → ${location}`);
+      return location;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('❌ Reverse geocoding error:', error.message);
+    return null;
+  }
+}
 
 /**
  * Helper: Parse images field from database (can be JSON string or array)
@@ -579,24 +615,77 @@ router.post('/by-activity', async (req, res) => {
     }
     
     // Get from Viator
-    // For "Near You" (prioritizeBored=true): Use destination ID filter (GUARANTEED location!)
+    // For "Near You" (prioritizeBored=true): Use GPS → city → destination ID + freetext hybrid
     // For "As Seen on Reel" (prioritizeBored=false): Use freetext search with location
     let viatorExperiences = [];
     
     if (prioritizeBored) {
-      // NEAR YOU: Use destination ID to GUARANTEE Lisboa results
-      // Lisboa destination ID in Viator = 538 (Lisbon, Portugal)
-      const LISBON_DESTINATION_ID = 538;
-      console.log(`   🔍 Viator Near You: Using destination ID ${LISBON_DESTINATION_ID} for Lisboa`);
+      // NEAR YOU: GPS-based dynamic location search
+      // Check if userLocation contains GPS coordinates
+      let cityName = 'Lisboa'; // Default fallback
+      let countryName = 'Portugal';
       
-      viatorExperiences = await viatorService.searchByDestinationId(
-        LISBON_DESTINATION_ID,
-        activity,
-        'EUR',
-        TARGET_COUNT * 2 // Get more, we'll filter by title
-      );
+      if (userLocation && typeof userLocation === 'object' && userLocation.lat && userLocation.lng) {
+        console.log(`   📍 GPS coordinates detected: ${userLocation.lat}, ${userLocation.lng}`);
+        
+        // Reverse geocode to get city name
+        const reverseGeocodedLocation = await reverseGeocode(userLocation.lat, userLocation.lng);
+        if (reverseGeocodedLocation) {
+          // Format: "Barcelona, Spain" or "Lisboa, Portugal"
+          const parts = reverseGeocodedLocation.split(',').map(p => p.trim());
+          cityName = parts[0];
+          countryName = parts[1] || '';
+          console.log(`   🏙️ Reverse geocoded to: ${cityName}, ${countryName}`);
+        }
+      }
       
-      console.log(`   📦 Viator destination search returned ${viatorExperiences.length} experiences`);
+      // Get Viator destination ID for the city
+      const destinationId = await viatorService.getDestinationId(cityName);
+      
+      if (destinationId) {
+        console.log(`   🔍 Viator Near You: Using destination ID ${destinationId} for ${cityName}`);
+        
+        // HYBRID SEARCH: destination ID (city) + freetext (region)
+        // This ensures city center results AND captures suburbs (Sintra, Cascais, Montserrat, etc.)
+        const [destinationResults, freetextResults] = await Promise.all([
+          viatorService.searchByDestinationId(
+            destinationId,
+            activity,
+            'EUR',
+            TARGET_COUNT * 2
+          ),
+          viatorService.smartSearch(
+            activity,
+            `${cityName}${countryName ? ' ' + countryName : ''}`,
+            'EUR',
+            TARGET_COUNT
+          )
+        ]);
+        
+        console.log(`   📦 Viator destination search returned ${destinationResults.length} experiences`);
+        console.log(`   📦 Viator freetext search returned ${freetextResults.length} experiences`);
+        
+        // Combine and deduplicate by productCode
+        const combinedMap = new Map();
+        [...destinationResults, ...freetextResults].forEach(exp => {
+          if (!combinedMap.has(exp.productCode)) {
+            combinedMap.set(exp.productCode, exp);
+          }
+        });
+        
+        viatorExperiences = Array.from(combinedMap.values());
+        console.log(`   🎯 Combined ${viatorExperiences.length} unique experiences`);
+      } else {
+        // Fallback to freetext search if destination ID not found
+        console.log(`   ⚠️ No destination ID found for ${cityName}, using freetext search`);
+        viatorExperiences = await viatorService.smartSearch(
+          activity,
+          `${cityName}${countryName ? ' ' + countryName : ''}`,
+          'EUR',
+          TARGET_COUNT * 2
+        );
+        console.log(`   📦 Viator freetext search returned ${viatorExperiences.length} experiences`);
+      }
     } else {
       // AS SEEN ON REEL: Use freetext search with exact location
       const viatorSearchQuery = fullActivity || activity;

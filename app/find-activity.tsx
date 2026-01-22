@@ -18,6 +18,7 @@ import { X, MapPin, ChevronDown, Heart, Star, Search, Edit3, Check } from 'lucid
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
+import * as Location from 'expo-location';
 import colors from '@/constants/colors';
 import api from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -86,6 +87,7 @@ export default function FindActivityScreen() {
   } : null;
   
   const [userLocation, setUserLocation] = useState('Lisboa');
+  const [userGpsCoords, setUserGpsCoords] = useState<{ lat: number; lng: number } | null>(null); // GPS coordinates
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [showNearYouDropdown, setShowNearYouDropdown] = useState(false);
   const [nearYouSearch, setNearYouSearch] = useState('');
@@ -685,6 +687,29 @@ export default function FindActivityScreen() {
   console.log('📦 Preloaded experiences:', preloadedExperiences?.length);
   console.log('📊 Preloaded analysis:', preloadedAnalysis);
   
+  // Get user GPS coordinates on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          setUserGpsCoords({
+            lat: location.coords.latitude,
+            lng: location.coords.longitude,
+          });
+          console.log('📍 User GPS:', location.coords.latitude, location.coords.longitude);
+        } else {
+          console.log('❌ Location permission denied, will use Lisboa as fallback');
+        }
+      } catch (error) {
+        console.error('❌ Error getting GPS:', error);
+      }
+    })();
+  }, []);
+  
   // Initial fetch: when we have preloaded data, fetch the 3 sections properly
   useEffect(() => {
     if (preloadedAnalysis && !hasFetchedSections) {
@@ -801,11 +826,11 @@ export default function FindActivityScreen() {
       
       // Parallel fetch for 3 sections
       const [nearYouResponse, reelResponse] = await Promise.all([
-        // 1. Near You: EXACT activity match + User city
+        // 1. Near You: EXACT activity match + GPS coordinates (or city name as fallback)
         // Only show experiences that match the EXACT activity type (surf = surf, not indoor skydiving)
         api.post('/experience-recommendations/by-activity', {
           activity: baseActivity,
-          userLocation: userLocation, // City name - backend will filter by this
+          userLocation: userGpsCoords || userLocation, // Pass GPS coords if available, otherwise city name
           strictActivityMatch: true, // Only exact activity matches
           prioritizeBored: true // Bored Tourist first
         }),
