@@ -84,8 +84,13 @@ export default function SpotResultScreen() {
       console.log(`💾 Saving ${selectedPOIsList.length} spots...`);
       
       const savePromises = selectedPOIsList.map(poi => {
+        if (!user?.id) {
+          console.error('User ID is undefined');
+          return Promise.resolve({ success: false });
+        }
+        
         const spotData = {
-          user_id: user?.id,
+          user_id: user.id,
           spot_name: poi.spot_name,
           activity: poi.activity || 'sightseeing',
           location_full: poi.location_full,

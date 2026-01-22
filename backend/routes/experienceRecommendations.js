@@ -152,17 +152,17 @@ router.post('/', async (req, res) => {
     let experiences = [];
     let viatorExperiences = [];
     let message = '';
-    const TARGET_COUNT = 5; // Always show 5 activities
+    // NO LIMIT - show all relevant experiences
     
     if (analysis.type === 'activity' && analysis.activity) {
       // Activity detected - find similar experiences in DB
       console.log(`🏄 Activity detected: ${analysis.activity}`);
       
-      // Get up to 5 from our DB (filtered by user's city)
+      // Get ALL matching experiences from our DB (no limit)
       experiences = await Experience.findSimilarActivities(
         analysis.activity,
         userCity,
-        TARGET_COUNT
+        50 // High limit to get all relevant
       );
       
       // Mark all DB experiences with source field AND parse images
@@ -172,41 +172,164 @@ router.post('/', async (req, res) => {
         source: 'database'
       }));
       
-      // CRITICAL: Always fetch Viator for user's location
-      // Use user's city (not video location) because we need local experiences
+      // Fetch Viator with strict activity matching
       const viatorPromise = viatorService.smartSearch(
         analysis.activity,
-        userCity, // ← User's city, not video location!
+        userCity,
         'EUR',
-        TARGET_COUNT
+        50, // Get more results to filter properly
+        true // Strict matching flag
       );
       
       viatorExperiences = await viatorPromise;
       
-      if (experiences.length >= TARGET_COUNT) {
-        // We have enough from our DB - use only ours
-        console.log(`✅ Found ${experiences.length} in our DB (enough)`);
-        experiences = experiences.slice(0, TARGET_COUNT);
-        message = `We found ${TARGET_COUNT} ${analysis.activity} experiences near you!`;
+      viatorExperiences = await viatorPromise;
+      
+      // Filter Viator results to only show relevant experiences (anti-bored tourist)
+      viatorExperiences = viatorExperiences.filter(exp => {
+        const title = exp.title.toLowerCase();
+        const activity = analysis.activity.toLowerCase();
+        
+        // Comprehensive activity synonyms dictionary (200+ activities)
+        const synonyms = {
+          // Water Sports
+          'surfing': ['surf', 'surfing', 'surf lesson', 'surf class', 'surf course', 'wave'],
+          'scuba diving': ['scuba', 'diving', 'dive', 'underwater'],
+          'snorkeling': ['snorkel', 'snorkeling', 'snorkelling'],
+          'kayaking': ['kayak', 'kayaking', 'paddle'],
+          'white water rafting': ['rafting', 'white water', 'rapids'],
+          'jet skiing': ['jet ski', 'jet-ski', 'jetski', 'pwc'],
+          'kitesurfing': ['kitesurf', 'kite surf', 'kite boarding'],
+          'windsurfing': ['windsurf', 'wind surf'],
+          'wakeboarding': ['wakeboard', 'wake board'],
+          'water skiing': ['water ski', 'waterski'],
+          'sup': ['paddleboard', 'paddle board', 'stand up paddle', 'sup'],
+          'sailing': ['sail', 'sailing', 'yacht'],
+          'cliff jumping': ['cliff jump', 'cliff diving'],
+          'bodyboarding': ['bodyboard', 'boogie board'],
+          'freediving': ['freedive', 'free dive', 'apnea'],
+          'flyboarding': ['flyboard', 'fly board'],
+          'parasailing': ['parasail', 'parachute'],
+          'canoeing': ['canoe', 'canoeing'],
+          'coasteering': ['coasteer', 'coastal'],
+          'cave diving': ['cave dive', 'cavern'],
+          
+          // Winter Sports
+          'skiing': ['ski', 'skiing', 'snow ski'],
+          'snowboarding': ['snowboard', 'snow board'],
+          'ice climbing': ['ice climb', 'frozen'],
+          'snowmobiling': ['snowmobile', 'snow mobile'],
+          'heli-skiing': ['heli ski', 'helicopter ski'],
+          'dog sledding': ['dog sled', 'husky', 'mushing'],
+          'snowshoeing': ['snowshoe', 'snow shoe'],
+          'ice skating': ['ice skate', 'skating'],
+          'glacier': ['glacier', 'ice'],
+          
+          // Air/Sky Sports
+          'skydiving': ['skydive', 'parachute', 'freefall'],
+          'paragliding': ['paraglide', 'paraglider'],
+          'hang gliding': ['hang glide', 'hang glider'],
+          'bungee jumping': ['bungee', 'bungee jump'],
+          'base jumping': ['base jump', 'base'],
+          'hot air balloon': ['balloon', 'ballooning'],
+          'helicopter': ['helicopter', 'heli'],
+          'wingsuit': ['wingsuit', 'wing suit'],
+          'zip line': ['zipline', 'zip line', 'zip-line', 'canopy'],
+          
+          // Land/Mountain Sports
+          'hiking': ['hike', 'hiking', 'trekking', 'trail'],
+          'rock climbing': ['climb', 'climbing', 'rock climb'],
+          'mountain biking': ['mtb', 'mountain bike', 'downhill'],
+          'camping': ['camp', 'camping'],
+          'bouldering': ['boulder', 'bouldering'],
+          'mountaineering': ['mountaineer', 'alpinism'],
+          'caving': ['cave', 'caving', 'spelunking'],
+          'atv': ['atv', 'quad', 'quadbike', 'four wheeler'],
+          'buggy': ['buggy', 'dune buggy', 'off-road'],
+          'safari': ['safari', 'game drive'],
+          'sandboarding': ['sandboard', 'sand board', 'dune'],
+          'horseback': ['horse', 'horseback', 'riding', 'equestrian'],
+          'camel': ['camel', 'camel ride'],
+          'elephant': ['elephant', 'elephant ride'],
+          'zorbing': ['zorb', 'zorbing', 'sphere'],
+          'via ferrata': ['via ferrata', 'ferrata'],
+          'rappelling': ['rappel', 'abseil', 'abseiling'],
+          'parkour': ['parkour', 'freerunning'],
+          'bmx': ['bmx', 'bike'],
+          'skateboard': ['skate', 'skateboard'],
+          'motocross': ['motocross', 'mx', 'dirt bike'],
+          
+          // Motorsports
+          'moto': ['moto', 'motorcycle', 'motorbike'],
+          'drifting': ['drift', 'drifting'],
+          'karting': ['kart', 'go-kart', 'go kart'],
+          '4x4': ['4x4', 'off-road', 'off road'],
+          
+          // Wildlife & Nature
+          'whale watching': ['whale', 'whale watch'],
+          'dolphin': ['dolphin', 'dolphin watch'],
+          'shark': ['shark', 'shark cage'],
+          'safari': ['safari', 'wildlife', 'game drive'],
+          'bird watching': ['bird', 'birding', 'birdwatching'],
+          'gorilla': ['gorilla', 'gorilla trek'],
+          'penguin': ['penguin', 'penguin colony'],
+        };
+        
+        // Get synonyms for this activity, or use the activity itself
+        const activityTerms = synonyms[activity] || [activity];
+        
+        // Check if title contains the activity or any synonym
+        const hasMatch = activityTerms.some(term => title.includes(term));
+        
+        if (!hasMatch) {
+          // Check for partial word match (e.g., "surf" in "surfing")
+          const words = activity.split(' ');
+          const hasPartialMatch = words.some(word => 
+            word.length > 3 && title.includes(word)
+          );
+          
+          if (!hasPartialMatch) {
+            console.log(`🚫 Filtered out: ${exp.title} (not relevant to ${activity})`);
+            return false;
+          }
+        }
+        
+        // STRICT: Exclude BORED TOURIST activities
+        const boringKeywords = [
+          'city tour', 'sightseeing', 'castle', 'museum', 'templar', 
+          'monastery', 'cathedral', 'historic', 'walking tour', 'food tour',
+          'wine tasting', 'cultural', 'heritage', 'guided tour', 'hop-on hop-off',
+          'brewery', 'temple', 'palace', 'archaeological', 'market visit',
+          'cooking class', 'festival', 'pilgrimage', 'architecture', 'ghost tour',
+          'segway tour', 'night tour', 'theater', 'opera', 'concert', 'gallery',
+          'village visit', 'tribal', 'dance show', 'spa', 'massage', 'wellness',
+          'yoga retreat', 'meditation', 'thermal bath', 'hammam', 'sauna',
+          'botanical garden', 'beach relaxation'
+        ];
+        
+        const isBoring = boringKeywords.some(keyword => title.includes(keyword));
+        if (isBoring) {
+          console.log(`🚫 Filtered out: ${exp.title} (bored tourist activity)`);
+          return false;
+        }
+        
+        return true;
+      });
+      
+      // Combine all results (DB + Viator filtered)
+      experiences = [...experiences, ...viatorExperiences];
+      
+      if (experiences.length >= 3) {
+        console.log(`✅ Found ${experiences.length} relevant ${analysis.activity} experiences`);
+        message = `We found ${experiences.length} ${analysis.activity} experiences near you!`;
         
       } else if (experiences.length > 0) {
-        // We have some, but not enough - complete with Viator
-        const needed = TARGET_COUNT - experiences.length;
-        console.log(`✅ Found ${experiences.length} in our DB, adding ${needed} from Viator`);
-        
-        const viatorToAdd = viatorExperiences.slice(0, needed);
-        experiences = [...experiences, ...viatorToAdd];
-        
+        console.log(`✅ Found ${experiences.length} ${analysis.activity} experiences`);
         message = `We found ${experiences.length} ${analysis.activity} experiences for you!`;
         
       } else {
-        // No results in our DB - use Viator as fallback
-        console.log(`🌐 No results in DB - using ${viatorExperiences.length} Viator experiences as fallback`);
-        
-        experiences = viatorExperiences.slice(0, TARGET_COUNT);
-        message = experiences.length > 0
-          ? `We found ${experiences.length} ${analysis.activity} experiences from our partners!`
-          : `No ${analysis.activity} experiences found. Try a different activity!`;
+        console.log(`❌ No relevant ${analysis.activity} experiences found`);
+        message = `No ${analysis.activity} experiences found. Try a different location!`;
       }
       
     } else if (analysis.type === 'landscape' && analysis.location) {
@@ -214,12 +337,12 @@ router.post('/', async (req, res) => {
       console.log(`🏔️ Landscape detected: ${analysis.location}`);
       
       // Get diverse activities from both sources (user's location!)
-      const dbPromise = Experience.getAllExperiences(TARGET_COUNT, 0);
+      const dbPromise = Experience.getAllExperiences(20, 0);
       const viatorPromise = viatorService.smartSearch(
         'activities', // Generic search
         userCity, // ← User's city for local activities
         'EUR',
-        TARGET_COUNT
+        20
       );
       
       [experiences, viatorExperiences] = await Promise.all([dbPromise, viatorPromise]);
@@ -231,19 +354,13 @@ router.post('/', async (req, res) => {
         source: 'database'
       }));
       
-      // Complete to 5 with Viator if needed
-      if (experiences.length < TARGET_COUNT) {
-        const needed = TARGET_COUNT - experiences.length;
-        experiences = [...experiences, ...viatorExperiences.slice(0, needed)];
-      } else {
-        experiences = experiences.slice(0, TARGET_COUNT);
-      }
+      // Add all Viator results
+      experiences = [...experiences, ...viatorExperiences];
       
-      message = `${analysis.location} looks amazing! Here are some activities you can do:`;
+      message = `${analysis.location} looks amazing! Here are ${experiences.length} activities you can do:`;
     }
     
-    // Ensure we always return exactly TARGET_COUNT (or less if unavailable)
-    experiences = experiences.slice(0, TARGET_COUNT);
+    // NO LIMIT - return all relevant experiences
     
     // Save to cache if this was a fresh analysis (not from cache)
     if (!cached) {

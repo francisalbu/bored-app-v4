@@ -96,7 +96,7 @@ export default function FindActivityScreen() {
     try {
       // Call backend API that uses Google Places Autocomplete
       const response = await fetch(
-        `${api.defaults.baseURL}/api/places/autocomplete?input=${encodeURIComponent(query)}&types=(cities)`
+        `https://bored-tourist-api.onrender.com/api/places/autocomplete?input=${encodeURIComponent(query)}&types=(cities)`
       );
       
       const data = await response.json();
@@ -623,6 +623,104 @@ export default function FindActivityScreen() {
             </View>
           )}
 
+          {/* Experiences for Specific Location */}
+          {isSpecificLocation && (
+            <View style={styles.specificLocationContainer}>
+              <Text style={styles.specificLocationTitle}>Experiences in {userLocation}</Text>
+              <View style={styles.experiencesList}>
+                {experiences.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>
+                      No experiences found in {userLocation}. Try a different location.
+                    </Text>
+                  </View>
+                ) : (
+                  experiences.map((experience, index) => {
+                    const imageUrl = (() => {
+                      if (experience.source === 'database') {
+                        return experience.images && experience.images.length > 0 
+                          ? experience.images[0] 
+                          : experience.image_url;
+                      } else {
+                        return experience.imageUrl || experience.image_url;
+                      }
+                    })();
+                    
+                    const sourceBadge = experience.source === 'database' ? 'Bored Tourist' : 'Viator';
+                    const isOurApp = experience.source === 'database';
+
+                    return (
+                      <Pressable
+                        key={`${experience.source}-${experience.id}-${index}`}
+                        style={styles.experienceCard}
+                        onPress={() => handleExperiencePress(experience)}
+                      >
+                        <View style={styles.cardImageWrapper}>
+                          {imageUrl ? (
+                            <Image
+                              source={{ uri: imageUrl }}
+                              style={styles.cardImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+                              <Text style={styles.placeholderText}>No Image</Text>
+                            </View>
+                          )}
+                        </View>
+                        
+                        <View style={styles.cardContent}>
+                          <View style={[styles.sourceBadge, isOurApp && styles.sourceBadgeOurs]}>
+                            <Text style={[styles.sourceBadgeText, isOurApp && styles.sourceBadgeTextOurs]}>
+                              {sourceBadge}
+                            </Text>
+                          </View>
+                          
+                          <View style={styles.cardHeader}>
+                            <Text style={styles.cardTitle} numberOfLines={2}>
+                              {experience.title}
+                            </Text>
+                            <Pressable
+                              style={styles.favoriteButton}
+                              onPress={() => toggleFavorite(experience.id)}
+                            >
+                              <Heart
+                                size={20}
+                                color={favorites.has(experience.id) ? '#FF6B00' : '#ccc'}
+                                fill={favorites.has(experience.id) ? '#FF6B00' : 'transparent'}
+                              />
+                            </Pressable>
+                          </View>
+                          
+                          <View style={styles.cardLocation}>
+                            <MapPin size={12} color="#999" />
+                            <Text style={styles.cardLocationText} numberOfLines={1}>{experience.location}</Text>
+                          </View>
+                          
+                          <View style={styles.cardFooter}>
+                            <Text style={styles.cardPrice}>
+                              {experience.price}€
+                            </Text>
+                            
+                            {(experience.rating || 0) > 0 && (
+                              <View style={styles.cardRating}>
+                                <Star size={14} color="#FFB800" fill="#FFB800" />
+                                <Text style={styles.cardRatingText}>
+                                  {(experience.rating || 0).toFixed(1)}
+                                </Text>
+                                <Text style={styles.cardRatingLabel}>stars</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Location Picker Modal (hidden by default) */}
           <View style={styles.locationSection}>
             
@@ -799,6 +897,123 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     paddingLeft: 20,
   },
+  specificLocationContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  specificLocationTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 20,
+  },
+  experiencesList: {
+    gap: 16,
+  },
+  experienceCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 16,
+  },
+  cardImageWrapper: {
+    width: 120,
+    height: 120,
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardImagePlaceholder: {
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    color: '#999',
+    fontSize: 12,
+  },
+  cardContent: {
+    flex: 1,
+    padding: 12,
+  },
+  sourceBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 6,
+  },
+  sourceBadgeOurs: {
+    backgroundColor: '#FFF500',
+  },
+  sourceBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+  },
+  sourceBadgeTextOurs: {
+    color: '#000',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  cardTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginRight: 8,
+  },
+  favoriteButton: {
+    padding: 4,
+  },
+  cardLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  cardLocationText: {
+    fontSize: 13,
+    color: '#666',
+    flex: 1,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+  },
+  cardRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cardRatingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+  },
+  cardRatingLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
   nearYouHeader: {
     marginBottom: 16,
     paddingRight: 20,
@@ -940,20 +1155,6 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     fontWeight: '700',
     color: '#000',
-  },
-  locationDropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  locationDropdownText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 20,
