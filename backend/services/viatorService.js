@@ -153,10 +153,8 @@ class ViatorService {
    * Transform Viator product format to our experience format
    */
   transformViatorProducts(viatorProducts, activity, searchLocation = null) {
-    // Note: We don't filter here because Viator's search already does semantic matching
-    // Their API is smart enough to return relevant results for "food tour" even if
-    // the product is called "Culinary Experience" or "Tapas Tasting"
-    return viatorProducts.map(product => ({
+    // Transform products first
+    const transformed = viatorProducts.map(product => ({
         // Mark as external source
         id: `viator_${product.productCode}`,
         source: 'viator',
@@ -191,6 +189,41 @@ class ViatorService {
         tags: product.tags || [],
         flags: product.flags || []
       }));
+    
+    // Sort results to prioritize best matches for the activity
+    // 1. Activity in title START (most relevant)
+    // 2. Activity in title ANYWHERE
+    // 3. More reviews (more popular/trustworthy)
+    // 4. Better rating
+    const activityLower = (activity || '').toLowerCase();
+    const activityBase = activityLower.replace(/ing$/, ''); // "sandboarding" → "sandboard"
+    
+    return transformed.sort((a, b) => {
+      const titleA = (a.title || '').toLowerCase();
+      const titleB = (b.title || '').toLowerCase();
+      
+      // Check if activity is at the START of title (most relevant)
+      const aStartsWithActivity = titleA.startsWith(activityBase) || titleA.startsWith(activityLower);
+      const bStartsWithActivity = titleB.startsWith(activityBase) || titleB.startsWith(activityLower);
+      
+      if (aStartsWithActivity && !bStartsWithActivity) return -1;
+      if (bStartsWithActivity && !aStartsWithActivity) return 1;
+      
+      // Check if activity appears early in title (first 30 chars)
+      const aEarlyMatch = titleA.substring(0, 30).includes(activityBase);
+      const bEarlyMatch = titleB.substring(0, 30).includes(activityBase);
+      
+      if (aEarlyMatch && !bEarlyMatch) return -1;
+      if (bEarlyMatch && !aEarlyMatch) return 1;
+      
+      // Both have similar relevance - sort by popularity (reviews count)
+      if (a.reviewCount !== b.reviewCount) {
+        return b.reviewCount - a.reviewCount; // More reviews first
+      }
+      
+      // Same review count - sort by rating
+      return b.rating - a.rating;
+    });
   }
 
   /**
