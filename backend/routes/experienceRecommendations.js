@@ -590,8 +590,8 @@ router.post('/by-activity', async (req, res) => {
       viatorSearchLocation = NEAR_YOU_CITY;
       console.log(`   🔍 Viator Near You search: "${viatorSearchQuery}" in "${viatorSearchLocation}"`);
     } else {
-      // AS SEEN ON REEL: Search for activity + specific location from the reel
-      // This ensures "surf French Polynesia" returns ONLY French Polynesia results
+      // AS SEEN ON REEL: Search for activity + EXACT location from the reel
+      // Keep the full location (e.g., "Huacachina, Ica, Peru") for the most accurate results
       viatorSearchQuery = fullActivity || activity;
       viatorSearchLocation = location || null;
       console.log(`   🔍 Viator Reel search: "${viatorSearchQuery}" in "${viatorSearchLocation || 'global'}"`);

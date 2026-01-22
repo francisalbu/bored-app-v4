@@ -173,7 +173,7 @@ export default function FindActivityScreen() {
     
     const normalizedSearch = activityName.toLowerCase().trim();
     
-    // Try exact match first
+    // Try exact match first (case insensitive)
     let found = activitiesDatabase.activities.find(
       (a: any) => a.activity.toLowerCase() === normalizedSearch
     );
@@ -186,74 +186,423 @@ export default function FindActivityScreen() {
       );
     }
     
-    // Try to match common variations
+    // COMPREHENSIVE mapping: AI-detected activity → JSON activity name
+    // This covers ALL 315 activities with common variations and abbreviations
     if (!found) {
-      const variations: { [key: string]: string[] } = {
+      const activityMappings: { [key: string]: string[] } = {
+        // ===== WATER ACTIVITIES =====
         'surf': ['Surfing', 'Big Wave Surfing'],
-        'dive': ['Scuba Diving', 'Cave Diving', 'Freediving'],
-        'diving': ['Scuba Diving', 'Cave Diving', 'Freediving'],
-        'snorkel': ['Snorkeling'],
-        'kayak': ['Kayaking', 'Sea Kayaking'],
-        'paddle': ['Stand Up Paddleboarding (SUP)'],
+        'surfing': ['Surfing', 'Big Wave Surfing'],
+        'big wave': ['Big Wave Surfing'],
+        'dive': ['Scuba Diving', 'Cave Diving', 'Freediving', 'Deep Sea Diving', 'Technical Diving', 'Ice Diving', 'Wreck Diving', 'Apnea Diving', 'Cage Diving', 'Shark Cage Diving', 'Lobster Diving', 'Pearl Diving'],
+        'diving': ['Scuba Diving', 'Cave Diving', 'Freediving', 'Deep Sea Diving'],
+        'scuba': ['Scuba Diving'],
+        'freedive': ['Freediving', 'Apnea Diving'],
+        'freediving': ['Freediving', 'Apnea Diving'],
+        'apnea': ['Apnea Diving', 'Freediving'],
+        'snorkel': ['Snorkeling', 'Dry-suit Snorkeling'],
+        'snorkeling': ['Snorkeling'],
+        'kayak': ['Kayaking', 'Sea Kayaking', 'Bioluminescent Kayaking', 'Iceberg Kayaking'],
+        'kayaking': ['Kayaking', 'Sea Kayaking'],
+        'sea kayak': ['Sea Kayaking'],
+        'canoe': ['Canoeing'],
+        'canoeing': ['Canoeing'],
+        'paddle': ['Stand Up Paddleboarding (SUP)', 'Paddleboarding', 'Glacier Paddleboarding'],
+        'paddleboard': ['Stand Up Paddleboarding (SUP)', 'Paddleboarding'],
         'sup': ['Stand Up Paddleboarding (SUP)'],
-        'paddleboard': ['Stand Up Paddleboarding (SUP)'],
-        'kite': ['Kitesurfing'],
+        'stand up paddle': ['Stand Up Paddleboarding (SUP)'],
+        'kite': ['Kitesurfing', 'Snowkiting', 'Land Kiting', 'Kite Landboarding'],
         'kitesurf': ['Kitesurfing'],
+        'kitesurfing': ['Kitesurfing'],
         'windsurf': ['Windsurfing'],
+        'windsurfing': ['Windsurfing'],
         'wakeboard': ['Wakeboarding'],
-        'ski': ['Skiing', 'Heli-Skiing', 'Cross Country Skiing'],
-        'snowboard': ['Snowboarding'],
-        'climb': ['Rock Climbing', 'Ice Climbing', 'Free Climbing'],
+        'wakeboarding': ['Wakeboarding'],
+        'water ski': ['Water Skiing'],
+        'waterski': ['Water Skiing'],
+        'jet ski': ['Jet Skiing'],
+        'jetski': ['Jet Skiing'],
+        'sail': ['Sailing'],
+        'sailing': ['Sailing'],
+        'boat': ['Jet Boating', 'Houseboat Stays'],
+        'jet boat': ['Jet Boating'],
+        'bodyboard': ['Bodyboarding'],
+        'boogie board': ['Bodyboarding'],
+        'skim board': ['Skim Boarding'],
+        'kneeboard': ['Kneeboarding', 'Knee Boarding'],
+        'flyboard': ['Flyboarding'],
+        'flowboard': ['Flowboarding'],
+        'subwing': ['Sub Wing'],
+        'sub wing': ['Sub Wing'],
+        'parasail': ['Parasailing'],
+        'parasailing': ['Parasailing'],
+        'fish': ['Fishing', 'Fly Fishing', 'Ice Fishing'],
+        'fishing': ['Fishing', 'Fly Fishing'],
+        'fly fish': ['Fly Fishing'],
+        'raft': ['White Water Rafting', 'Whitewater Rafting'],
+        'rafting': ['White Water Rafting', 'Whitewater Rafting'],
+        'white water': ['White Water Rafting', 'Whitewater Rafting'],
+        'whitewater': ['Whitewater Rafting'],
+        'river tube': ['River Tubing'],
+        'tubing': ['River Tubing', 'Snow Tubing'],
+        'cliff jump': ['Cliff Jumping', 'Cliff Diving'],
+        'cliff dive': ['Cliff Diving'],
+        'coasteer': ['Coasteering'],
+        'coasteering': ['Coasteering'],
+        'submarine': ['Submarine Tours'],
+        'shark cage': ['Shark Cage Diving', 'Cage Diving'],
+        'whale watch': ['Whale Watching'],
+        'whale': ['Whale Watching'],
+        'dolphin': ['Dolphin Swimming', 'Dolphin Watching'],
+        'swim with dolphin': ['Dolphin Swimming'],
+        'manatee': ['Manatee Swimming'],
+        'turtle': ['Sea Turtle Watching'],
+        'sea turtle': ['Sea Turtle Watching'],
+        'coral': ['Coral Reef Exploration'],
+        'reef': ['Coral Reef Exploration'],
+        'marine': ['Marine Life Tours'],
+        'cenote': ['Cenote Jumping'],
+        'bioluminescen': ['Bioluminescence Tours', 'Bioluminescent Kayaking'],
+        
+        // ===== SNOW & ICE ACTIVITIES =====
+        'ski': ['Skiing', 'Heli-Skiing', 'Cross Country Skiing', 'Ski Touring', 'Backcountry Skiing', 'Slalom Skiing', 'Freestyle Skiing', 'Telemark Skiing', 'Helicopter Skiing', 'Cross-country Skiing', 'Ski Jumping', 'Ski Racing'],
+        'skiing': ['Skiing', 'Cross Country Skiing'],
+        'heli ski': ['Heli-Skiing', 'Helicopter Skiing'],
+        'heliski': ['Heli-Skiing'],
+        'backcountry': ['Backcountry Skiing'],
+        'cross country': ['Cross Country Skiing', 'Cross-country Skiing'],
+        'snowboard': ['Snowboarding', 'Snowboard Cross', 'Snowboard Racing'],
+        'snowboarding': ['Snowboarding'],
+        'sandboard': ['Sandboarding'],
+        'sandboarding': ['Sandboarding'],
+        'ice climb': ['Ice Climbing'],
+        'ice climbing': ['Ice Climbing'],
+        'snowmobile': ['Snowmobiling'],
+        'snowmobiling': ['Snowmobiling'],
+        'sled': ['Sledding', 'Dog Sledding', 'Reindeer Sledding'],
+        'sledding': ['Sledding'],
+        'toboggan': ['Tobogganing'],
+        'dog sled': ['Dog Sledding'],
+        'husky': ['Dog Sledding'],
+        'snow tube': ['Snow Tubing'],
+        'snowshoe': ['Snowshoeing'],
+        'snowshoeing': ['Snowshoeing'],
+        'ice skate': ['Ice Skating'],
+        'ice skating': ['Ice Skating'],
+        'glacier': ['Glacier Trekking', 'Glacier Hiking', 'Glacier Paddleboarding'],
+        'glacier trek': ['Glacier Trekking'],
+        'ice cave': ['Ice Cave Exploring'],
+        'ice drive': ['Ice Driving'],
+        'luge': ['Luge'],
+        'bobsled': ['Bobsledding'],
+        'ice fish': ['Ice Fishing'],
+        'igloo': ['Igloo Building', 'Igloo Stays'],
+        'snow bike': ['Snow Biking'],
+        'arctic': ['Arctic Expeditions', 'Arctic Wildlife Tours'],
+        'monoski': ['Monoskiing'],
+        'snowblade': ['Snowblading'],
+        'snowkite': ['Snowkiting'],
+        'speed ride': ['Speed Riding'],
+        'reindeer': ['Reindeer Experience', 'Reindeer Sledding'],
+        
+        // ===== AIR ACTIVITIES =====
+        'skydive': ['Skydiving', 'Indoor Skydiving', 'Tandem Skydiving', 'Formation Skydiving'],
+        'skydiving': ['Skydiving', 'Indoor Skydiving'],
+        'indoor skydive': ['Indoor Skydiving'],
+        'tandem': ['Tandem Skydiving'],
+        'paraglide': ['Paragliding'],
+        'paragliding': ['Paragliding'],
+        'hang glide': ['Hang Gliding', 'Hang-gliding'],
+        'hang gliding': ['Hang Gliding'],
+        'bungee': ['Bungee Jumping'],
+        'bungee jump': ['Bungee Jumping'],
+        'base jump': ['Base Jumping'],
+        'hot air balloon': ['Hot Air Ballooning'],
+        'balloon': ['Hot Air Ballooning', 'Balloon Safaris'],
+        'helicopter': ['Helicopter Tours', 'Helicopter Skiing'],
+        'heli': ['Helicopter Tours', 'Heli-Skiing', 'Heli-Biking'],
+        'wingsuit': ['Wingsuit Flying'],
+        'zipline': ['Zip Lining', 'Zip-lining'],
+        'zip line': ['Zip Lining', 'Zip-lining'],
+        'ziplining': ['Zip Lining', 'Zip-lining'],
+        'canyon swing': ['Canyon Swing', 'Tricycle Canyon Swing'],
+        'parachute': ['Parachuting'],
+        'microlight': ['Micro Lighting'],
+        'ultralight': ['Micro Lighting'],
+        'glide': ['Gliding'],
+        'gliding': ['Gliding'],
+        'trapeze': ['Trapeze'],
+        'highline': ['Highlining'],
+        'slackline': ['Slacklining', 'Highlining'],
+        'slingshot': ['Slingshot Rides'],
+        'giant swing': ['Giant Swing'],
+        'aerobatic': ['Aerobatic Flying', 'Aerobatic Flights'],
+        'stunt plane': ['Stunt Plane Flying', 'Aerobatic Flying'],
+        'paramotor': ['Paramotoring', 'Paramotor Flying'],
+        'seaplane': ['Seaplane Tours'],
+        'scenic flight': ['Scenic Flights'],
+        'fighter jet': ['Fighter Jet Rides'],
+        'weightless': ['Weightlessness Flights'],
+        'zero gravity': ['Weightlessness Flights'],
+        'wing walk': ['Wingwalking', 'Plane Wing Walking'],
+        'zeppelin': ['Zeppelin Tours'],
+        'airship': ['Airship Tours'],
+        'bush plane': ['Bush Plane Tours'],
+        
+        // ===== LAND ADVENTURES =====
+        'hike': ['Hiking', 'Volcano Hiking', 'Canyon Hiking', 'Glacier Hiking'],
+        'hiking': ['Hiking'],
+        'trek': ['Hiking', 'Jungle Trekking', 'Desert Trekking', 'Glacier Trekking', 'Gorilla Trekking', 'Orangutan Trekking', 'Llama Trekking', 'Yak Trekking'],
+        'trekking': ['Hiking', 'Jungle Trekking'],
+        'volcano': ['Volcano Hiking'],
+        'jungle': ['Jungle Trekking'],
+        'desert trek': ['Desert Trekking'],
+        'climb': ['Rock Climbing', 'Ice Climbing', 'Free Climbing', 'Tree Climbing'],
+        'climbing': ['Rock Climbing'],
         'rock climb': ['Rock Climbing'],
-        'hike': ['Hiking', 'Volcano Hiking', 'Canyon Hiking'],
-        'trek': ['Hiking', 'Jungle Trekking', 'Desert Trekking', 'Glacier Trekking'],
+        'free climb': ['Free Climbing'],
+        'boulder': ['Bouldering'],
+        'bouldering': ['Bouldering'],
+        'mountain': ['Mountaineering', 'Winter Mountaineering', 'Mountain Biking', 'Mountain Boarding', 'Mountain Karting', 'Mountain Drives'],
+        'mountaineer': ['Mountaineering', 'Winter Mountaineering'],
+        'cave': ['Caving', 'Cave Exploring', 'Caving/Spelunking', 'Cave Diving', 'Ice Cave Exploring'],
+        'caving': ['Caving', 'Caving/Spelunking'],
+        'spelunk': ['Caving/Spelunking'],
+        'atv': ['ATV/Quad Biking', 'ATV Tours'],
+        'quad': ['ATV/Quad Biking', 'Quad Biking'],
+        'quad bike': ['ATV/Quad Biking', 'Quad Biking'],
+        'buggy': ['Dune Buggy', 'Buggy Tours', 'Dune Buggy Racing'],
+        'dune buggy': ['Dune Buggy', 'Dune Buggy Racing'],
+        'safari': ['Safari', 'Safari (Wildlife)', 'Photography Safari', 'Night Safari', 'Tiger Safari', 'Lion Safari', 'Walking Safari', 'Balloon Safaris', 'Game Drives'],
+        'game drive': ['Game Drives', 'Safari'],
+        'horse': ['Horseback Riding', 'Horse Racing'],
+        'horseback': ['Horseback Riding'],
+        'horse riding': ['Horseback Riding'],
+        'camel': ['Camel Riding', 'Camel Racing'],
+        'elephant': ['Elephant Riding'],
+        'llama': ['Llama Trekking'],
+        'yak': ['Yak Trekking'],
+        'ostrich': ['Ostrich Riding'],
+        'zorb': ['Zorbing'],
+        'zorbing': ['Zorbing'],
+        'via ferrata': ['Via Ferrata'],
+        'ferrata': ['Via Ferrata'],
+        'abseil': ['Abseiling/Rappelling', 'Rappelling'],
+        'rappel': ['Abseiling/Rappelling', 'Rappelling'],
+        'parkour': ['Parkour'],
+        'freerun': ['Parkour'],
+        'trail run': ['Trail Running', 'Ultra Running'],
+        'trail running': ['Trail Running'],
+        'ultra': ['Ultra Running'],
+        'orienteer': ['Orienteering'],
+        'geocach': ['Geocaching'],
+        'off road': ['Off-Road Driving'],
+        'offroad': ['Off-Road Driving'],
+        '4x4': ['Off-Road Driving', 'Jeep Tours', 'Land Rover Tours'],
+        'jeep': ['Jeep Tours'],
+        'land rover': ['Land Rover Tours'],
+        'gorge walk': ['Gorge Walking'],
+        'rope course': ['Rope Course'],
+        'obstacle': ['Obstacle Course Racing'],
+        'wildlife track': ['Wildlife Tracking'],
+        'gorilla': ['Gorilla Trekking'],
+        'orangutan': ['Orangutan Trekking'],
+        'tiger': ['Tiger Safari'],
+        'lion': ['Lion Safari'],
+        'bear': ['Bear Watching', 'Polar Bear Viewing'],
+        'polar bear': ['Polar Bear Viewing'],
+        'penguin': ['Penguin Watching'],
+        'bird': ['Bird Watching'],
+        'birdwatch': ['Bird Watching'],
+        'seal': ['Seal Watching'],
+        'firefly': ['Firefly Watching'],
+        'butterfly': ['Butterfly Sanctuary Visits', 'Butterfly Migration Watching'],
+        'rainforest': ['Rainforest Tours'],
+        'botanical': ['Botanical Garden Visits'],
+        'national park': ['National Park Tours'],
+        
+        // ===== WHEELS & MOTORS =====
+        'bike': ['Mountain Biking', 'Bike Tours', 'Snow Biking', 'Dirt Bike Tours', 'Heli-Biking'],
+        'biking': ['Mountain Biking', 'Bike Tours'],
         'mountain bike': ['Mountain Biking'],
         'mtb': ['Mountain Biking'],
         'cycle': ['Mountain Biking', 'Bike Tours'],
-        'bike': ['Mountain Biking', 'Bike Tours'],
-        'paraglide': ['Paragliding'],
-        'paragliding': ['Paragliding'],
-        'skydive': ['Skydiving'],
-        'bungee': ['Bungee Jumping'],
-        'yoga': ['Yoga Retreats'],
-        'spa': ['Spa Treatments'],
-        'wine': ['Wine Tasting'],
-        'cook': ['Cooking Classes'],
+        'cycling': ['Mountain Biking', 'Bike Tours'],
+        'bmx': ['BMX'],
+        'dirt bike': ['Dirt Bike Tours'],
+        'skateboard': ['Skateboarding'],
+        'longboard': ['Longboarding'],
+        'motocross': ['Motocross', 'FMX (Freestyle Motocross)'],
+        'fmx': ['FMX (Freestyle Motocross)'],
+        'freestyle motocross': ['FMX (Freestyle Motocross)'],
+        'inline skate': ['Aggressive Inline Skating'],
+        'rollerblad': ['Aggressive Inline Skating'],
+        'mountain board': ['Mountain Boarding'],
+        'drift': ['Drifting'],
+        'drifting': ['Drifting'],
+        'kart': ['Mountain Karting', 'Go-kart Racing'],
+        'go kart': ['Go-kart Racing'],
+        'land kite': ['Land Kiting', 'Kite Landboarding'],
+        'motorcycle': ['Motorcycle Racing', 'Motorcycle Touring'],
+        'motorbike': ['Motorcycle Touring'],
+        'rally': ['Rally Driving'],
+        'race car': ['Race Car Driving'],
+        'stunt drive': ['Stunt Driving'],
+        'autobahn': ['Autobahn Driving'],
+        'segway': ['Segway Tours'],
+        'rv': ['RV Touring'],
+        'caravan': ['Caravan Touring'],
+        'road trip': ['Road Trips', 'Scenic Drives'],
+        'scenic drive': ['Scenic Drives', 'Coastal Drives', 'Mountain Drives', 'Desert Drives'],
+        'rickshaw': ['Rickshaw Driving'],
+        
+        // ===== CULTURAL & TOURS =====
+        'city tour': ['City Tours'],
+        'walk tour': ['Walking Tours'],
+        'walking tour': ['Walking Tours'],
+        'museum': ['Museum Visits'],
+        'history': ['Historical Site Tours'],
+        'historical': ['Historical Site Tours'],
+        'food tour': ['Food Tours'],
         'food': ['Food Tours'],
-        'safari': ['Safari', 'Safari (Wildlife)', 'Photography Safari'],
-        'whale': ['Whale Watching'],
-        'dolphin': ['Dolphin Swimming', 'Dolphin Watching'],
-        'zipline': ['Zip Lining'],
-        'zip line': ['Zip Lining'],
-        'hot air balloon': ['Hot Air Ballooning'],
-        'balloon': ['Hot Air Ballooning', 'Balloon Safaris'],
-        'atv': ['ATV/Quad Biking', 'ATV Tours'],
-        'quad': ['ATV/Quad Biking'],
-        'jet ski': ['Jet Skiing'],
-        'sail': ['Sailing'],
-        'sailing': ['Sailing'],
-        'fish': ['Fishing', 'Fly Fishing'],
-        'fishing': ['Fishing', 'Fly Fishing'],
-        'rafting': ['White Water Rafting'],
-        'raft': ['White Water Rafting'],
+        'wine': ['Wine Tasting'],
+        'wine tasting': ['Wine Tasting'],
+        'brewery': ['Brewery Tours'],
+        'beer': ['Brewery Tours'],
+        'temple': ['Temple Visits', 'Temple Stays'],
+        'castle': ['Castle Tours'],
+        'palace': ['Palace Tours'],
+        'archaeological': ['Archaeological Site Visits'],
+        'archaeology': ['Archaeological Site Visits'],
+        'street art': ['Street Art Tours'],
+        'graffiti': ['Street Art Tours'],
+        'market': ['Market Visits'],
+        'cook': ['Cooking Classes'],
+        'cooking': ['Cooking Classes'],
+        'cooking class': ['Cooking Classes'],
+        'festival': ['Cultural Festivals'],
+        'pilgrimage': ['Religious Pilgrimages'],
+        'architecture': ['Architecture Tours'],
+        'ghost tour': ['Ghost Tours'],
+        'ghost': ['Ghost Tours'],
+        'bike tour': ['Bike Tours'],
+        'hop on': ['Hop-On Hop-Off Bus'],
+        'bus tour': ['Hop-On Hop-Off Bus'],
+        'night tour': ['Night Tours', 'Night Safari'],
+        'photo tour': ['Photography Tours', 'Photography Safari'],
+        'photography': ['Photography Tours', 'Photography Safari'],
+        'art gallery': ['Art Gallery Visits'],
+        'gallery': ['Art Gallery Visits'],
+        'theater': ['Theater Shows'],
+        'theatre': ['Theater Shows'],
+        'opera': ['Opera Performances'],
+        'concert': ['Concert Attendance'],
+        'village': ['Local Village Visits'],
+        'tribal': ['Tribal Experiences'],
+        'dance': ['Traditional Dance Shows'],
+        'geisha': ['Geisha Experiences'],
+        'sumo': ['Sumo Watching'],
+        'bullfight': ['Bullfighting'],
+        'rodeo': ['Rodeo'],
+        'polo': ['Polo'],
+        'equestrian': ['Equestrian Events'],
+        'falcon': ['Falconry'],
+        'falconry': ['Falconry'],
+        'archery': ['Archery'],
+        'muay thai': ['Muay Thai'],
+        'thai box': ['Muay Thai'],
+        'kok boru': ['Kok Boru'],
+        
+        // ===== WELLNESS & RELAXATION =====
+        'beach': ['Beach Relaxation'],
+        'spa': ['Spa Treatments'],
+        'massage': ['Massage Therapy'],
+        'yoga': ['Yoga Retreats'],
+        'meditation': ['Meditation Retreats'],
+        'wellness': ['Wellness Retreats'],
+        'retreat': ['Yoga Retreats', 'Meditation Retreats', 'Wellness Retreats'],
+        'hot spring': ['Hot Springs', 'Hot Spring Bathing'],
+        'thermal': ['Thermal Baths', 'Thermal Bath'],
+        'hammam': ['Hammam/Turkish Bath'],
+        'turkish bath': ['Hammam/Turkish Bath'],
+        'onsen': ['Onsen (Japanese Bath)', 'Onsen Bathing'],
+        'japanese bath': ['Onsen (Japanese Bath)'],
+        'sauna': ['Sauna', 'Sauna Experiences'],
+        'mud bath': ['Mud Baths'],
+        'float': ['Float Therapy'],
+        'ayurveda': ['Ayurveda Treatments'],
+        'tai chi': ['Tai Chi Classes'],
+        'ashram': ['Ashram Stays'],
+        
+        // ===== ACCOMMODATIONS & STAYS =====
+        'camp': ['Camping'],
+        'camping': ['Camping'],
+        'backpack': ['Backpacking'],
+        'glamp': ['Glamping'],
+        'glamping': ['Glamping'],
+        'treehouse': ['Tree House Stays'],
+        'tree house': ['Tree House Stays'],
+        'houseboat': ['Houseboat Stays'],
+        'yurt': ['Yurt Stays'],
+        'farm stay': ['Farm Stays'],
+        'eco lodge': ['Eco-lodge Stays'],
+        'monastery': ['Monastery Stays'],
+        'ice hotel': ['Ice Hotel Stays'],
+        'ice bar': ['Ice Bar Experience'],
+        'van life': ['Van Life'],
+        
+        // ===== TRAINS & TRANSPORT =====
+        'train': ['Scenic Train Rides', 'Luxury Train Journeys', 'Bullet Train Rides'],
+        'bullet train': ['Bullet Train Rides'],
+        'luxury train': ['Luxury Train Journeys'],
+        
+        // ===== SKY WATCHING =====
+        'stargaze': ['Stargazing'],
+        'stargazing': ['Stargazing'],
+        'meteor': ['Meteor Shower Watching'],
+        'northern light': ['Arctic Expeditions'],
+        'aurora': ['Arctic Expeditions'],
+        
+        // ===== MISC =====
         'canyoning': ['Canyoning'],
-        'canyon': ['Canyoning', 'Canyon Hiking'],
-        'cave': ['Caving', 'Cave Exploring', 'Caving/Spelunking'],
+        'canyon': ['Canyoning', 'Canyon Hiking', 'Canyon Swing'],
+        'space': ['Space Tourism'],
       };
       
-      const matchKeys = Object.keys(variations).filter(key => 
+      // Find the best match
+      const matchKeys = Object.keys(activityMappings).filter(key => 
         normalizedSearch.includes(key) || key.includes(normalizedSearch)
       );
       
+      // Sort by key length (longer = more specific match)
+      matchKeys.sort((a, b) => b.length - a.length);
+      
       if (matchKeys.length > 0) {
         for (const key of matchKeys) {
-          for (const activityVariation of variations[key]) {
+          for (const activityVariation of activityMappings[key]) {
             found = activitiesDatabase.activities.find(
               (a: any) => a.activity === activityVariation
             );
-            if (found) break;
+            if (found) {
+              console.log(`🎯 Mapped "${activityName}" → "${key}" → "${found.activity}"`);
+              break;
+            }
           }
           if (found) break;
+        }
+      }
+    }
+    
+    // Last resort: fuzzy match - find activity that contains any word from search
+    if (!found) {
+      const searchWords = normalizedSearch.split(' ').filter(w => w.length > 3);
+      for (const word of searchWords) {
+        found = activitiesDatabase.activities.find(
+          (a: any) => a.activity.toLowerCase().includes(word)
+        );
+        if (found) {
+          console.log(`🔍 Fuzzy matched "${activityName}" → "${found.activity}" (via "${word}")`);
+          break;
         }
       }
     }
@@ -552,10 +901,10 @@ export default function FindActivityScreen() {
         <View style={styles.loadingContainer}>
           <Text style={styles.emptyText}>Loading...</Text>
         </View>
-      ) : !analysis || experiences.length === 0 ? (
+      ) : !analysis ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
-            No experiences found. Please try again.
+            Could not analyze this reel. Please try again.
           </Text>
         </View>
       ) : (
@@ -730,6 +1079,18 @@ export default function FindActivityScreen() {
                   </ScrollView>
                 </View>
               </Modal>
+              
+              {/* Show empty state or experiences */}
+              {nearYouExperiences.length === 0 ? (
+                <View style={styles.nearYouEmpty}>
+                  <Text style={styles.nearYouEmptyText}>
+                    No {analysis?.activity || 'activities'} found near {userLocation}
+                  </Text>
+                  <Text style={styles.nearYouEmptySubtext}>
+                    Tap the ✏️ icon above to search in a different location
+                  </Text>
+                </View>
+              ) : (
               <ScrollView 
                 horizontal 
                 showsHorizontalScrollIndicator={false}
@@ -803,6 +1164,7 @@ export default function FindActivityScreen() {
                   );
                 })}
               </ScrollView>
+              )}
             </View>
           )}
 
@@ -1846,6 +2208,25 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+    textAlign: 'center',
+  },
+  nearYouEmpty: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 16,
+    alignItems: 'center',
+  },
+  nearYouEmptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  nearYouEmptySubtext: {
+    fontSize: 14,
+    color: '#666',
     textAlign: 'center',
   },
 });
