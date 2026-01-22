@@ -67,7 +67,14 @@ export default function FindActivityScreen() {
   
   // Check if data was passed from shared-content
   const preloadedExperiences = params.experiences ? JSON.parse(params.experiences as string) : null;
-  const preloadedAnalysis = params.analysis ? JSON.parse(params.analysis as string) : null;
+  const rawPreloadedAnalysis = params.analysis ? JSON.parse(params.analysis as string) : null;
+  
+  // Process preloaded analysis to ensure fullActivity and base activity are set
+  const preloadedAnalysis = rawPreloadedAnalysis ? {
+    ...rawPreloadedAnalysis,
+    fullActivity: rawPreloadedAnalysis.fullActivity || rawPreloadedAnalysis.activity, // Ensure fullActivity is set
+    activity: rawPreloadedAnalysis.activity // Base activity (already processed in shared-content)
+  } : null;
   
   const [userLocation, setUserLocation] = useState('Lisboa');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -80,14 +87,15 @@ export default function FindActivityScreen() {
   const [isSpecificLocation, setIsSpecificLocation] = useState(false); // Track if viewing specific location
   
   // Separate states for 3 sections
-  const [nearYouExperiences, setNearYouExperiences] = useState<Experience[]>([]);
-  const [reelExperiences, setReelExperiences] = useState<Experience[]>(preloadedExperiences || []);
+  const [nearYouExperiences, setNearYouExperiences] = useState<Experience[]>(preloadedExperiences || []); // Preloaded goes to Near You initially
+  const [reelExperiences, setReelExperiences] = useState<Experience[]>([]); // Will be fetched separately
   const [suggestedLocations, setSuggestedLocations] = useState<string[]>([]);
   
   const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []); // Keep for compatibility
   const [analysis, setAnalysis] = useState<Analysis | null>(preloadedAnalysis);
   const [loading, setLoading] = useState(false); // Never show loading - data must be preloaded
   const [hasAnalyzed, setHasAnalyzed] = useState(!!preloadedExperiences);
+  const [hasFetchedSections, setHasFetchedSections] = useState(false); // Track if we've fetched the 3 sections
   const [favorites, setFavorites] = useState<Set<string | number>>(new Set());
   
   const cities = ['New York', 'Los Angeles', 'Miami', 'Washington DC', 'Boston', 'Atlanta', 'Lisboa', 'Porto', 'Barcelona', 'Madrid', 'Paris', 'London', 'Rome', 'Amsterdam'];
@@ -189,6 +197,8 @@ export default function FindActivityScreen() {
     whale: ['Açores', 'Madeira', 'Algarve'],
   };
   
+
+  
   // Load recent searches
   useEffect(() => {
     loadRecentSearches();
@@ -253,18 +263,22 @@ export default function FindActivityScreen() {
   console.log('📦 Preloaded experiences:', preloadedExperiences?.length);
   console.log('📊 Preloaded analysis:', preloadedAnalysis);
   
-  // Only fetch if no preloaded data - but DON'T navigate back, just fetch
+  // Initial fetch: when we have preloaded data, fetch the 3 sections properly
   useEffect(() => {
-    if (!preloadedExperiences && instagramUrl) {
-      console.log('⚠️ No preloaded data, but we have URL - will fetch on location change');
-      // Don't navigate back - user came here intentionally
-      // Data will be fetched when location changes or on mount via fetchRecommendations
+    if (preloadedAnalysis && !hasFetchedSections) {
+      console.log('🚀 Have preloaded analysis, fetching 3 sections...');
+      fetchRecommendations();
+      setHasFetchedSections(true);
+    } else if (!preloadedExperiences && instagramUrl && !hasFetchedSections) {
+      console.log('⚠️ No preloaded data, but we have URL - will fetch');
+      fetchRecommendations();
+      setHasFetchedSections(true);
     }
-  }, []);
+  }, [preloadedAnalysis]);
   
-  // Re-fetch experiences when location changes (but don't re-analyze)
+  // Re-fetch experiences when user manually changes location
   useEffect(() => {
-    if (hasAnalyzed && analysis) {
+    if (hasAnalyzed && analysis && hasFetchedSections) {
       console.log('📍 Location changed to:', userLocation, '- fetching new experiences...');
       fetchRecommendations();
     }
@@ -313,24 +327,29 @@ export default function FindActivityScreen() {
       
       const baseActivity = analysisData.activity; // General: "snorkeling"
       const fullActivity = analysisData.fullActivity || analysisData.activity; // Specific: "snorkeling with giant manta rays"
+      const reelLocation = analysisData.location; // Location from reel: "French Polynesia", "Maldives", etc.
       
       console.log('🎯 Base activity:', baseActivity);
       console.log('🎯 Full activity:', fullActivity);
+      console.log('🌍 Reel location:', reelLocation);
+      console.log('📍 User location:', userLocation);
       
       // Parallel fetch for 3 sections
       const [nearYouResponse, reelResponse] = await Promise.all([
-        // 1. Near You: Base activity + User location + Prioritize Bored
+        // 1. Near You: EXACT activity match + User city
+        // Only show experiences that match the EXACT activity type (surf = surf, not indoor skydiving)
         api.post('/experience-recommendations/by-activity', {
           activity: baseActivity,
-          userLocation: userLocation,
-          prioritizeBored: true
+          userLocation: userLocation, // City name - backend will filter by this
+          strictActivityMatch: true, // Only exact activity matches
+          prioritizeBored: true // Bored Tourist first
         }),
         
-        // 2. As Seen on the Reel: Full specific activity + Global search
+        // 2. As Seen on the Reel: Full specific activity + Reel location (where the video was filmed)
         api.post('/experience-recommendations/by-activity', {
           activity: fullActivity,
-          userLocation: null, // Global search
-          prioritizeBored: false // Exact matches only
+          userLocation: reelLocation || null, // Search in the location from the reel
+          prioritizeBored: false // Show all relevant results (Viator primarily for exotic locations)
         })
       ]);
       
@@ -671,13 +690,13 @@ export default function FindActivityScreen() {
             </View>
           )}
 
-          {/* As Seen on the Reel Section - Show exact matches from reel */}
-          {!isSpecificLocation && analysis && analysis.fullActivity && reelExperiences.length > 0 && (
+          {/* As Seen on the Reel Section - Show experiences matching the exact reel content */}
+          {!isSpecificLocation && analysis && analysis.fullActivity && analysis.location && reelExperiences.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.asSeenHeader}>
                 <Text style={styles.asSeenTitle}>🎬 As Seen on the Reel</Text>
                 <Text style={styles.asSeenSubtitle}>
-                  {analysis.fullActivity}
+                  {analysis.fullActivity} in {analysis.location}
                 </Text>
               </View>
               <ScrollView 
@@ -756,10 +775,13 @@ export default function FindActivityScreen() {
             </View>
           )}
 
-          {/* Suggested Locations Section - Show destinations for base activity */}
+          {/* Suggested Locations Section - Suggest places to do this activity */}
           {!isSpecificLocation && suggestedLocations.length > 0 && (
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Suggested Locations for {analysis?.activity}</Text>
+              <View style={styles.suggestedHeader}>
+                <Text style={styles.sectionTitle}>🌍 Where to try {analysis?.activity}</Text>
+                <Text style={styles.suggestedDescription}>Popular destinations for this experience</Text>
+              </View>
               <View style={styles.suggestedGrid}>
                 {suggestedLocations.slice(0, 6).map((city, index) => (
                   <Pressable
@@ -1146,12 +1168,21 @@ const styles = StyleSheet.create({
   },
   sourceBadgeOurs: {
     backgroundColor: '#FFF500',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  sourceBadgeViator: {
+    backgroundColor: '#E0E0E0',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
   sourceBadgeText: {
     fontSize: 9,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: 0.5,
   },
   sourceBadgeTextOurs: {
     color: '#000',
@@ -1448,24 +1479,6 @@ const styles = StyleSheet.create({
     color: '#000',
     lineHeight: 20,
   },
-  sourceBadgeOurs: {
-    backgroundColor: '#FFF500',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  sourceBadgeViator: {
-    backgroundColor: '#E0E0E0',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  sourceBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#000',
-    letterSpacing: 0.5,
-  },
   nearYouCard: {
     width: 280,
     height: 180,
@@ -1522,6 +1535,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
+  },
+  suggestedHeader: {
+    marginBottom: 16,
+  },
+  suggestedDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
   suggestedGrid: {
     flexDirection: 'row',
@@ -1709,104 +1730,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     textAlign: 'center',
-  },
-  experienceCard: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-    overflow: 'hidden',
-    padding: 12,
-  },
-  cardImageWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginRight: 12,
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f0f0f0',
-  },
-  cardImagePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    fontSize: 11,
-    color: '#999',
-  },
-  cardContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-    flex: 1,
-    marginRight: 8,
-    lineHeight: 20,
-  },
-  favoriteButton: {
-    padding: 4,
-  },
-  cardLocation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
-  },
-  cardLocationText: {
-    fontSize: 13,
-    color: '#666',
-    flex: 1,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  cardPrice: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#000',
-  },
-  cardRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  cardRatingText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-  },
-  cardRatingLabel: {
-    fontSize: 13,
-    color: '#999',
-  },
-  sourceBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: '#f0f0f0',
-    marginBottom: 6,
   },
 });

@@ -25,6 +25,58 @@ function parseImages(images) {
 }
 
 /**
+ * Helper: Parse coordinates from experience data
+ * Tries to extract lat/lng from various fields
+ */
+function parseCoordinates(experience) {
+  // Direct lat/lng fields
+  if (experience.latitude && experience.longitude) {
+    return { 
+      latitude: parseFloat(experience.latitude), 
+      longitude: parseFloat(experience.longitude) 
+    };
+  }
+  
+  // Coordinates object
+  if (experience.coordinates) {
+    if (typeof experience.coordinates === 'string') {
+      try {
+        const parsed = JSON.parse(experience.coordinates);
+        if (parsed.latitude && parsed.longitude) {
+          return { latitude: parsed.latitude, longitude: parsed.longitude };
+        }
+      } catch (e) {}
+    } else if (experience.coordinates.latitude && experience.coordinates.longitude) {
+      return experience.coordinates;
+    }
+  }
+  
+  // Location object with lat/lng
+  if (experience.location && typeof experience.location === 'object') {
+    if (experience.location.lat && experience.location.lng) {
+      return { latitude: experience.location.lat, longitude: experience.location.lng };
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Helper: Calculate distance between two coordinates in km (Haversine formula)
+ */
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+/**
  * Check if video analysis is cached
  */
 async function getCachedAnalysis(instagramUrl) {
@@ -400,11 +452,23 @@ router.post('/', async (req, res) => {
  * POST /api/experience-recommendations/by-activity
  * Search experiences by activity and location WITHOUT re-analyzing video
  * 
- * Body: { activity: string, userLocation: string, fullActivity?: string, prioritizeBored?: boolean }
+ * Body: { 
+ *   activity: string, 
+ *   userLocation: string, 
+ *   strictActivityMatch?: boolean, // Only exact activity matches
+ *   fullActivity?: string, 
+ *   prioritizeBored?: boolean 
+ * }
  */
 router.post('/by-activity', async (req, res) => {
   try {
-    const { activity, fullActivity, userLocation, prioritizeBored } = req.body;
+    const { 
+      activity, 
+      fullActivity, 
+      userLocation, 
+      strictActivityMatch = false,
+      prioritizeBored 
+    } = req.body;
     
     if (!activity) {
       return res.status(400).json({
@@ -419,35 +483,62 @@ router.post('/by-activity', async (req, res) => {
     console.log('   Activity:', activity);
     console.log('   Full Activity:', fullActivity);
     console.log('   Location:', userCity);
+    console.log('   Strict Activity Match:', strictActivityMatch);
     console.log('   Prioritize Bored:', prioritizeBored);
     
-    const TARGET_COUNT = 5;
+    const TARGET_COUNT = 8; // More results
     let experiences = [];
     
-    // For Bored Tourist: expand search with synonyms/related activities
-    const boredActivities = prioritizeBored ? getBoredActivitySynonyms(activity) : [activity];
-    console.log('   Bored activities to search:', boredActivities);
+    // Get base word for matching (e.g., "surfing" -> "surf")
+    const activityLower = activity.toLowerCase();
+    const activityBase = activityLower.replace(/ing$/, '').replace(/s$/, '');
     
-    // Search our DB with expanded activities
-    for (const boredActivity of boredActivities) {
-      const dbExperiences = await Experience.findSimilarActivities(
-        boredActivity,
-        userCity,
-        TARGET_COUNT
-      );
-      
-      // Add to results if we found something
-      if (dbExperiences.length > 0) {
-        experiences.push(...dbExperiences.map(exp => ({
-          ...exp,
-          images: parseImages(exp.images),
-          source: 'database'
-        })));
+    console.log('   Activity base:', activityBase);
+    
+    // Search our DB - get experiences from the user's location
+    const dbExperiences = await Experience.findSimilarActivities(
+      activity,
+      userCity,
+      TARGET_COUNT * 3 // Get more to filter
+    );
+    
+    console.log(`   📦 DB returned ${dbExperiences.length} experiences`);
+    
+    // Filter to only matching activities if strict mode
+    if (strictActivityMatch) {
+      experiences = dbExperiences.filter(exp => {
+        const title = (exp.title || '').toLowerCase();
+        const desc = (exp.description || '').toLowerCase();
+        const category = (exp.category || '').toLowerCase();
+        const tags = Array.isArray(exp.tags) ? exp.tags.join(' ').toLowerCase() : '';
         
-        // Stop if we have enough
-        if (experiences.length >= TARGET_COUNT) break;
-      }
+        // Check if the activity matches
+        const activityMatch = 
+          title.includes(activityLower) || 
+          title.includes(activityBase) ||
+          category.includes(activityLower) ||
+          category.includes(activityBase) ||
+          tags.includes(activityLower) ||
+          tags.includes(activityBase);
+        
+        if (activityMatch) {
+          console.log(`   ✅ Match: ${exp.title}`);
+        }
+        
+        return activityMatch;
+      });
+      
+      console.log(`   🎯 After strict filter: ${experiences.length} experiences match "${activity}"`);
+    } else {
+      experiences = dbExperiences;
     }
+    
+    // Mark with source and parse images
+    experiences = experiences.map(exp => ({
+      ...exp,
+      images: parseImages(exp.images),
+      source: 'database'
+    }));
     
     // Remove duplicates based on ID
     experiences = experiences.filter((exp, index, self) => 
@@ -459,8 +550,11 @@ router.post('/by-activity', async (req, res) => {
       activity,
       userCity,
       'EUR',
-      TARGET_COUNT
+      TARGET_COUNT,
+      true // strict matching
     );
+    
+    console.log(`   📦 Viator returned ${viatorExperiences.length} experiences`);
     
     // Combine: DB first (Bored Tourist priority), complete with Viator
     if (experiences.length >= TARGET_COUNT) {

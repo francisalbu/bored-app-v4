@@ -344,7 +344,7 @@ async function findSimilarActivities(activity, city = null, limit = 3) {
   try {
     console.log(`🔍 Finding experiences for: "${activity}" in ${city || 'any city'}`);
     
-    // Get all active experiences with city filter
+    // Get all active experiences - we'll filter by location in memory for flexibility
     let query = from('experiences')
       .select(`
         *,
@@ -353,23 +353,61 @@ async function findSimilarActivities(activity, city = null, limit = 3) {
       `)
       .eq('is_active', true);
     
-    // Simple city filter using new city column
-    if (city) {
-      // Normalize: Lisboa -> Lisbon
-      const normalizedCity = city.toLowerCase() === 'lisboa' ? 'Lisbon' : city;
-      query = query.eq('city', normalizedCity);
-    }
-    
     const { data: allExperiences, error } = await query;
     
     if (error) throw error;
     
     if (!allExperiences || allExperiences.length === 0) {
-      console.log('⚠️ No experiences found in region');
+      console.log('⚠️ No experiences found in database');
       return [];
     }
     
-    console.log(`📊 Found ${allExperiences.length} experiences in region`);
+    console.log(`📊 Found ${allExperiences.length} total experiences in database`);
+    
+    // Filter by city/location if specified
+    let experiencesInCity = allExperiences;
+    if (city) {
+      const normalizedCity = city.toLowerCase().trim();
+      // Also check common variations
+      const cityVariations = [normalizedCity];
+      if (normalizedCity === 'lisboa') cityVariations.push('lisbon');
+      if (normalizedCity === 'lisbon') cityVariations.push('lisboa');
+      
+      experiencesInCity = allExperiences.filter(exp => {
+        const expCity = (exp.city || '').toLowerCase();
+        const expLocation = (exp.location || '').toLowerCase();
+        
+        // Check if any variation matches
+        return cityVariations.some(cv => 
+          expCity.includes(cv) || 
+          cv.includes(expCity) ||
+          expLocation.includes(cv) ||
+          cv.includes(expLocation)
+        );
+      });
+      
+      console.log(`📍 After city filter: ${experiencesInCity.length} experiences in/near ${city}`);
+      
+      // If no results in city, expand to country level (Portugal)
+      if (experiencesInCity.length === 0) {
+        experiencesInCity = allExperiences.filter(exp => {
+          const expLocation = (exp.location || '').toLowerCase();
+          return expLocation.includes('portugal') || 
+                 expLocation.includes('lisbon') ||
+                 expLocation.includes('lisboa') ||
+                 expLocation.includes('porto') ||
+                 expLocation.includes('cascais') ||
+                 expLocation.includes('sintra') ||
+                 expLocation.includes('algarve');
+        });
+        console.log(`📍 Expanded to Portugal: ${experiencesInCity.length} experiences`);
+      }
+    }
+    
+    if (experiencesInCity.length === 0) {
+      console.log('⚠️ No experiences found in region');
+      return [];
+    }
     
     let sortedExperiences = [];
     
@@ -377,7 +415,7 @@ async function findSimilarActivities(activity, city = null, limit = 3) {
     try {
       if (process.env.OPENAI_API_KEY) {
         console.log('🤖 Using AI matching...');
-        const experiencesForAI = allExperiences.map(exp => ({
+        const experiencesForAI = experiencesInCity.map(exp => ({
           id: exp.id,
           title: exp.title,
           description: exp.description,
@@ -399,7 +437,7 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         console.log(`✅ AI matched IDs:`, matchedIds);
         
         sortedExperiences = matchedIds
-          .map(id => allExperiences.find(exp => exp.id === id))
+          .map(id => experiencesInCity.find(exp => exp.id === id))
           .filter(exp => exp);
       } else {
         throw new Error('OpenAI API key not configured');
@@ -409,7 +447,12 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
       console.log('⚠️ AI matching failed, using strict text search:', aiError.message);
       
       const searchTerm = activity.toLowerCase().trim();
-      const scoredExperiences = allExperiences.map(exp => {
+      // Get base word for matching (e.g., "surfing" -> "surf", "snorkeling" -> "snorkel")
+      const searchBase = searchTerm.replace(/ing$/, '').replace(/s$/, '');
+      
+      console.log(`   Searching for: "${searchTerm}" (base: "${searchBase}")`);
+      
+      const scoredExperiences = experiencesInCity.map(exp => {
         let score = 0;
         const title = (exp.title || '').toLowerCase();
         const description = (exp.description || '').toLowerCase();
@@ -417,15 +460,16 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         const tags = (exp.tags || []).map(t => t.toLowerCase());
         
         // STRICT MATCHING - High quality only!
-        // Title exact match (most important)
+        // Title exact match (most important) - check both full term and base
         if (title.includes(searchTerm)) score += 50;
+        if (title.includes(searchBase)) score += 45;
         
         // Category/Tag exact match (very important)
-        if (category.includes(searchTerm)) score += 40;
-        if (tags.some(tag => tag.includes(searchTerm))) score += 35;
+        if (category.includes(searchTerm) || category.includes(searchBase)) score += 40;
+        if (tags.some(tag => tag.includes(searchTerm) || tag.includes(searchBase))) score += 35;
         
         // Description match (less important)
-        if (description.includes(searchTerm)) score += 15;
+        if (description.includes(searchTerm) || description.includes(searchBase)) score += 15;
         
         // Word-by-word matching (bonus for multi-word activities)
         const searchWords = searchTerm.split(' ');
@@ -439,7 +483,7 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         
         // Penalty for irrelevant experiences
         // If activity is "surfing" but exp has "tour" or "visit" without surf-related words
-        if (searchTerm === 'surfing' || searchTerm === 'surf') {
+        if (searchTerm === 'surfing' || searchTerm === 'surf' || searchBase === 'surf') {
           const hasIrrelevantWords = (title.includes('tour') || title.includes('visit')) && 
                                     !title.includes('surf') && 
                                     !description.includes('surf') &&
@@ -451,9 +495,18 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
       });
       
       // STRICT FILTER: Only return experiences with score >= 30 (strong match)
-      const MINIMUM_SCORE = 30;
-      sortedExperiences = scoredExperiences
-        .filter(exp => exp.matchScore >= MINIMUM_SCORE)
+      // But if we have NO matches, lower the threshold
+      let MINIMUM_SCORE = 30;
+      let filtered = scoredExperiences.filter(exp => exp.matchScore >= MINIMUM_SCORE);
+      
+      // If no results with strict filter, try with lower threshold
+      if (filtered.length === 0) {
+        MINIMUM_SCORE = 15;
+        filtered = scoredExperiences.filter(exp => exp.matchScore >= MINIMUM_SCORE);
+        console.log(`   Lowered threshold to ${MINIMUM_SCORE}, found ${filtered.length} matches`);
+      }
+      
+      sortedExperiences = filtered
         .sort((a, b) => b.matchScore - a.matchScore)
         .slice(0, limit);
       

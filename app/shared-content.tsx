@@ -426,16 +426,60 @@ export default function SharedContentScreen() {
             if (response.success && response.data) {
               console.log('✅ Got recommendations:', response.data);
               
+              // Extract base activity from detailed description
+              const getBaseActivity = (activityString: string): string => {
+                const activity = activityString.toLowerCase();
+                if (activity.includes('snorkel')) return 'snorkeling';
+                if (activity.includes('dive') || activity.includes('diving')) return 'diving';
+                if (activity.includes('surf')) return 'surfing';
+                if (activity.includes('kayak')) return 'kayaking';
+                if (activity.includes('paddle')) return 'paddleboarding';
+                if (activity.includes('hike') || activity.includes('hiking') || activity.includes('trek')) return 'hiking';
+                if (activity.includes('climb')) return 'climbing';
+                if (activity.includes('bike') || activity.includes('cycling') || activity.includes('biking')) return 'biking';
+                if (activity.includes('ski')) return 'skiing';
+                if (activity.includes('snowboard')) return 'snowboarding';
+                if (activity.includes('paraglid')) return 'paragliding';
+                if (activity.includes('skydiv')) return 'skydiving';
+                if (activity.includes('bungee') || activity.includes('bungy')) return 'bungee jumping';
+                if (activity.includes('yoga')) return 'yoga';
+                if (activity.includes('sail')) return 'sailing';
+                if (activity.includes('windsurf')) return 'windsurfing';
+                if (activity.includes('kitesurf') || activity.includes('kiteboard')) return 'kitesurfing';
+                if (activity.includes('jet ski') || activity.includes('jetski')) return 'jet skiing';
+                if (activity.includes('whale watch')) return 'whale watching';
+                if (activity.includes('dolphin')) return 'dolphin watching';
+                if (activity.includes('rafting')) return 'rafting';
+                if (activity.includes('canyoning') || activity.includes('canyoneering')) return 'canyoning';
+                if (activity.includes('ziplin')) return 'ziplining';
+                if (activity.includes('scuba')) return 'scuba diving';
+                if (activity.includes('freediv')) return 'freediving';
+                return activity.split(' ')[0]; // Return first word if no match
+              };
+              
+              // Process analysis: keep original as fullActivity, extract base for header
+              const originalActivity = response.data.analysis.activity;
+              const baseActivity = getBaseActivity(originalActivity);
+              
+              const processedAnalysis = {
+                ...response.data.analysis,
+                fullActivity: originalActivity, // Keep original detailed description
+                activity: baseActivity // Generic activity for header and near you search
+              };
+              
+              console.log('🎯 Original activity:', originalActivity);
+              console.log('🎯 Base activity:', baseActivity);
+              
               // Navigate to find-activity with all data ready
               router.replace({
                 pathname: '/find-activity',
                 params: {
                   instagramUrl: url,
                   thumbnail: response.data.analysis?.thumbnailUrl || '',
-                  activity: response.data.analysis.activity,
+                  activity: baseActivity, // Use base activity
                   // Pass experiences as JSON string
                   experiences: JSON.stringify(response.data.experiences),
-                  analysis: JSON.stringify(response.data.analysis)
+                  analysis: JSON.stringify(processedAnalysis) // Pass processed analysis with both fields
                 }
               });
               return;
