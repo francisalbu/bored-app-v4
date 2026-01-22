@@ -22,6 +22,9 @@ import colors from '@/constants/colors';
 import api from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Import activities database with destinations and photos
+import activitiesDatabase from '@/assets/COMPLETE_ACTIVITIES_DATABASE_WITH_PHOTOS.json';
+
 interface Experience {
   id: string | number;
   title: string;
@@ -46,6 +49,12 @@ interface Analysis {
   location: string;
   confidence: number;
   fullActivity?: string; // Original detailed activity from reel
+}
+
+// Destination from activities database JSON
+interface ActivityDestination {
+  location: string;
+  photo_url: string;
 }
 
 interface ApiResponse {
@@ -89,7 +98,7 @@ export default function FindActivityScreen() {
   // Separate states for 3 sections
   const [nearYouExperiences, setNearYouExperiences] = useState<Experience[]>(preloadedExperiences || []); // Preloaded goes to Near You initially
   const [reelExperiences, setReelExperiences] = useState<Experience[]>([]); // Will be fetched separately
-  const [suggestedLocations, setSuggestedLocations] = useState<string[]>([]);
+  const [suggestedLocations, setSuggestedLocations] = useState<ActivityDestination[]>([]);
   
   const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []); // Keep for compatibility
   const [analysis, setAnalysis] = useState<Analysis | null>(preloadedAnalysis);
@@ -157,44 +166,108 @@ export default function FindActivityScreen() {
     return () => clearTimeout(timer);
   }, [nearYouSearch]);
   
-  // Popular destinations by activity - shown automatically!
-  const popularDestinations: { [key: string]: string[] } = {
-    // Water Sports
-    surfing: ['Peniche', 'Ericeira', 'Nazaré', 'Costa da Caparica', 'Carcavelos', 'Algarve'],
-    diving: ['Sesimbra', 'Berlengas', 'Madeira', 'Açores', 'Algarve'],
-    snorkeling: ['Sesimbra', 'Berlengas', 'Madeira', 'Açores', 'Algarve'],
-    sailing: ['Cascais', 'Sesimbra', 'Algarve', 'Lisboa', 'Porto'],
-    kayaking: ['Sesimbra', 'Arrábida', 'Peniche', 'Algarve', 'Gerês'],
-    paddleboarding: ['Cascais', 'Lisboa', 'Algarve', 'Porto', 'Peniche'],
-    kitesurfing: ['Costa da Caparica', 'Guincho', 'Algarve', 'Peniche'],
+  // Find destinations for an activity from the JSON database
+  // Returns destinations with photos from the 315 activities database
+  const getActivityDestinations = (activityName: string): ActivityDestination[] => {
+    if (!activityName) return [];
     
-    // Mountain & Adventure
-    climbing: ['Sintra', 'Cascais', 'Monsanto', 'Arrábida', 'Gerês'],
-    hiking: ['Sintra', 'Arrábida', 'Gerês', 'Madeira', 'Açores', 'Serra da Estrela'],
-    skiing: ['Serra da Estrela', 'Spain (Pyrenees)', 'Andorra', 'Switzerland', 'Austria'],
-    snowboarding: ['Serra da Estrela', 'Spain (Pyrenees)', 'Andorra', 'Switzerland'],
-    mountaineering: ['Serra da Estrela', 'Gerês', 'Madeira', 'Swiss Alps'],
+    const normalizedSearch = activityName.toLowerCase().trim();
     
-    // Cycling & Urban
-    cycling: ['Cascais', 'Lisboa', 'Porto', 'Algarve', 'Sintra', 'Alentejo'],
-    biking: ['Cascais', 'Lisboa', 'Porto', 'Algarve', 'Sintra', 'Alentejo'],
-    running: ['Lisboa', 'Porto', 'Cascais', 'Sintra', 'Algarve'],
+    // Try exact match first
+    let found = activitiesDatabase.activities.find(
+      (a: any) => a.activity.toLowerCase() === normalizedSearch
+    );
     
-    // Wellness & Culture
-    yoga: ['Lisboa', 'Porto', 'Algarve', 'Cascais', 'Sintra', 'Comporta'],
-    meditation: ['Sintra', 'Comporta', 'Alentejo', 'Gerês', 'Madeira'],
-    cooking: ['Lisboa', 'Porto', 'Sintra', 'Évora', 'Algarve'],
-    wine: ['Douro', 'Alentejo', 'Lisboa', 'Setúbal', 'Dão'],
+    // Try partial match (e.g., "surf" matches "Surfing")
+    if (!found) {
+      found = activitiesDatabase.activities.find(
+        (a: any) => a.activity.toLowerCase().includes(normalizedSearch) ||
+                   normalizedSearch.includes(a.activity.toLowerCase())
+      );
+    }
     
-    // Extreme Sports
-    paragliding: ['Madeira', 'Algarve', 'Sintra', 'Arrábida'],
-    skydiving: ['Algarve', 'Évora', 'Lisboa'],
-    bungee: ['Algarve', 'Porto', 'Lisboa'],
+    // Try to match common variations
+    if (!found) {
+      const variations: { [key: string]: string[] } = {
+        'surf': ['Surfing', 'Big Wave Surfing'],
+        'dive': ['Scuba Diving', 'Cave Diving', 'Freediving'],
+        'diving': ['Scuba Diving', 'Cave Diving', 'Freediving'],
+        'snorkel': ['Snorkeling'],
+        'kayak': ['Kayaking', 'Sea Kayaking'],
+        'paddle': ['Stand Up Paddleboarding (SUP)'],
+        'sup': ['Stand Up Paddleboarding (SUP)'],
+        'paddleboard': ['Stand Up Paddleboarding (SUP)'],
+        'kite': ['Kitesurfing'],
+        'kitesurf': ['Kitesurfing'],
+        'windsurf': ['Windsurfing'],
+        'wakeboard': ['Wakeboarding'],
+        'ski': ['Skiing', 'Heli-Skiing', 'Cross Country Skiing'],
+        'snowboard': ['Snowboarding'],
+        'climb': ['Rock Climbing', 'Ice Climbing', 'Free Climbing'],
+        'rock climb': ['Rock Climbing'],
+        'hike': ['Hiking', 'Volcano Hiking', 'Canyon Hiking'],
+        'trek': ['Hiking', 'Jungle Trekking', 'Desert Trekking', 'Glacier Trekking'],
+        'mountain bike': ['Mountain Biking'],
+        'mtb': ['Mountain Biking'],
+        'cycle': ['Mountain Biking', 'Bike Tours'],
+        'bike': ['Mountain Biking', 'Bike Tours'],
+        'paraglide': ['Paragliding'],
+        'paragliding': ['Paragliding'],
+        'skydive': ['Skydiving'],
+        'bungee': ['Bungee Jumping'],
+        'yoga': ['Yoga Retreats'],
+        'spa': ['Spa Treatments'],
+        'wine': ['Wine Tasting'],
+        'cook': ['Cooking Classes'],
+        'food': ['Food Tours'],
+        'safari': ['Safari', 'Safari (Wildlife)', 'Photography Safari'],
+        'whale': ['Whale Watching'],
+        'dolphin': ['Dolphin Swimming', 'Dolphin Watching'],
+        'zipline': ['Zip Lining'],
+        'zip line': ['Zip Lining'],
+        'hot air balloon': ['Hot Air Ballooning'],
+        'balloon': ['Hot Air Ballooning', 'Balloon Safaris'],
+        'atv': ['ATV/Quad Biking', 'ATV Tours'],
+        'quad': ['ATV/Quad Biking'],
+        'jet ski': ['Jet Skiing'],
+        'sail': ['Sailing'],
+        'sailing': ['Sailing'],
+        'fish': ['Fishing', 'Fly Fishing'],
+        'fishing': ['Fishing', 'Fly Fishing'],
+        'rafting': ['White Water Rafting'],
+        'raft': ['White Water Rafting'],
+        'canyoning': ['Canyoning'],
+        'canyon': ['Canyoning', 'Canyon Hiking'],
+        'cave': ['Caving', 'Cave Exploring', 'Caving/Spelunking'],
+      };
+      
+      const matchKeys = Object.keys(variations).filter(key => 
+        normalizedSearch.includes(key) || key.includes(normalizedSearch)
+      );
+      
+      if (matchKeys.length > 0) {
+        for (const key of matchKeys) {
+          for (const activityVariation of variations[key]) {
+            found = activitiesDatabase.activities.find(
+              (a: any) => a.activity === activityVariation
+            );
+            if (found) break;
+          }
+          if (found) break;
+        }
+      }
+    }
     
-    // Nature & Wildlife
-    birdwatching: ['Algarve', 'Comporta', 'Berlengas', 'Açores', 'Madeira'],
-    dolphin: ['Sesimbra', 'Setúbal', 'Algarve', 'Madeira', 'Açores'],
-    whale: ['Açores', 'Madeira', 'Algarve'],
+    if (found && found.destinations) {
+      console.log(`🗺️ Found ${found.destinations.length} destinations for "${activityName}" → "${found.activity}"`);
+      // Filter out destinations without valid photo URLs and cast to correct type
+      return found.destinations
+        .filter((d: any) => d.photo_url && typeof d.photo_url === 'string')
+        .map((d: any) => ({ location: d.location, photo_url: d.photo_url })) as ActivityDestination[];
+    }
+    
+    console.log(`⚠️ No destinations found in database for "${activityName}"`);
+    return [];
   };
   
 
@@ -280,9 +353,52 @@ export default function FindActivityScreen() {
   useEffect(() => {
     if (hasAnalyzed && analysis && hasFetchedSections) {
       console.log('📍 Location changed to:', userLocation, '- fetching new experiences...');
-      fetchRecommendations();
+      
+      // If in specific location mode (clicked a "Where to try" destination), 
+      // fetch experiences for that specific location
+      if (isSpecificLocation) {
+        fetchExperiencesForDestination(userLocation);
+      } else {
+        fetchRecommendations();
+      }
     }
-  }, [userLocation]);
+  }, [userLocation, isSpecificLocation]);
+  
+  // Fetch experiences for a specific destination (when user clicks "Where to try")
+  const fetchExperiencesForDestination = async (destination: string) => {
+    if (!analysis) return;
+    
+    console.log('🌍 Fetching experiences for destination:', destination);
+    console.log('   Activity:', analysis.activity);
+    
+    try {
+      setLoading(true);
+      
+      // Search for activity + destination (e.g., "surfing Uluwatu Indonesia")
+      const response = await api.post('/experience-recommendations/by-activity', {
+        activity: analysis.activity,
+        userLocation: destination, // The destination they clicked
+        strictActivityMatch: true,
+        prioritizeBored: false // Viator will have more results for exotic locations
+      });
+      
+      console.log('📦 Destination Response:', response.data?.experiences?.length);
+      
+      if (response.data && response.data.experiences) {
+        const sorted = sortExperiences(response.data.experiences);
+        setExperiences(sorted);
+        console.log('✅ Experiences for', destination, ':', sorted.length);
+      } else {
+        setExperiences([]);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error fetching destination experiences:', error);
+      setExperiences([]);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const fetchRecommendations = async () => {
     if (!instagramUrl && !analysis) {
@@ -369,10 +485,10 @@ export default function FindActivityScreen() {
         console.log('✅ As Seen on Reel:', sorted.length, 'experiences');
       }
       
-      // 3. Suggested Locations: Use popularDestinations for base activity
-      const locations = popularDestinations[baseActivity.toLowerCase()] || [];
-      setSuggestedLocations(locations);
-      console.log('📍 Suggested locations:', locations);
+      // 3. Suggested Locations: Get destinations from JSON database with photos
+      const destinations = getActivityDestinations(baseActivity);
+      setSuggestedLocations(destinations);
+      console.log('📍 Suggested locations from database:', destinations.length);
       
       // Keep experiences state for compatibility
       setExperiences(nearYouResponse.data?.experiences || []);
@@ -783,24 +899,25 @@ export default function FindActivityScreen() {
                 <Text style={styles.suggestedDescription}>Popular destinations for this experience</Text>
               </View>
               <View style={styles.suggestedGrid}>
-                {suggestedLocations.slice(0, 6).map((city, index) => (
+                {suggestedLocations.slice(0, 6).map((destination, index) => (
                   <Pressable
                     key={`suggested-${index}`}
                     style={styles.suggestedCardVertical}
                     onPress={() => {
-                      setUserLocation(city);
-                      saveRecentSearch(city);
-                      setIsSpecificLocation(true); // Enter specific location mode
+                      // Set location to just the city/place name for search
+                      setUserLocation(destination.location);
+                      saveRecentSearch(destination.location);
+                      setIsSpecificLocation(true); // Enter specific location mode - triggers Viator search
                     }}
                   >
                     <ExpoImage
-                      source={{ uri: `https://source.unsplash.com/400x400/?${city},travel,landscape` }}
+                      source={{ uri: destination.photo_url }}
                       style={styles.suggestedImageVertical}
                       contentFit="cover"
                       transition={200}
                     />
                     <View style={styles.suggestedOverlayVertical}>
-                      <Text style={styles.suggestedCityNameVertical}>{city}</Text>
+                      <Text style={styles.suggestedCityNameVertical}>{destination.location}</Text>
                     </View>
                   </Pressable>
                 ))}
@@ -966,25 +1083,25 @@ export default function FindActivityScreen() {
                     </View>
                   )}
 
-                  {/* Popular for Activity */}
-                  {analysis?.activity && popularDestinations[analysis.activity.toLowerCase()] && !searchQuery && (
+                  {/* Popular for Activity - from JSON database */}
+                  {analysis?.activity && suggestedLocations.length > 0 && !searchQuery && (
                     <View style={styles.locationGroup}>
                       <Text style={styles.locationGroupTitle}>Popular for {analysis.activity}</Text>
-                      {popularDestinations[analysis.activity.toLowerCase()].map((city, index) => (
+                      {suggestedLocations.slice(0, 8).map((destination, index) => (
                         <Pressable
                           key={`popular-${index}`}
                           style={styles.cityOption}
                           onPress={() => {
-                            setUserLocation(city);
-                            saveRecentSearch(city);
+                            setUserLocation(destination.location);
+                            saveRecentSearch(destination.location);
                             setIsSpecificLocation(true); // Enter specific location mode
                             setShowLocationPicker(false);
                             setSearchQuery('');
                           }}
                         >
                           <MapPin size={16} color="#007AFF" style={styles.locationIcon} />
-                          <Text style={styles.cityOptionText}>{city}</Text>
-                          {city === userLocation && <Text style={styles.checkmark}>✓</Text>}
+                          <Text style={styles.cityOptionText}>{destination.location}</Text>
+                          {destination.location === userLocation && <Text style={styles.checkmark}>✓</Text>}
                         </Pressable>
                       ))}
                     </View>

@@ -608,10 +608,11 @@ router.post('/by-activity', async (req, res) => {
     console.log(`   📦 Viator returned ${viatorExperiences.length} experiences`);
     
     // CRITICAL: For Near You, filter Viator to ONLY Lisboa experiences
-    // NEVER show Rio de Janeiro or any other city!
+    // AND they must actually be about the activity (not random tours)
     if (prioritizeBored) {
       viatorExperiences = viatorExperiences.filter(exp => {
         const expLocation = (exp.location || '').toLowerCase();
+        const expTitle = (exp.title || '').toLowerCase();
         
         // Must be in Lisboa/Lisbon area - very strict!
         const isLisbon = expLocation.includes('lisbo') || 
@@ -622,16 +623,29 @@ router.post('/by-activity', async (req, res) => {
                          expLocation.includes('setúbal') ||
                          expLocation.includes('setubal') ||
                          expLocation.includes('arrábida') ||
-                         expLocation.includes('arrabida');
+                         expLocation.includes('arrabida') ||
+                         expLocation.includes('location varies'); // Viator sometimes uses this
+        
+        // CRITICAL: TITLE MUST CONTAIN the activity or related terms
+        // No more "Templar's Castle" - even if description mentions surf
+        // We only want tours that are ABOUT the activity, not tours that mention it
+        const titleHasActivity = searchTerms.some(term => expTitle.includes(term));
         
         if (!isLisbon) {
           console.log(`   ❌ Filtered out (not Lisboa area): ${exp.title} (${exp.location})`);
+          return false;
         }
         
-        return isLisbon;
+        if (!titleHasActivity) {
+          console.log(`   ❌ Filtered out (title doesn't mention ${activity}): ${exp.title}`);
+          return false;
+        }
+        
+        console.log(`   ✅ Viator match: ${exp.title}`);
+        return true;
       });
       
-      console.log(`   📍 After Lisboa filter: ${viatorExperiences.length} Viator experiences`);
+      console.log(`   📍 After Lisboa + title filter: ${viatorExperiences.length} Viator experiences`);
     }
     
     // Combine: 
