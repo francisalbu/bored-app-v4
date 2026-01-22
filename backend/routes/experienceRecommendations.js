@@ -477,12 +477,13 @@ router.post('/by-activity', async (req, res) => {
       });
     }
     
-    const userCity = userLocation || 'Lisbon';
+    // NEAR YOU IS ALWAYS LISBON - no exceptions!
+    const NEAR_YOU_CITY = 'Lisboa';
     
     console.log('🔍 Searching experiences by activity...');
     console.log('   Activity:', activity);
     console.log('   Full Activity:', fullActivity);
-    console.log('   Location:', userCity);
+    console.log('   Near You City:', NEAR_YOU_CITY);
     console.log('   Strict Activity Match:', strictActivityMatch);
     console.log('   Prioritize Bored:', prioritizeBored);
     
@@ -493,50 +494,67 @@ router.post('/by-activity', async (req, res) => {
     const activityLower = activity.toLowerCase();
     const activityBase = activityLower.replace(/ing$/, '').replace(/s$/, '');
     
-    console.log('   Activity base:', activityBase);
+    // Related activities mapping for Bored Tourist
+    const relatedActivities = {
+      'snorkel': ['diving', 'scuba', 'underwater', 'ocean', 'sea'],
+      'dive': ['snorkeling', 'scuba', 'underwater', 'ocean'],
+      'surf': ['paddle', 'bodyboard', 'wave', 'beach', 'water sport'],
+      'paddle': ['surf', 'kayak', 'sup', 'water sport'],
+      'kayak': ['paddle', 'canoe', 'water sport'],
+      'quad': ['buggy', 'atv', '4x4', 'off-road'],
+      'buggy': ['quad', 'atv', '4x4', 'off-road'],
+      'bike': ['cycling', 'e-bike', 'bicycle'],
+      'hike': ['trek', 'walk', 'nature', 'trail'],
+    };
+    
+    // Get related terms for this activity
+    const getRelatedTerms = (act) => {
+      const terms = [act];
+      for (const [key, related] of Object.entries(relatedActivities)) {
+        if (act.includes(key)) {
+          terms.push(...related);
+        }
+      }
+      return [...new Set(terms)];
+    };
+    
+    const searchTerms = getRelatedTerms(activityBase);
+    console.log('   Search terms (including related):', searchTerms);
     console.log('   Prioritize Bored:', prioritizeBored);
     
     // Only search Bored Tourist DB if prioritizeBored = true (Near You section)
     // For "As Seen on Reel" (prioritizeBored = false), skip DB entirely
     if (prioritizeBored) {
-      console.log('   Searching Bored Tourist DB...');
-      // Search our DB - get experiences from the user's location
+      console.log('   Searching Bored Tourist DB for related activities...');
+      // Search our DB - get experiences from LISBON only
       const dbExperiences = await Experience.findSimilarActivities(
         activity,
-        userCity,
+        NEAR_YOU_CITY,
         TARGET_COUNT * 3 // Get more to filter
       );
       
       console.log(`   📦 DB returned ${dbExperiences.length} experiences`);
       
-      // Filter to only matching activities if strict mode
-      if (strictActivityMatch) {
+      // For Bored Tourist, be MORE permissive - include related activities
+      // This ensures we show diving when searching snorkeling, paddle when searching surf, etc.
       experiences = dbExperiences.filter(exp => {
         const title = (exp.title || '').toLowerCase();
         const desc = (exp.description || '').toLowerCase();
         const category = (exp.category || '').toLowerCase();
         const tags = Array.isArray(exp.tags) ? exp.tags.join(' ').toLowerCase() : '';
+        const combined = `${title} ${desc} ${category} ${tags}`;
         
-        // Check if the activity matches
-        const activityMatch = 
-          title.includes(activityLower) || 
-          title.includes(activityBase) ||
-          category.includes(activityLower) ||
-          category.includes(activityBase) ||
-          tags.includes(activityLower) ||
-          tags.includes(activityBase);
+        // Check if ANY of our search terms match
+        const hasMatch = searchTerms.some(term => combined.includes(term));
         
-        if (activityMatch) {
-          console.log(`   ✅ Match: ${exp.title}`);
+        if (hasMatch) {
+          console.log(`   ✅ Bored Tourist Match: ${exp.title}`);
         }
         
-        return activityMatch;
+        return hasMatch;
       });
       
-        console.log(`   🎯 After strict filter: ${experiences.length} experiences match "${activity}"`);  
-      } else {
-        experiences = dbExperiences;
-      }
+      console.log(`   🎯 Bored Tourist matches: ${experiences.length} experiences`);
       
       // Mark with source and parse images
       experiences = experiences.map(exp => ({
@@ -554,9 +572,9 @@ router.post('/by-activity', async (req, res) => {
     }
     
     // Get from Viator (strict match only)
-    // For "Near You" (prioritizeBored=true): Search in userCity (Lisboa)
-    // For "As Seen on Reel" (prioritizeBored=false): Search in reel location (Bali)
-    const viatorSearchLocation = prioritizeBored ? userCity : null; // Global search for reel location
+    // For "Near You" (prioritizeBored=true): Search in LISBON only
+    // For "As Seen on Reel" (prioritizeBored=false): Search globally
+    const viatorSearchLocation = prioritizeBored ? NEAR_YOU_CITY : null;
     
     let viatorExperiences = await viatorService.smartSearch(
       activity,
@@ -568,25 +586,31 @@ router.post('/by-activity', async (req, res) => {
     
     console.log(`   📦 Viator returned ${viatorExperiences.length} experiences`);
     
-    // CRITICAL: Filter Viator results to ONLY show experiences in user's city for Near You
-    // Never show Rio de Janeiro when user is in Lisboa!
-    if (prioritizeBored && userCity) {
-      const cityLower = userCity.toLowerCase();
+    // CRITICAL: For Near You, filter Viator to ONLY Lisboa experiences
+    // NEVER show Rio de Janeiro or any other city!
+    if (prioritizeBored) {
       viatorExperiences = viatorExperiences.filter(exp => {
         const expLocation = (exp.location || '').toLowerCase();
-        const expCity = (exp.city || '').toLowerCase();
         
-        // Must contain the user's city name
-        const isInCity = expLocation.includes(cityLower) || expCity.includes(cityLower);
+        // Must be in Lisboa/Lisbon area - very strict!
+        const isLisbon = expLocation.includes('lisbo') || 
+                         expLocation.includes('lisbon') ||
+                         expLocation.includes('sintra') ||
+                         expLocation.includes('cascais') ||
+                         expLocation.includes('sesimbra') ||
+                         expLocation.includes('setúbal') ||
+                         expLocation.includes('setubal') ||
+                         expLocation.includes('arrábida') ||
+                         expLocation.includes('arrabida');
         
-        if (!isInCity) {
-          console.log(`   ❌ Filtered out: ${exp.title} (${exp.location}) - not in ${userCity}`);
+        if (!isLisbon) {
+          console.log(`   ❌ Filtered out (not Lisboa area): ${exp.title} (${exp.location})`);
         }
         
-        return isInCity;
+        return isLisbon;
       });
       
-      console.log(`   📍 After city filter: ${viatorExperiences.length} Viator experiences in ${userCity}`);
+      console.log(`   📍 After Lisboa filter: ${viatorExperiences.length} Viator experiences`);
     }
     
     // Combine: DB first (Bored Tourist priority), complete with Viator
