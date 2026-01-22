@@ -400,11 +400,11 @@ router.post('/', async (req, res) => {
  * POST /api/experience-recommendations/by-activity
  * Search experiences by activity and location WITHOUT re-analyzing video
  * 
- * Body: { activity: string, userLocation: string }
+ * Body: { activity: string, userLocation: string, fullActivity?: string, prioritizeBored?: boolean }
  */
 router.post('/by-activity', async (req, res) => {
   try {
-    const { activity, userLocation } = req.body;
+    const { activity, fullActivity, userLocation, prioritizeBored } = req.body;
     
     if (!activity) {
       return res.status(400).json({
@@ -417,26 +417,44 @@ router.post('/by-activity', async (req, res) => {
     
     console.log('🔍 Searching experiences by activity...');
     console.log('   Activity:', activity);
+    console.log('   Full Activity:', fullActivity);
     console.log('   Location:', userCity);
+    console.log('   Prioritize Bored:', prioritizeBored);
     
     const TARGET_COUNT = 5;
     let experiences = [];
     
-    // Get from our DB
-    experiences = await Experience.findSimilarActivities(
-      activity,
-      userCity,
-      TARGET_COUNT
+    // For Bored Tourist: expand search with synonyms/related activities
+    const boredActivities = prioritizeBored ? getBoredActivitySynonyms(activity) : [activity];
+    console.log('   Bored activities to search:', boredActivities);
+    
+    // Search our DB with expanded activities
+    for (const boredActivity of boredActivities) {
+      const dbExperiences = await Experience.findSimilarActivities(
+        boredActivity,
+        userCity,
+        TARGET_COUNT
+      );
+      
+      // Add to results if we found something
+      if (dbExperiences.length > 0) {
+        experiences.push(...dbExperiences.map(exp => ({
+          ...exp,
+          images: parseImages(exp.images),
+          source: 'database'
+        })));
+        
+        // Stop if we have enough
+        if (experiences.length >= TARGET_COUNT) break;
+      }
+    }
+    
+    // Remove duplicates based on ID
+    experiences = experiences.filter((exp, index, self) => 
+      index === self.findIndex(e => e.id === exp.id)
     );
     
-    // Mark all DB experiences with source field
-    experiences = experiences.map(exp => ({
-      ...exp,
-      images: parseImages(exp.images), // Parse images correctly
-      source: 'database'
-    }));
-    
-    // Get from Viator
+    // Get from Viator (strict match only)
     const viatorExperiences = await viatorService.smartSearch(
       activity,
       userCity,
@@ -444,7 +462,7 @@ router.post('/by-activity', async (req, res) => {
       TARGET_COUNT
     );
     
-    // Combine: DB first, complete with Viator to reach 5 total
+    // Combine: DB first (Bored Tourist priority), complete with Viator
     if (experiences.length >= TARGET_COUNT) {
       experiences = experiences.slice(0, TARGET_COUNT);
     } else {
@@ -459,6 +477,7 @@ router.post('/by-activity', async (req, res) => {
       success: true,
       data: {
         experiences: experiences.slice(0, TARGET_COUNT),
+        fullActivity: fullActivity || activity, // Pass full activity to frontend
         sources: {
           database: experiences.filter(e => e.source === 'database').length,
           viator: experiences.filter(e => e.source === 'viator').length
@@ -475,5 +494,73 @@ router.post('/by-activity', async (req, res) => {
     });
   }
 });
+
+/**
+ * Get activity synonyms for Bored Tourist database
+ * Expands search to related activities to increase Bored Tourist matches
+ */
+function getBoredActivitySynonyms(activity) {
+  const activityLower = activity.toLowerCase();
+  const synonyms = [activityLower]; // Always include original
+  
+  // Water activities
+  if (activityLower.includes('snorkel')) {
+    synonyms.push('diving', 'scuba diving', 'snorkeling', 'underwater');
+  }
+  if (activityLower.includes('div')) {
+    synonyms.push('snorkeling', 'scuba diving', 'underwater');
+  }
+  if (activityLower.includes('kayak')) {
+    synonyms.push('kayaking', 'paddling', 'canoeing');
+  }
+  if (activityLower.includes('paddle')) {
+    synonyms.push('paddleboarding', 'sup', 'kayaking');
+  }
+  if (activityLower.includes('surf')) {
+    synonyms.push('surfing', 'surf lesson', 'wave riding');
+  }
+  
+  // Land activities
+  if (activityLower.includes('hik')) {
+    synonyms.push('hiking', 'trekking', 'walking', 'trail');
+  }
+  if (activityLower.includes('walk')) {
+    synonyms.push('walking tour', 'city tour', 'guided walk');
+  }
+  if (activityLower.includes('bike') || activityLower.includes('cycling')) {
+    synonyms.push('biking', 'cycling', 'bike tour', 'bicycle');
+  }
+  if (activityLower.includes('climb')) {
+    synonyms.push('climbing', 'rock climbing', 'bouldering');
+  }
+  
+  // Adventure activities  
+  if (activityLower.includes('atv') || activityLower.includes('quad')) {
+    synonyms.push('atv', 'quad', 'buggy', 'quad biking', 'atv riding');
+  }
+  if (activityLower.includes('buggy')) {
+    synonyms.push('atv', 'quad', 'dune buggy', 'quad biking');
+  }
+  if (activityLower.includes('zip') || activityLower.includes('zipline')) {
+    synonyms.push('zipline', 'ziplining', 'canopy tour');
+  }
+  if (activityLower.includes('paraglid') || activityLower.includes('skydiv')) {
+    synonyms.push('paragliding', 'skydiving', 'parachute', 'tandem');
+  }
+  
+  // Cultural activities
+  if (activityLower.includes('food') || activityLower.includes('culinary')) {
+    synonyms.push('food tour', 'culinary', 'tasting', 'gastronomic');
+  }
+  if (activityLower.includes('wine')) {
+    synonyms.push('wine tasting', 'vineyard', 'winery');
+  }
+  if (activityLower.includes('art') || activityLower.includes('museum')) {
+    synonyms.push('art', 'museum', 'gallery', 'cultural');
+  }
+  
+  // Remove duplicates
+  return [...new Set(synonyms)];
+}
 
 module.exports = router;

@@ -45,6 +45,7 @@ interface Analysis {
   activity: string;
   location: string;
   confidence: number;
+  fullActivity?: string; // Original detailed activity from reel
 }
 
 interface ApiResponse {
@@ -77,7 +78,13 @@ export default function FindActivityScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSpecificLocation, setIsSpecificLocation] = useState(false); // Track if viewing specific location
-  const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []);
+  
+  // Separate states for 3 sections
+  const [nearYouExperiences, setNearYouExperiences] = useState<Experience[]>([]);
+  const [reelExperiences, setReelExperiences] = useState<Experience[]>(preloadedExperiences || []);
+  const [suggestedLocations, setSuggestedLocations] = useState<string[]>([]);
+  
+  const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []); // Keep for compatibility
   const [analysis, setAnalysis] = useState<Analysis | null>(preloadedAnalysis);
   const [loading, setLoading] = useState(false); // Never show loading - data must be preloaded
   const [hasAnalyzed, setHasAnalyzed] = useState(!!preloadedExperiences);
@@ -208,6 +215,40 @@ export default function FindActivityScreen() {
     }
   };
   
+  // Extract base activity from detailed description (e.g., "snorkeling with giant manta rays" -> "snorkeling")
+  const getBaseActivity = (activityString: string): string => {
+    const activity = activityString.toLowerCase();
+    
+    // Common activity patterns
+    if (activity.includes('snorkel')) return 'snorkeling';
+    if (activity.includes('dive') || activity.includes('diving')) return 'diving';
+    if (activity.includes('surf')) return 'surfing';
+    if (activity.includes('kayak')) return 'kayaking';
+    if (activity.includes('paddle')) return 'paddleboarding';
+    if (activity.includes('hike') || activity.includes('hiking')) return 'hiking';
+    if (activity.includes('climb')) return 'climbing';
+    if (activity.includes('bike') || activity.includes('cycling')) return 'biking';
+    if (activity.includes('ski')) return 'skiing';
+    if (activity.includes('snowboard')) return 'snowboarding';
+    
+    // Return first word if no pattern match
+    return activity.split(' ')[0];
+  };
+  
+  // Sort experiences: Bored Tourist first, then by rating
+  const sortExperiences = (exps: Experience[]): Experience[] => {
+    return [...exps].sort((a, b) => {
+      // Bored Tourist always first
+      if (a.source === 'database' && b.source !== 'database') return -1;
+      if (a.source !== 'database' && b.source === 'database') return 1;
+      
+      // Then by rating
+      const ratingA = a.rating || 0;
+      const ratingB = b.rating || 0;
+      return ratingB - ratingA;
+    });
+  };
+  
   console.log('🎯 Find Activity params:', params);
   console.log('📦 Preloaded experiences:', preloadedExperiences?.length);
   console.log('📊 Preloaded analysis:', preloadedAnalysis);
@@ -243,48 +284,85 @@ export default function FindActivityScreen() {
     try {
       setLoading(true);
       
-      let response;
+      let analysisData = analysis;
       
-      if (hasAnalyzed && analysis) {
-        // Already analyzed - just search by activity in new location
-        console.log('⚡ Using existing analysis, searching by activity only');
-        response = await api.post('/experience-recommendations/by-activity', {
-          activity: analysis.activity,
-          userLocation: userLocation
-        });
-      } else {
-        // First time - analyze video
+      // First time: analyze video if needed
+      if (!hasAnalyzed && instagramUrl) {
         console.log('🎬 First time: analyzing video...');
-        response = await api.post<ApiResponse>('/experience-recommendations', {
+        const analyzeResponse = await api.post<ApiResponse>('/experience-recommendations', {
           instagramUrl: instagramUrl,
-          userLocation: userLocation
-        });
-      }
-      
-      console.log('📦 Response:', response.data);
-      
-      if (response.data && response.data.experiences) {
-        console.log('✅ Success! Experiences:', response.data.experiences.length);
-        
-        // Debug: log sources
-        response.data.experiences.forEach((exp: any, i: number) => {
-          console.log(`   ${i+1}. ${exp.title} - source: ${exp.source}`);
+          userLocation: userLocation,
+          prioritizeBored: true
         });
         
-        // Set analysis only on first fetch
-        if (response.data.analysis) {
-          setAnalysis(response.data.analysis);
+        if (analyzeResponse.data && analyzeResponse.data.analysis) {
+          analysisData = {
+            ...analyzeResponse.data.analysis,
+            fullActivity: analyzeResponse.data.analysis.activity, // Keep original detailed
+            activity: getBaseActivity(analyzeResponse.data.analysis.activity) // Base for general searches
+          };
+          setAnalysis(analysisData);
+          setHasAnalyzed(true);
         }
-        
-        setExperiences(response.data.experiences);
-        setHasAnalyzed(true);
-      } else {
-        console.log('❌ No experiences in response');
-        setExperiences([]);
       }
+      
+      if (!analysisData) {
+        console.error('❌ No analysis data available');
+        return;
+      }
+      
+      const baseActivity = analysisData.activity; // General: "snorkeling"
+      const fullActivity = analysisData.fullActivity || analysisData.activity; // Specific: "snorkeling with giant manta rays"
+      
+      console.log('🎯 Base activity:', baseActivity);
+      console.log('🎯 Full activity:', fullActivity);
+      
+      // Parallel fetch for 3 sections
+      const [nearYouResponse, reelResponse] = await Promise.all([
+        // 1. Near You: Base activity + User location + Prioritize Bored
+        api.post('/experience-recommendations/by-activity', {
+          activity: baseActivity,
+          userLocation: userLocation,
+          prioritizeBored: true
+        }),
+        
+        // 2. As Seen on the Reel: Full specific activity + Global search
+        api.post('/experience-recommendations/by-activity', {
+          activity: fullActivity,
+          userLocation: null, // Global search
+          prioritizeBored: false // Exact matches only
+        })
+      ]);
+      
+      console.log('📦 Near You Response:', nearYouResponse.data?.experiences?.length);
+      console.log('📦 Reel Response:', reelResponse.data?.experiences?.length);
+      
+      // Set experiences for each section
+      if (nearYouResponse.data && nearYouResponse.data.experiences) {
+        const sorted = sortExperiences(nearYouResponse.data.experiences);
+        setNearYouExperiences(sorted);
+        console.log('✅ Near You:', sorted.length, 'experiences');
+      }
+      
+      if (reelResponse.data && reelResponse.data.experiences) {
+        const sorted = sortExperiences(reelResponse.data.experiences);
+        setReelExperiences(sorted);
+        console.log('✅ As Seen on Reel:', sorted.length, 'experiences');
+      }
+      
+      // 3. Suggested Locations: Use popularDestinations for base activity
+      const locations = popularDestinations[baseActivity.toLowerCase()] || [];
+      setSuggestedLocations(locations);
+      console.log('📍 Suggested locations:', locations);
+      
+      // Keep experiences state for compatibility
+      setExperiences(nearYouResponse.data?.experiences || []);
+      
     } catch (error) {
       console.error('❌ Error fetching recommendations:', error);
-      setExperiences([]);
+      setNearYouExperiences([]);
+      setReelExperiences([]);
+      setSuggestedLocations([]);
     } finally {
       setLoading(false);
     }
@@ -522,7 +600,7 @@ export default function FindActivityScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalScroll}
               >
-                {experiences.map((experience, index) => {
+                {nearYouExperiences.map((experience, index) => {
                   const imageUrl = (() => {
                     if (experience.source === 'database') {
                       return experience.images && experience.images.length > 0 
@@ -535,7 +613,7 @@ export default function FindActivityScreen() {
 
                   return (
                     <Pressable
-                      key={`${experience.source}-${experience.id}-${index}`}
+                      key={`near-${experience.source}-${experience.id}-${index}`}
                       style={styles.nearYouFullCard}
                       onPress={() => handleExperiencePress(experience)}
                     >
@@ -593,12 +671,97 @@ export default function FindActivityScreen() {
             </View>
           )}
 
-          {/* Suggested Locations Section - Only show when not in specific location */}
-          {!isSpecificLocation && analysis?.activity && popularDestinations[analysis.activity.toLowerCase()] && (
+          {/* As Seen on the Reel Section - Show exact matches from reel */}
+          {!isSpecificLocation && analysis && analysis.fullActivity && reelExperiences.length > 0 && (
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Suggested Locations</Text>
+              <View style={styles.asSeenHeader}>
+                <Text style={styles.asSeenTitle}>🎬 As Seen on the Reel</Text>
+                <Text style={styles.asSeenSubtitle}>
+                  {analysis.fullActivity}
+                </Text>
+              </View>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScroll}
+              >
+                {reelExperiences.slice(0, 8).map((experience, index) => {
+                  const imageUrl = (() => {
+                    if (experience.source === 'database') {
+                      return experience.images && experience.images.length > 0 
+                        ? experience.images[0] 
+                        : experience.image_url;
+                    } else {
+                      return experience.imageUrl || experience.image_url;
+                    }
+                  })();
+
+                  return (
+                    <Pressable
+                      key={`reel-${experience.source}-${experience.id}-${index}`}
+                      style={styles.nearYouFullCard}
+                      onPress={() => handleExperiencePress(experience)}
+                    >
+                      <View style={styles.nearYouImageContainer}>
+                        <ExpoImage
+                          source={{ uri: imageUrl }}
+                          style={styles.nearYouFullImage}
+                          contentFit="cover"
+                          transition={200}
+                        />
+                        
+                        {/* Dark gradient overlay */}
+                        <LinearGradient
+                          colors={['transparent', 'rgba(0,0,0,0.7)']}
+                          style={styles.imageGradient}
+                        />
+                        
+                        {/* Badge top-left */}
+                        <View style={styles.badgeTopLeft}>
+                          <View style={experience.source === 'database' ? styles.sourceBadgeOurs : styles.sourceBadgeViator}>
+                            <Text style={styles.sourceBadgeText}>
+                              {experience.source === 'database' ? 'BORED TOURIST' : 'VIATOR'}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        {/* Price top-right */}
+                        <View style={styles.priceOverlay}>
+                          <Text style={styles.priceOverlayText}>
+                            {experience.price}€
+                          </Text>
+                        </View>
+                        
+                        {/* Rating bottom-left */}
+                        {(experience.rating || experience.reviewCount) && (
+                          <View style={styles.ratingOverlay}>
+                            <Star size={14} color="#FFB800" fill="#FFB800" />
+                            <Text style={styles.ratingOverlayText}>
+                              {(experience.rating || 0).toFixed(1)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      
+                      {/* Title outside image */}
+                      <View style={styles.nearYouCardContent}>
+                        <Text style={styles.nearYouCardTitle} numberOfLines={2}>
+                          {experience.title}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Suggested Locations Section - Show destinations for base activity */}
+          {!isSpecificLocation && suggestedLocations.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Suggested Locations for {analysis?.activity}</Text>
               <View style={styles.suggestedGrid}>
-                {popularDestinations[analysis.activity.toLowerCase()].slice(0, 6).map((city, index) => (
+                {suggestedLocations.slice(0, 6).map((city, index) => (
                   <Pressable
                     key={`suggested-${index}`}
                     style={styles.suggestedCardVertical}
@@ -892,6 +1055,36 @@ const styles = StyleSheet.create({
   compactTitleBold: {
     fontWeight: '700',
     color: '#000',
+  },
+  asSeenHeader: {
+    marginBottom: 16,
+    paddingRight: 20,
+  },
+  asSeenTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 4,
+  },
+  asSeenSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  sourceBadgeAbsolute: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  sourceBadgeTextWhite: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 0.5,
   },
   sectionContainer: {
     marginBottom: 32,
