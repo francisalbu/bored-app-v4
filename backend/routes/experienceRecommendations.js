@@ -494,18 +494,23 @@ router.post('/by-activity', async (req, res) => {
     const activityBase = activityLower.replace(/ing$/, '').replace(/s$/, '');
     
     console.log('   Activity base:', activityBase);
+    console.log('   Prioritize Bored:', prioritizeBored);
     
-    // Search our DB - get experiences from the user's location
-    const dbExperiences = await Experience.findSimilarActivities(
-      activity,
-      userCity,
-      TARGET_COUNT * 3 // Get more to filter
-    );
-    
-    console.log(`   📦 DB returned ${dbExperiences.length} experiences`);
-    
-    // Filter to only matching activities if strict mode
-    if (strictActivityMatch) {
+    // Only search Bored Tourist DB if prioritizeBored = true (Near You section)
+    // For "As Seen on Reel" (prioritizeBored = false), skip DB entirely
+    if (prioritizeBored) {
+      console.log('   Searching Bored Tourist DB...');
+      // Search our DB - get experiences from the user's location
+      const dbExperiences = await Experience.findSimilarActivities(
+        activity,
+        userCity,
+        TARGET_COUNT * 3 // Get more to filter
+      );
+      
+      console.log(`   📦 DB returned ${dbExperiences.length} experiences`);
+      
+      // Filter to only matching activities if strict mode
+      if (strictActivityMatch) {
       experiences = dbExperiences.filter(exp => {
         const title = (exp.title || '').toLowerCase();
         const desc = (exp.description || '').toLowerCase();
@@ -528,25 +533,28 @@ router.post('/by-activity', async (req, res) => {
         return activityMatch;
       });
       
-      console.log(`   🎯 After strict filter: ${experiences.length} experiences match "${activity}"`);
+        console.log(`   🎯 After strict filter: ${experiences.length} experiences match "${activity}"`);  
+      } else {
+        experiences = dbExperiences;
+      }
+      
+      // Mark with source and parse images
+      experiences = experiences.map(exp => ({
+        ...exp,
+        images: parseImages(exp.images),
+        source: 'database'
+      }));
+      
+      // Remove duplicates based on ID
+      experiences = experiences.filter((exp, index, self) => 
+        index === self.findIndex(e => e.id === exp.id)
+      );
     } else {
-      experiences = dbExperiences;
+      console.log('   ⚠️ Skipping Bored Tourist DB (As Seen on Reel mode)');
     }
     
-    // Mark with source and parse images
-    experiences = experiences.map(exp => ({
-      ...exp,
-      images: parseImages(exp.images),
-      source: 'database'
-    }));
-    
-    // Remove duplicates based on ID
-    experiences = experiences.filter((exp, index, self) => 
-      index === self.findIndex(e => e.id === exp.id)
-    );
-    
     // Get from Viator (strict match only)
-    const viatorExperiences = await viatorService.smartSearch(
+    let viatorExperiences = await viatorService.smartSearch(
       activity,
       userCity,
       'EUR',
@@ -555,6 +563,27 @@ router.post('/by-activity', async (req, res) => {
     );
     
     console.log(`   📦 Viator returned ${viatorExperiences.length} experiences`);
+    
+    // CRITICAL: Filter Viator results to ONLY show experiences in user's city
+    // Never show Rio de Janeiro when user is in Lisboa!
+    if (prioritizeBored && userCity) {
+      const cityLower = userCity.toLowerCase();
+      viatorExperiences = viatorExperiences.filter(exp => {
+        const expLocation = (exp.location || '').toLowerCase();
+        const expCity = (exp.city || '').toLowerCase();
+        
+        // Must contain the user's city name
+        const isInCity = expLocation.includes(cityLower) || expCity.includes(cityLower);
+        
+        if (!isInCity) {
+          console.log(`   ❌ Filtered out: ${exp.title} (${exp.location}) - not in ${userCity}`);
+        }
+        
+        return isInCity;
+      });
+      
+      console.log(`   📍 After city filter: ${viatorExperiences.length} Viator experiences in ${userCity}`);
+    }
     
     // Combine: DB first (Bored Tourist priority), complete with Viator
     if (experiences.length >= TARGET_COUNT) {

@@ -364,7 +364,7 @@ async function findSimilarActivities(activity, city = null, limit = 3) {
     
     console.log(`📊 Found ${allExperiences.length} total experiences in database`);
     
-    // Filter by city/location if specified
+    // Filter by city/location if specified - ULTRA STRICT!
     let experiencesInCity = allExperiences;
     if (city) {
       const normalizedCity = city.toLowerCase().trim();
@@ -373,35 +373,29 @@ async function findSimilarActivities(activity, city = null, limit = 3) {
       if (normalizedCity === 'lisboa') cityVariations.push('lisbon');
       if (normalizedCity === 'lisbon') cityVariations.push('lisboa');
       
+      console.log('   Filtering by city:', cityVariations);
+      
       experiencesInCity = allExperiences.filter(exp => {
-        const expCity = (exp.city || '').toLowerCase();
-        const expLocation = (exp.location || '').toLowerCase();
+        const expCity = (exp.city || '').toLowerCase().trim();
+        const expLocation = (exp.location || '').toLowerCase().trim();
         
-        // Check if any variation matches
-        return cityVariations.some(cv => 
-          expCity.includes(cv) || 
-          cv.includes(expCity) ||
-          expLocation.includes(cv) ||
-          cv.includes(expLocation)
+        // STRICT: City must match exactly (not just "contains")
+        const cityMatches = cityVariations.some(cv => 
+          expCity === cv || 
+          expLocation.startsWith(cv) || // "Lisboa, Portugal" is ok
+          expLocation === cv
         );
+        
+        if (cityMatches) {
+          console.log(`   ✅ City match: ${exp.title} (${exp.city || exp.location})`);
+        }
+        
+        return cityMatches;
       });
       
-      console.log(`📍 After city filter: ${experiencesInCity.length} experiences in/near ${city}`);
+      console.log(`📍 After STRICT city filter: ${experiencesInCity.length} experiences in ${city}`);
       
-      // If no results in city, expand to country level (Portugal)
-      if (experiencesInCity.length === 0) {
-        experiencesInCity = allExperiences.filter(exp => {
-          const expLocation = (exp.location || '').toLowerCase();
-          return expLocation.includes('portugal') || 
-                 expLocation.includes('lisbon') ||
-                 expLocation.includes('lisboa') ||
-                 expLocation.includes('porto') ||
-                 expLocation.includes('cascais') ||
-                 expLocation.includes('sintra') ||
-                 expLocation.includes('algarve');
-        });
-        console.log(`📍 Expanded to Portugal: ${experiencesInCity.length} experiences`);
-      }
+      // NO FALLBACK - if not in the city, don't show it!
     }
     
     if (experiencesInCity.length === 0) {
@@ -459,51 +453,84 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         const category = (exp.category || '').toLowerCase();
         const tags = (exp.tags || []).map(t => t.toLowerCase());
         
-        // STRICT MATCHING - High quality only!
-        // Title exact match (most important) - check both full term and base
-        if (title.includes(searchTerm)) score += 50;
-        if (title.includes(searchBase)) score += 45;
+        // MORE PERMISSIVE MATCHING for Bored Tourist
+        // Title exact match (most important)
+        if (title.includes(searchTerm)) score += 100;
+        if (title.includes(searchBase) && searchBase.length > 3) score += 90;
         
         // Category/Tag exact match (very important)
-        if (category.includes(searchTerm) || category.includes(searchBase)) score += 40;
-        if (tags.some(tag => tag.includes(searchTerm) || tag.includes(searchBase))) score += 35;
+        if (category.includes(searchTerm) || category.includes(searchBase)) score += 80;
+        if (tags.some(tag => tag.includes(searchTerm) || tag.includes(searchBase))) score += 70;
         
-        // Description match (less important)
-        if (description.includes(searchTerm) || description.includes(searchBase)) score += 15;
+        // Similar water activities get bonus points (snorkeling ↔ diving)
+        const waterActivities = [
+          { search: 'snorkel', similar: ['dive', 'diving', 'scuba', 'underwater'] },
+          { search: 'dive', similar: ['snorkel', 'snorkeling', 'scuba', 'underwater'] },
+          { search: 'diving', similar: ['snorkel', 'snorkeling', 'scuba', 'underwater'] },
+          { search: 'kayak', similar: ['paddle', 'canoe', 'rowing'] },
+          { search: 'surf', similar: ['bodyboard', 'wave', 'beach'] },
+          { search: 'quad', similar: ['buggy', 'atv', '4x4'] },
+          { search: 'buggy', similar: ['quad', 'atv', '4x4'] }
+        ];
         
-        // Word-by-word matching (bonus for multi-word activities)
-        const searchWords = searchTerm.split(' ');
-        searchWords.forEach(word => {
-          if (word.length > 3) {
-            if (title.includes(word)) score += 10;
-            if (category.includes(word)) score += 8;
-            if (tags.some(tag => tag.includes(word))) score += 7;
+        const activityMatch = waterActivities.find(wa => 
+          searchTerm.includes(wa.search) || searchBase.includes(wa.search)
+        );
+        
+        if (activityMatch) {
+          // Check if experience contains similar activities
+          const hasSimilar = activityMatch.similar.some(sim => 
+            title.includes(sim) || category.includes(sim) || description.includes(sim)
+          );
+          if (hasSimilar) {
+            score += 60; // Good bonus for similar activities
+            console.log(`   ⭐ Similar activity bonus: ${exp.title} (${searchTerm} → similar)`);
           }
-        });
+        }
         
-        // Penalty for irrelevant experiences
-        // If activity is "surfing" but exp has "tour" or "visit" without surf-related words
-        if (searchTerm === 'surfing' || searchTerm === 'surf' || searchBase === 'surf') {
-          const hasIrrelevantWords = (title.includes('tour') || title.includes('visit')) && 
-                                    !title.includes('surf') && 
-                                    !description.includes('surf') &&
-                                    !description.includes('wave');
-          if (hasIrrelevantWords) score = Math.max(0, score - 30);
+        // Description match
+        if (description.includes(searchTerm) || description.includes(searchBase)) {
+          score += 15;
+        }
+        
+        // Massive penalty for completely irrelevant experiences
+        // If searching for water sport but exp is about castles, temples, tours, etc.
+        const waterSports = ['surf', 'snorkel', 'dive', 'kayak', 'paddle', 'swim'];
+        const isWaterSport = waterSports.some(ws => searchTerm.includes(ws) || searchBase.includes(ws));
+        
+        if (isWaterSport) {
+          const irrelevantWords = ['castle', 'temple', 'museum', 'cathedral', 'palace', 'monument', 'church'];
+          const hasIrrelevant = irrelevantWords.some(word => title.includes(word) || category.includes(word));
+          if (hasIrrelevant) {
+            score = 0; // Zero out completely irrelevant experiences
+          }
+        }
+        
+        // Additional penalty for generic "tour" or "visit" without the actual activity
+        if ((title.includes('tour') || title.includes('visit')) && score < 50) {
+          // If it's a tour but doesn't strongly match the activity, penalize
+          score = Math.max(0, score - 40);
         }
         
         return { ...exp, matchScore: score };
       });
       
-      // STRICT FILTER: Only return experiences with score >= 30 (strong match)
-      // But if we have NO matches, lower the threshold
-      let MINIMUM_SCORE = 30;
+      // FLEXIBLE FILTER for Bored Tourist: Show similar activities
+      // Score >= 50 is good enough (snorkeling can show diving, quad can show buggy)
+      let MINIMUM_SCORE = 50;
       let filtered = scoredExperiences.filter(exp => exp.matchScore >= MINIMUM_SCORE);
       
-      // If no results with strict filter, try with lower threshold
+      // If no results, lower threshold to 30 (more permissive for Bored Tourist)
       if (filtered.length === 0) {
-        MINIMUM_SCORE = 15;
+        MINIMUM_SCORE = 30;
         filtered = scoredExperiences.filter(exp => exp.matchScore >= MINIMUM_SCORE);
-        console.log(`   Lowered threshold to ${MINIMUM_SCORE}, found ${filtered.length} matches`);
+        console.log(`   Lowered threshold to ${MINIMUM_SCORE} (Bored Tourist mode), found ${filtered.length} matches`);
+      }
+      
+      // Last resort - if still nothing, show top 3 by score
+      if (filtered.length === 0 && scoredExperiences.length > 0) {
+        filtered = scoredExperiences.slice(0, 3);
+        console.log(`   No matches - showing top ${filtered.length} experiences by relevance`);
       }
       
       sortedExperiences = filtered
