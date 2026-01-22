@@ -421,31 +421,25 @@ router.post('/', async (req, res) => {
       }
       
     } else if (analysis.type === 'landscape' && analysis.location) {
-      // Landscape detected - suggest generic activities
-      console.log(`🏔️ Landscape detected: ${analysis.location}`);
+      // Landscape detected - search activities at that location via Viator
+      console.log(`🏔️ Landscape detected at: ${analysis.location}`);
+      console.log(`   That view just broke our algorithm! 🔥`);
       
-      // Get diverse activities from both sources (user's location!)
-      const dbPromise = Experience.getAllExperiences(20, 0);
-      const viatorPromise = viatorService.smartSearch(
-        'activities', // Generic search
-        userCity, // ← User's city for local activities
+      // Use the detected location to search for activities on Viator
+      // Similar to "As Seen on Reel" - search by location
+      viatorExperiences = await viatorService.smartSearch(
+        'tours activities things to do', // Generic activity search
+        analysis.location, // ← The location from the landscape
         'EUR',
         20
       );
       
-      [experiences, viatorExperiences] = await Promise.all([dbPromise, viatorPromise]);
+      console.log(`   📦 Viator returned ${viatorExperiences.length} activities for ${analysis.location}`);
       
-      // Mark all DB experiences with source field
-      experiences = experiences.map(exp => ({
-        ...exp,
-        images: parseImages(exp.images), // Parse images correctly
-        source: 'database'
-      }));
+      // No DB results for landscape - just Viator
+      experiences = viatorExperiences;
       
-      // Add all Viator results
-      experiences = [...experiences, ...viatorExperiences];
-      
-      message = `${analysis.location} looks amazing! Here are ${experiences.length} activities you can do:`;
+      message = `That view just broke our algorithm! 🔥 We can't pinpoint the exact activity, but check out these experiences near ${analysis.location}:`;
     }
     
     // NO LIMIT - return all relevant experiences

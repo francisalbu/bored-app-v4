@@ -955,7 +955,7 @@ export default function FindActivityScreen() {
           )}
 
           {/* Compact Activity Detection Title - Only show when not in specific location */}
-          {!isSpecificLocation && analysis && (
+          {!isSpecificLocation && analysis && analysis.type !== 'landscape' && (
             <View style={styles.compactTitleSection}>
               <Text style={styles.compactTitleText}>
                 Found '<Text style={styles.compactTitleBold}>{analysis.activity}</Text>' in your Instagram Reel
@@ -963,8 +963,98 @@ export default function FindActivityScreen() {
             </View>
           )}
           
-          {/* Near You Section - Only show when not in specific location */}
-          {!isSpecificLocation && (
+          {/* LANDSCAPE SPECIAL UI - When we detect a beautiful view but can't identify the activity */}
+          {!isSpecificLocation && analysis && analysis.type === 'landscape' && (
+            <View style={styles.landscapeSection}>
+              <Text style={styles.landscapeTitle}>That view just broke our algorithm! 🔥</Text>
+              <Text style={styles.landscapeSubtitle}>
+                We can't pinpoint the exact activity (it's THAT special), but check out these experiences {analysis.location ? `in ${analysis.location}` : 'nearby'}:
+              </Text>
+              
+              {/* Show experiences from Viator for this location */}
+              {nearYouExperiences.length > 0 ? (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScroll}
+                  style={{ marginTop: 16 }}
+                >
+                  {nearYouExperiences
+                    .filter(exp => {
+                      const hasImage = exp.source === 'database' 
+                        ? (exp.images && exp.images.length > 0) || exp.image_url
+                        : exp.imageUrl || exp.image_url;
+                      return hasImage;
+                    })
+                    .map((experience, index) => {
+                    const imageUrl = experience.source === 'database'
+                      ? (experience.images && experience.images.length > 0 ? experience.images[0] : experience.image_url)
+                      : (experience.imageUrl || experience.image_url);
+
+                    return (
+                      <Pressable
+                        key={`landscape-${experience.source}-${experience.id}-${index}`}
+                        style={styles.nearYouFullCard}
+                        onPress={() => handleExperiencePress(experience)}
+                      >
+                        <View style={styles.nearYouImageContainer}>
+                          <ExpoImage
+                            source={{ uri: imageUrl }}
+                            style={styles.nearYouFullImage}
+                            contentFit="cover"
+                            transition={200}
+                          />
+                          
+                          <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.7)']}
+                            style={styles.imageGradient}
+                          />
+                          
+                          <View style={styles.badgeTopLeft}>
+                            <View style={experience.source === 'database' ? styles.sourceBadgeOurs : styles.sourceBadgeViator}>
+                              <Text style={styles.sourceBadgeText}>
+                                {experience.source === 'database' ? 'BORED TOURIST' : 'VIATOR'}
+                              </Text>
+                            </View>
+                          </View>
+                          
+                          <View style={styles.priceOverlay}>
+                            <Text style={styles.priceOverlayText}>
+                              {experience.price}€
+                            </Text>
+                          </View>
+                          
+                          {((experience.rating ?? 0) > 0 || (experience.reviewCount ?? 0) > 0) && (
+                            <View style={styles.ratingOverlay}>
+                              <Star size={14} color="#FFB800" fill="#FFB800" />
+                              <Text style={styles.ratingOverlayText}>
+                                {(experience.rating || 0).toFixed(1)}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        
+                        <View style={styles.nearYouCardContent}>
+                          <Text style={styles.nearYouCardTitle} numberOfLines={2}>
+                            {experience.title}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    No experiences found for this location. Try sharing another reel!
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+          
+          {/* Near You Section - Only show when not in specific location AND not landscape */}
+          {!isSpecificLocation && analysis?.type !== 'landscape' && (
             <View style={styles.sectionContainer}>
               <View style={styles.nearYouHeader}>
                 <Pressable 
@@ -1121,16 +1211,17 @@ export default function FindActivityScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalScroll}
               >
-                {nearYouExperiences.map((experience, index) => {
-                  const imageUrl = (() => {
-                    if (experience.source === 'database') {
-                      return experience.images && experience.images.length > 0 
-                        ? experience.images[0] 
-                        : experience.image_url;
-                    } else {
-                      return experience.imageUrl || experience.image_url;
-                    }
-                  })();
+                {nearYouExperiences
+                  .filter(exp => {
+                    const hasImage = exp.source === 'database' 
+                      ? (exp.images && exp.images.length > 0) || exp.image_url
+                      : exp.imageUrl || exp.image_url;
+                    return hasImage;
+                  })
+                  .map((experience, index) => {
+                  const imageUrl = experience.source === 'database'
+                    ? (experience.images && experience.images.length > 0 ? experience.images[0] : experience.image_url)
+                    : (experience.imageUrl || experience.image_url);
 
                   return (
                     <Pressable
@@ -1169,7 +1260,7 @@ export default function FindActivityScreen() {
                         </View>
                         
                         {/* Rating bottom-left */}
-                        {(experience.rating || experience.reviewCount) && (
+                        {((experience.rating ?? 0) > 0 || (experience.reviewCount ?? 0) > 0) && (
                           <View style={styles.ratingOverlay}>
                             <Star size={14} color="#FFB800" fill="#FFB800" />
                             <Text style={styles.ratingOverlayText}>
@@ -1194,7 +1285,8 @@ export default function FindActivityScreen() {
           )}
 
           {/* As Seen on the Reel Section - Show experiences matching the exact reel content */}
-          {!isSpecificLocation && analysis && analysis.fullActivity && analysis.location && reelExperiences.length > 0 && (
+          {/* Hide for landscape - we already show location-based results above */}
+          {!isSpecificLocation && analysis && analysis.type !== 'landscape' && analysis.fullActivity && analysis.location && reelExperiences.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.asSeenHeader}>
                 <Text style={styles.asSeenTitle}>🎬 As Seen on the Reel</Text>
@@ -1207,16 +1299,18 @@ export default function FindActivityScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalScroll}
               >
-                {reelExperiences.slice(0, 8).map((experience, index) => {
-                  const imageUrl = (() => {
-                    if (experience.source === 'database') {
-                      return experience.images && experience.images.length > 0 
-                        ? experience.images[0] 
-                        : experience.image_url;
-                    } else {
-                      return experience.imageUrl || experience.image_url;
-                    }
-                  })();
+                {reelExperiences
+                  .filter(exp => {
+                    const hasImage = exp.source === 'database' 
+                      ? (exp.images && exp.images.length > 0) || exp.image_url
+                      : exp.imageUrl || exp.image_url;
+                    return hasImage;
+                  })
+                  .slice(0, 8)
+                  .map((experience, index) => {
+                  const imageUrl = experience.source === 'database'
+                    ? (experience.images && experience.images.length > 0 ? experience.images[0] : experience.image_url)
+                    : (experience.imageUrl || experience.image_url);
 
                   return (
                     <Pressable
@@ -1255,7 +1349,7 @@ export default function FindActivityScreen() {
                         </View>
                         
                         {/* Rating bottom-left */}
-                        {(experience.rating || experience.reviewCount) && (
+                        {((experience.rating ?? 0) > 0 || (experience.reviewCount ?? 0) > 0) && (
                           <View style={styles.ratingOverlay}>
                             <Star size={14} color="#FFB800" fill="#FFB800" />
                             <Text style={styles.ratingOverlayText}>
@@ -1279,7 +1373,8 @@ export default function FindActivityScreen() {
           )}
 
           {/* Suggested Locations Section - Suggest places to do this activity */}
-          {!isSpecificLocation && suggestedLocations.length > 0 && (
+          {/* Hide for landscape - doesn't make sense without a specific activity */}
+          {!isSpecificLocation && analysis?.type !== 'landscape' && suggestedLocations.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.suggestedHeader}>
                 <Text style={styles.sectionTitle}>🌍 Where to try {analysis?.activity}</Text>
@@ -1324,16 +1419,17 @@ export default function FindActivityScreen() {
                     </Text>
                   </View>
                 ) : (
-                  experiences.map((experience, index) => {
-                    const imageUrl = (() => {
-                      if (experience.source === 'database') {
-                        return experience.images && experience.images.length > 0 
-                          ? experience.images[0] 
-                          : experience.image_url;
-                      } else {
-                        return experience.imageUrl || experience.image_url;
-                      }
-                    })();
+                  experiences
+                    .filter(exp => {
+                      const hasImage = exp.source === 'database' 
+                        ? (exp.images && exp.images.length > 0) || exp.image_url
+                        : exp.imageUrl || exp.image_url;
+                      return hasImage;
+                    })
+                    .map((experience, index) => {
+                    const imageUrl = experience.source === 'database'
+                      ? (experience.images && experience.images.length > 0 ? experience.images[0] : experience.image_url)
+                      : (experience.imageUrl || experience.image_url);
                     
                     const sourceBadge = experience.source === 'database' ? 'Bored Tourist' : 'Viator';
                     const isOurApp = experience.source === 'database';
@@ -1548,6 +1644,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // LANDSCAPE SPECIAL SECTION STYLES
+  landscapeSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  landscapeTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#000',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  landscapeSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 8,
   },
   loadingContainer: {
     flex: 1,
