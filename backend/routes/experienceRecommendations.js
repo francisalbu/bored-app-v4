@@ -465,7 +465,7 @@ router.post('/by-activity', async (req, res) => {
     const { 
       activity, 
       fullActivity, 
-      userLocation, 
+      userLocation, // This is the reel location for "As Seen on Reel" or user city for "Near You"
       strictActivityMatch = false,
       prioritizeBored 
     } = req.body;
@@ -477,41 +477,48 @@ router.post('/by-activity', async (req, res) => {
       });
     }
     
+    // Extract location from userLocation
+    const location = userLocation;
+    
     // NEAR YOU IS ALWAYS LISBON - no exceptions!
     const NEAR_YOU_CITY = 'Lisboa';
     
     console.log('🔍 Searching experiences by activity...');
     console.log('   Activity:', activity);
     console.log('   Full Activity:', fullActivity);
-    console.log('   Near You City:', NEAR_YOU_CITY);
-    console.log('   Strict Activity Match:', strictActivityMatch);
+    console.log('   Location from reel:', location);
     console.log('   Prioritize Bored:', prioritizeBored);
     
-    const TARGET_COUNT = 8; // More results
+    const TARGET_COUNT = 8;
+    const MAX_BORED_TOURIST = 3; // Max 3 Bored Tourist experiences in Near You
     let experiences = [];
     
     // Get base word for matching (e.g., "surfing" -> "surf")
     const activityLower = activity.toLowerCase();
     const activityBase = activityLower.replace(/ing$/, '').replace(/s$/, '');
     
-    // Related activities mapping for Bored Tourist
+    // STRICT related activities - only truly similar activities
+    // Water activities stay with water, land with land
     const relatedActivities = {
-      'snorkel': ['diving', 'scuba', 'underwater', 'ocean', 'sea'],
-      'dive': ['snorkeling', 'scuba', 'underwater', 'ocean'],
-      'surf': ['paddle', 'bodyboard', 'wave', 'beach', 'water sport'],
-      'paddle': ['surf', 'kayak', 'sup', 'water sport'],
-      'kayak': ['paddle', 'canoe', 'water sport'],
-      'quad': ['buggy', 'atv', '4x4', 'off-road'],
-      'buggy': ['quad', 'atv', '4x4', 'off-road'],
-      'bike': ['cycling', 'e-bike', 'bicycle'],
-      'hike': ['trek', 'walk', 'nature', 'trail'],
+      // Water activities - can show related water sports
+      'snorkel': ['snorkeling', 'diving', 'scuba', 'underwater'],
+      'dive': ['diving', 'snorkeling', 'scuba', 'underwater'],
+      'surf': ['surfing', 'bodyboard', 'wave', 'surf lesson'],
+      'paddle': ['paddleboard', 'sup', 'stand up paddle'],
+      'kayak': ['kayaking', 'canoeing', 'paddle'],
+      // Land activities
+      'quad': ['quad', 'buggy', 'atv', '4x4'],
+      'buggy': ['buggy', 'quad', 'atv', '4x4'],
+      'bike': ['biking', 'cycling', 'e-bike', 'bicycle'],
+      'hike': ['hiking', 'trekking', 'walking tour', 'trail'],
+      'climb': ['climbing', 'rock climbing', 'bouldering'],
     };
     
-    // Get related terms for this activity
+    // Get STRICT related terms - only for Bored Tourist expansion
     const getRelatedTerms = (act) => {
-      const terms = [act];
+      const terms = [act, activityLower]; // Include base and original
       for (const [key, related] of Object.entries(relatedActivities)) {
-        if (act.includes(key)) {
+        if (act.includes(key) || activityLower.includes(key)) {
           terms.push(...related);
         }
       }
@@ -519,8 +526,7 @@ router.post('/by-activity', async (req, res) => {
     };
     
     const searchTerms = getRelatedTerms(activityBase);
-    console.log('   Search terms (including related):', searchTerms);
-    console.log('   Prioritize Bored:', prioritizeBored);
+    console.log('   Search terms for Bored Tourist:', searchTerms);
     
     // Only search Bored Tourist DB if prioritizeBored = true (Near You section)
     // For "As Seen on Reel" (prioritizeBored = false), skip DB entirely
@@ -535,26 +541,32 @@ router.post('/by-activity', async (req, res) => {
       
       console.log(`   📦 DB returned ${dbExperiences.length} experiences`);
       
-      // For Bored Tourist, be MORE permissive - include related activities
-      // This ensures we show diving when searching snorkeling, paddle when searching surf, etc.
+      // For Bored Tourist, be STRICT - only include if activity REALLY matches
+      // Title or description must contain the activity or a related term
       experiences = dbExperiences.filter(exp => {
         const title = (exp.title || '').toLowerCase();
         const desc = (exp.description || '').toLowerCase();
-        const category = (exp.category || '').toLowerCase();
-        const tags = Array.isArray(exp.tags) ? exp.tags.join(' ').toLowerCase() : '';
-        const combined = `${title} ${desc} ${category} ${tags}`;
+        const combined = `${title} ${desc}`;
         
-        // Check if ANY of our search terms match
-        const hasMatch = searchTerms.some(term => combined.includes(term));
+        // Check if the TITLE contains the activity or related terms
+        // (not just description - title is more important)
+        const titleMatch = searchTerms.some(term => title.includes(term));
+        const descMatch = searchTerms.some(term => desc.includes(term));
+        
+        // Prioritize title matches, but accept strong description matches
+        const hasMatch = titleMatch || descMatch;
         
         if (hasMatch) {
-          console.log(`   ✅ Bored Tourist Match: ${exp.title}`);
+          console.log(`   ✅ Bored Tourist Match: ${exp.title} (title: ${titleMatch}, desc: ${descMatch})`);
         }
         
         return hasMatch;
       });
       
-      console.log(`   🎯 Bored Tourist matches: ${experiences.length} experiences`);
+      // LIMIT to MAX_BORED_TOURIST experiences
+      experiences = experiences.slice(0, MAX_BORED_TOURIST);
+      
+      console.log(`   🎯 Bored Tourist matches: ${experiences.length} experiences (max ${MAX_BORED_TOURIST})`);
       
       // Mark with source and parse images
       experiences = experiences.map(exp => ({
@@ -562,22 +574,31 @@ router.post('/by-activity', async (req, res) => {
         images: parseImages(exp.images),
         source: 'database'
       }));
-      
-      // Remove duplicates based on ID
-      experiences = experiences.filter((exp, index, self) => 
-        index === self.findIndex(e => e.id === exp.id)
-      );
     } else {
       console.log('   ⚠️ Skipping Bored Tourist DB (As Seen on Reel mode)');
     }
     
     // Get from Viator (strict match only)
-    // For "Near You" (prioritizeBored=true): Search in LISBON only
-    // For "As Seen on Reel" (prioritizeBored=false): Search globally
-    const viatorSearchLocation = prioritizeBored ? NEAR_YOU_CITY : null;
+    // For "Near You" (prioritizeBored=true): Search activity in LISBON only
+    // For "As Seen on Reel" (prioritizeBored=false): Search activity + SPECIFIC location from reel
+    let viatorSearchQuery;
+    let viatorSearchLocation;
+    
+    if (prioritizeBored) {
+      // NEAR YOU: Search for the activity in Lisboa
+      viatorSearchQuery = activity;
+      viatorSearchLocation = NEAR_YOU_CITY;
+      console.log(`   🔍 Viator Near You search: "${viatorSearchQuery}" in "${viatorSearchLocation}"`);
+    } else {
+      // AS SEEN ON REEL: Search for activity + specific location from the reel
+      // This ensures "surf French Polynesia" returns ONLY French Polynesia results
+      viatorSearchQuery = fullActivity || activity;
+      viatorSearchLocation = location || null;
+      console.log(`   🔍 Viator Reel search: "${viatorSearchQuery}" in "${viatorSearchLocation || 'global'}"`);
+    }
     
     let viatorExperiences = await viatorService.smartSearch(
-      activity,
+      viatorSearchQuery,
       viatorSearchLocation,
       'EUR',
       TARGET_COUNT,
@@ -613,13 +634,20 @@ router.post('/by-activity', async (req, res) => {
       console.log(`   📍 After Lisboa filter: ${viatorExperiences.length} Viator experiences`);
     }
     
-    // Combine: DB first (Bored Tourist priority), complete with Viator
-    if (experiences.length >= TARGET_COUNT) {
-      experiences = experiences.slice(0, TARGET_COUNT);
-    } else {
-      const needed = TARGET_COUNT - experiences.length;
-      const viatorToAdd = viatorExperiences.slice(0, needed);
+    // Combine: 
+    // - Near You: Max 3 Bored Tourist + fill with Viator (for the same activity in Lisboa)
+    // - As Seen on Reel: Only Viator (specific to reel location)
+    if (prioritizeBored) {
+      // Near You: Bored Tourist first (max 3), then Viator to complete
+      const boredCount = experiences.length;
+      const viatorNeeded = TARGET_COUNT - boredCount;
+      const viatorToAdd = viatorExperiences.slice(0, viatorNeeded);
       experiences = [...experiences, ...viatorToAdd];
+      console.log(`   📊 Near You mix: ${boredCount} Bored Tourist + ${viatorToAdd.length} Viator`);
+    } else {
+      // As Seen on Reel: Only Viator from the specific location
+      experiences = viatorExperiences.slice(0, TARGET_COUNT);
+      console.log(`   📊 As Seen on Reel: ${experiences.length} Viator from reel location`);
     }
     
     console.log(`✅ Found ${experiences.length} experiences (${experiences.filter(e => e.source === 'database').length} DB + ${experiences.filter(e => e.source === 'viator').length} Viator)`);
