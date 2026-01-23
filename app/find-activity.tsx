@@ -46,10 +46,10 @@ interface Experience {
 
 interface Analysis {
   type: string;
-  activity: string;
+  activity: string | null; // Can be null for landscape
   location: string;
   confidence: number;
-  fullActivity?: string; // Original detailed activity from reel
+  fullActivity?: string | null; // Original detailed activity from reel (null for landscape)
 }
 
 // Destination from activities database JSON
@@ -800,10 +800,11 @@ export default function FindActivityScreen() {
         });
         
         if (analyzeResponse.data && analyzeResponse.data.analysis) {
+          const rawActivity = analyzeResponse.data.analysis.activity;
           analysisData = {
             ...analyzeResponse.data.analysis,
-            fullActivity: analyzeResponse.data.analysis.activity, // Keep original detailed
-            activity: getBaseActivity(analyzeResponse.data.analysis.activity) // Base for general searches
+            fullActivity: rawActivity, // Keep original detailed (can be null for landscape)
+            activity: rawActivity ? getBaseActivity(rawActivity) : null // Base for general searches (null for landscape)
           };
           setAnalysis(analysisData);
           setHasAnalyzed(true);
@@ -815,16 +816,55 @@ export default function FindActivityScreen() {
         return;
       }
       
-      const baseActivity = analysisData.activity; // General: "snorkeling"
+      const baseActivity = analysisData.activity; // General: "snorkeling" (null for landscape)
       const fullActivity = analysisData.fullActivity || analysisData.activity; // Specific: "snorkeling with giant manta rays"
       const reelLocation = analysisData.location; // Location from reel: "French Polynesia", "Maldives", etc.
+      const isLandscape = analysisData.type === 'landscape';
       
       console.log('🎯 Base activity:', baseActivity);
       console.log('🎯 Full activity:', fullActivity);
       console.log('🌍 Reel location:', reelLocation);
       console.log('📍 User location:', userLocation);
+      console.log('🏔️ Is landscape:', isLandscape);
       
-      // Parallel fetch for 3 sections
+      // For LANDSCAPE: Skip activity-based searches, just show location-based results
+      // The main API already returned Viator results for the location
+      if (isLandscape) {
+        console.log('🏔️ Landscape mode - using preloaded experiences');
+        console.log('   Preloaded count:', preloadedExperiences?.length || 0);
+        
+        // For landscape, the experiences were already loaded from the main API
+        // Just set them to nearYouExperiences to display in the landscape section
+        if (preloadedExperiences && preloadedExperiences.length > 0) {
+          setNearYouExperiences(sortExperiences(preloadedExperiences));
+          console.log('✅ Landscape experiences:', preloadedExperiences.length);
+        } else {
+          // No preloaded experiences - fetch from Viator directly using the location
+          console.log('⚠️ No preloaded experiences, fetching from Viator for:', reelLocation);
+          try {
+            const viatorResponse = await api.post('/experience-recommendations/by-activity', {
+              activity: 'tours activities things to do',
+              userLocation: reelLocation,
+              strictActivityMatch: false,
+              prioritizeBored: false
+            });
+            if (viatorResponse.data?.experiences?.length > 0) {
+              setNearYouExperiences(sortExperiences(viatorResponse.data.experiences));
+              console.log('✅ Fetched landscape experiences:', viatorResponse.data.experiences.length);
+            } else {
+              console.log('❌ No experiences found for:', reelLocation);
+            }
+          } catch (err) {
+            console.error('❌ Error fetching landscape experiences:', err);
+          }
+        }
+        setReelExperiences([]);
+        setSuggestedLocations([]);
+        setLoading(false);
+        return;
+      }
+      
+      // For ACTIVITY: Fetch Near You and As Seen on Reel sections
       const [nearYouResponse, reelResponse] = await Promise.all([
         // 1. Near You: EXACT activity match + GPS coordinates (or city name as fallback)
         // Only show experiences that match the EXACT activity type (surf = surf, not indoor skydiving)
@@ -860,9 +900,12 @@ export default function FindActivityScreen() {
       }
       
       // 3. Suggested Locations: Get destinations from JSON database with photos
-      const destinations = getActivityDestinations(baseActivity);
-      setSuggestedLocations(destinations);
-      console.log('📍 Suggested locations from database:', destinations.length);
+      // Only for activity types, not landscapes (baseActivity is null for landscapes)
+      if (baseActivity) {
+        const destinations = getActivityDestinations(baseActivity);
+        setSuggestedLocations(destinations);
+        console.log('📍 Suggested locations from database:', destinations.length);
+      }
       
       // Keep experiences state for compatibility
       setExperiences(nearYouResponse.data?.experiences || []);

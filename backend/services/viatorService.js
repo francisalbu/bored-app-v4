@@ -363,7 +363,8 @@ class ViatorService {
   }
 
   /**
-   * Search with smart fallback - use free text search instead
+   * Search with smart fallback - PRIORITY: Destination ID first, then free text
+   * This ensures location-accurate results
    */
   async smartSearch(activity, location, currency = 'EUR', maxResults = 5) {
     if (!this.apiKey) {
@@ -372,7 +373,28 @@ class ViatorService {
     }
 
     try {
-      // Use /search/freetext endpoint - more flexible
+      // STEP 1: Try to get destination ID for the location
+      logger.info(`🔍 Smart search for "${activity}" in "${location}"`);
+      
+      const destinationId = await this.getDestinationId(location);
+      
+      if (destinationId) {
+        logger.info(`✅ Found destination ID ${destinationId} for "${location}"`);
+        
+        // STEP 2: Search by destination ID (most accurate)
+        const results = await this.searchByDestinationId(destinationId, activity, currency, maxResults);
+        
+        if (results && results.length > 0) {
+          logger.info(`📦 Destination search returned ${results.length} products`);
+          return results;
+        }
+        
+        logger.info(`⚠️ Destination search returned 0 results, trying freetext...`);
+      } else {
+        logger.info(`⚠️ No destination ID found for "${location}", using freetext search`);
+      }
+      
+      // STEP 3: Fallback to freetext search
       const searchTerm = location ? `${activity} ${location}` : activity;
       
       const response = await axios.post(
@@ -410,13 +432,13 @@ class ViatorService {
       }
 
       const products = response.data.products.results;
-      logger.info(`Viator found ${products.length} products for "${searchTerm}"`);
+      logger.info(`📦 Freetext found ${products.length} products for "${searchTerm}"`);
 
       return this.transformViatorProducts(products, activity, location);
 
     } catch (error) {
       if (error.response) {
-        logger.error('Viator free text search error:', {
+        logger.error('Viator smart search error:', {
           status: error.response.status,
           message: error.response.data?.message || error.message
         });

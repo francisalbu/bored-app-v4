@@ -459,16 +459,18 @@ export default function SharedContentScreen() {
               
               // Process analysis: keep original as fullActivity, extract base for header
               const originalActivity = response.data.analysis.activity;
-              const baseActivity = getBaseActivity(originalActivity);
+              // For landscapes, activity is null - handle this case
+              const baseActivity = originalActivity ? getBaseActivity(originalActivity) : null;
               
               const processedAnalysis = {
                 ...response.data.analysis,
-                fullActivity: originalActivity, // Keep original detailed description
-                activity: baseActivity // Generic activity for header and near you search
+                fullActivity: originalActivity, // Keep original detailed description (null for landscape)
+                activity: baseActivity // Generic activity for header and near you search (null for landscape)
               };
               
               console.log('🎯 Original activity:', originalActivity);
               console.log('🎯 Base activity:', baseActivity);
+              console.log('🏔️ Analysis type:', response.data.analysis.type);
               
               // Navigate to find-activity with all data ready
               router.replace({
@@ -476,7 +478,7 @@ export default function SharedContentScreen() {
                 params: {
                   instagramUrl: url,
                   thumbnail: response.data.analysis?.thumbnailUrl || '',
-                  activity: baseActivity, // Use base activity
+                  activity: baseActivity || '', // Use base activity (empty for landscape)
                   // Pass experiences as JSON string
                   experiences: JSON.stringify(response.data.experiences),
                   analysis: JSON.stringify(processedAnalysis) // Pass processed analysis with both fields
