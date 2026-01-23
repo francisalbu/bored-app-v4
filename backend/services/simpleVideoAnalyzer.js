@@ -13,11 +13,15 @@ function loadValidActivities() {
   if (!VALID_ACTIVITIES) {
     try {
       const jsonPath = path.join(__dirname, '../../assets/COMPLETE_ACTIVITIES_DATABASE_WITH_PHOTOS.json');
+      console.log('📂 Loading activities from:', jsonPath);
+      console.log('📂 Path exists:', fs.existsSync(jsonPath));
       const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
       VALID_ACTIVITIES = data.activities.map(a => a.activity.toLowerCase());
       console.log(`✅ Loaded ${VALID_ACTIVITIES.length} valid activities`);
+      console.log(`✅ First 5 activities:`, VALID_ACTIVITIES.slice(0, 5));
     } catch (error) {
       console.error('⚠️ Failed to load activities database:', error.message);
+      console.error('⚠️ Full error:', error);
       VALID_ACTIVITIES = [];
     }
   }
@@ -121,18 +125,23 @@ class SimpleVideoAnalyzer {
       // Step 5: VALIDATE if activity is in our 315 activities database
       // If type is 'activity' but not in our list → mark as irrelevant
       if (finalResult.type === 'activity' && finalResult.activity) {
-        const isValid = isValidActivity(finalResult.activity);
-        if (!isValid) {
-          console.log(`❌ Activity "${finalResult.activity}" not in valid activities list - marking as irrelevant`);
-          finalResult = {
-            type: 'irrelevant',
-            activity: null,
-            location: null,
-            confidence: 0.1,
-            source: 'validation'
-          };
-        } else {
-          console.log(`✅ Activity "${finalResult.activity}" is valid`);
+        try {
+          const isValid = isValidActivity(finalResult.activity);
+          if (!isValid) {
+            console.log(`❌ Activity "${finalResult.activity}" not in valid activities list - marking as irrelevant`);
+            finalResult = {
+              type: 'irrelevant',
+              activity: null,
+              location: null,
+              confidence: 0.1,
+              source: 'validation'
+            };
+          } else {
+            console.log(`✅ Activity "${finalResult.activity}" is valid`);
+          }
+        } catch (validationError) {
+          console.error('⚠️ Validation error, accepting activity by default:', validationError.message);
+          // If validation fails, accept the activity (fail open)
         }
       }
       
