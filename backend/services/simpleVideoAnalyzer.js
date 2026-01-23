@@ -54,7 +54,7 @@ function isValidActivity(detectedActivity) {
 const BORING_CATEGORIES = [
   'Night Club Tours', 'Bar Tours', 'Pub Tours', 'Bar Crawls', 'Nightclub Tours',
   'Transfers', 'Airport Transfers', 'Hotel Transfers',
-  'Bus Tours', 'Hop on Hop off', 'City Bus Tours',
+  'Bus Tours', 'Hop on Hop off', 'Hop', 'HopnOff', 'City Bus Tours', 'Sightseeing Bus',
   'Car Rentals', 'Vehicle Rentals',
   'Hotel Bookings', 'Resort Stays', 'Luxury Stays', 'Accommodation',
   'Shopping Tours', 'Souvenir Shopping', 'Outlet Shopping',
@@ -76,18 +76,28 @@ async function isBoringActivity(activity) {
   if (!activity) return false;
   
   try {
-    const prompt = `You are a fun activity classifier. Your job is to determine if an activity is BORING or EPIC.
+    const prompt = `You are a strict activity filter. Classify if an activity is BORING or EPIC.
 
-BORING activities include:
+🚫 BORING CATEGORIES (reject these):
 ${BORING_CATEGORIES.map(cat => `- ${cat}`).join('\n')}
 
-User's activity: "${activity}"
+🎯 USER'S ACTIVITY: "${activity}"
 
-Rules:
-- If the activity matches ANY of the boring categories above (even with variations like "hop", "hopnoff", "transfer", "bus tour"), respond with "BORING"
-- If the activity is an authentic, active, or unique experience (like surfing, hiking, cooking classes, skydiving, etc.), respond with "EPIC"
+CRITICAL RULES:
+1. If activity contains words like "hop", "bus", "transfer", "bar", "pub", "shopping", "hotel", "casino", "tuk tuk" → BORING
+2. If activity is about transportation (bus, car, airport) → BORING
+3. If activity is nightlife (bar, club, pub crawl) → BORING
+4. If activity is accommodation (hotel, resort) → BORING
+5. ONLY active, authentic experiences (surfing, hiking, cooking, diving, etc.) → EPIC
 
-Respond with ONLY one word: "BORING" or "EPIC"`;
+EXAMPLES:
+- "hop" → BORING (bus tour)
+- "hop on hop off" → BORING
+- "bar tour" → BORING
+- "surfing" → EPIC
+- "cooking class" → EPIC
+
+Respond with ONLY: BORING or EPIC`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini', // Cheapest model
@@ -99,7 +109,7 @@ Respond with ONLY one word: "BORING" or "EPIC"`;
     const result = response.choices[0]?.message?.content?.trim().toUpperCase();
     const isBoring = result === 'BORING';
     
-    console.log(`🎯 Boring check: "${activity}" → ${isBoring ? '🚫 BORING' : '✅ EPIC'}`);
+    console.log(`🎯 Boring check: "${activity}" → ${isBoring ? '🚫 BORING' : '✅ EPIC'} (GPT said: "${result}")`);
     return isBoring;
     
   } catch (error) {
