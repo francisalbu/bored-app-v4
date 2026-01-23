@@ -1,6 +1,12 @@
 // API Configuration
-// Use Render.com production API
-const API_BASE_URL = 'https://bored-tourist-api.onrender.com/api';
+// Use Render.com production API or localhost for testing
+// Set USE_LOCALHOST to true to test locally
+const USE_LOCALHOST = false; // Change to false for production
+const API_BASE_URL = USE_LOCALHOST 
+  ? 'http://localhost:3000/api' 
+  : 'https://bored-tourist-api.onrender.com/api';
+
+console.log('🌐 API Base URL:', API_BASE_URL);
 
 interface ApiResponse<T> {
   success: boolean;

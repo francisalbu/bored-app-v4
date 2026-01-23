@@ -46,6 +46,7 @@ const spotsRoutes = require('./routes/spots');
 const placesRoutes = require('./routes/places');
 const analyzeExperienceRoutes = require('./routes/analyzeExperience'); // NEW: Simplified experience analysis
 const experienceRecommendationsRoutes = require('./routes/experienceRecommendations'); // NEW: Get experience recommendations from video
+const feedbackRoutes = require('./routes/feedback'); // User feedback and ratings
 
 // Initialize Express app
 const app = express();
@@ -112,6 +113,7 @@ app.use('/api/spots', spotsRoutes); // Saved travel spots for user's map
 app.use('/api/places', placesRoutes); // Google Places autocomplete
 app.use('/api/analyze-experience', analyzeExperienceRoutes); // NEW: Simplified experience analysis from video
 app.use('/api/experience-recommendations', experienceRecommendationsRoutes); // NEW: Get experience recommendations from video
+app.use('/api/feedback', feedbackRoutes); // User feedback and ratings
 
 // Privacy Policy page (required for App Store)
 app.get('/privacy', (req, res) => {

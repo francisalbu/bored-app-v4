@@ -60,10 +60,17 @@ class SimpleVideoAnalyzer {
     console.log('🎬 Simple Video Analysis Started');
     console.log('📱 Instagram URL:', instagramUrl);
     
-    try {
-      // Step 1: Download video and get metadata
-      const videoData = await this.downloadInstagramVideo(instagramUrl);
-      console.log('✅ Video downloaded');
+    // Wrap everything in a timeout promise
+    const timeoutMs = 60000; // 60 seconds max
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Video analysis timeout after 60 seconds')), timeoutMs);
+    });
+    
+    const analysisPromise = (async () => {
+      try {
+        // Step 1: Download video and get metadata
+        const videoData = await this.downloadInstagramVideo(instagramUrl);
+        console.log('✅ Video downloaded');
       
       const envFrames = Number.parseInt(process.env.VIDEO_ANALYSIS_FRAMES || '', 10);
       const frameCount = Number.isFinite(envFrames) && envFrames > 0 ? envFrames : 3;
@@ -93,12 +100,25 @@ class SimpleVideoAnalyzer {
       
       // Decide which result to use based on confidence
       let finalResult;
+      
+      // Merge location from both sources
+      const mergedLocation = metadataResult.location || frameAnalysis.location;
+      
+      // CRITICAL RULE: If we have a valid location, NEVER mark as irrelevant
+      // Location = landscape/destination content (e.g., Dolomites, Grand Canyon)
+      if (mergedLocation && mergedLocation !== 'null' && frameAnalysis.type === 'irrelevant') {
+        console.log(`🗺️ Location detected: "${mergedLocation}" - Converting irrelevant to landscape`);
+        frameAnalysis.type = 'landscape';
+        frameAnalysis.location = mergedLocation;
+        frameAnalysis.confidence = Math.max(frameAnalysis.confidence, 0.8);
+      }
+      
       if (metadataResult.activity && metadataResult.confidence >= 0.7) {
         console.log(`✅ Using metadata result (high confidence: ${metadataResult.confidence})`);
         finalResult = {
           type: 'activity',
           activity: metadataResult.activity,
-          location: metadataResult.location || frameAnalysis.location,
+          location: mergedLocation,
           confidence: metadataResult.confidence,
           source: 'metadata'
         };
@@ -107,19 +127,32 @@ class SimpleVideoAnalyzer {
         finalResult = {
           type: frameAnalysis.type,
           activity: frameAnalysis.activity,
-          location: frameAnalysis.location || metadataResult.location,
+          location: mergedLocation,
           confidence: frameAnalysis.confidence,
           source: 'frames'
         };
       } else {
         console.log(`✅ Using metadata result (fallback)`);
+        
+        // Determine type: 
+        // - If we have activity → 'activity'
+        // - If we have location but no activity → 'landscape'
+        // - If frameAnalysis says landscape → 'landscape'
+        let resultType = 'activity';
+        if (frameAnalysis.type === 'landscape' || (!metadataResult.activity && mergedLocation)) {
+          resultType = 'landscape';
+        } else if (metadataResult.activity) {
+          resultType = 'activity';
+        }
+        
         finalResult = {
-          type: 'activity',
+          type: resultType,
           activity: metadataResult.activity,
-          location: metadataResult.location || frameAnalysis.location,
-          confidence: metadataResult.confidence,
+          location: mergedLocation,
+          confidence: metadataResult.confidence || 0.5,
           source: 'metadata'
         };
+        console.log(`🎯 Final type determined: "${resultType}" (activity: ${metadataResult.activity}, location: ${mergedLocation})`);
       }
       
       // Step 5: VALIDATE if activity is in our 315 activities database
@@ -159,9 +192,27 @@ class SimpleVideoAnalyzer {
         ...finalResult
       };
       
+      } catch (error) {
+        console.error('❌ Error in video analysis:', error);
+        throw error;
+      }
+    })();
+    
+    // Race between analysis and timeout
+    try {
+      return await Promise.race([analysisPromise, timeoutPromise]);
     } catch (error) {
-      console.error('❌ Error in video analysis:', error);
-      throw error;
+      console.error('❌ Video analysis failed:', error.message);
+      // Return irrelevant if analysis fails or times out
+      return {
+        success: true,
+        type: 'irrelevant',
+        activity: null,
+        location: null,
+        confidence: 0,
+        source: 'error',
+        thumbnailUrl: null
+      };
     }
   }
   
@@ -337,7 +388,8 @@ Return JSON only:
 }`
         }],
         temperature: 0.2,
-        max_tokens: 100
+        max_tokens: 100,
+        timeout: 20000 // 20 second timeout
       });
       
       const text = response.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
@@ -486,7 +538,8 @@ Respond in JSON format ONLY:
             model: visionModel,
             messages: messages,
             max_tokens: 300,
-            temperature: 0.3
+            temperature: 0.3,
+            timeout: 25000 // 25 second timeout per frame
           });
           
           const content = response.choices[0].message.content;

@@ -109,6 +109,10 @@ export default function FindActivityScreen() {
   const [hasFetchedSections, setHasFetchedSections] = useState(false); // Track if we've fetched the 3 sections
   const [favorites, setFavorites] = useState<Set<string | number>>(new Set());
   
+  // Rating system states
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedRating, setSelectedRating] = useState<number | null>(null);
+  
   const cities = ['New York', 'Los Angeles', 'Miami', 'Washington DC', 'Boston', 'Atlanta', 'Lisboa', 'Porto', 'Barcelona', 'Madrid', 'Paris', 'London', 'Rome', 'Amsterdam'];
   
   // Search for cities globally using Google Places Autocomplete API via backend
@@ -774,6 +778,49 @@ export default function FindActivityScreen() {
     }
   };
   
+  // Check if we should show rating modal (3rd, 9th, 21st import)
+  const checkAndShowRating = async () => {
+    try {
+      // Get current import count
+      const countStr = await AsyncStorage.getItem('@import_count');
+      const currentCount = countStr ? parseInt(countStr, 10) : 0;
+      const newCount = currentCount + 1;
+      
+      // Save new count
+      await AsyncStorage.setItem('@import_count', newCount.toString());
+      
+      console.log(`📊 Import count: ${newCount}`);
+      
+      // Show rating on 3rd, 9th, and 21st import
+      if (newCount === 3 || newCount === 9 || newCount === 21) {
+        console.log('⭐ Showing rating modal!');
+        setTimeout(() => {
+          setShowRatingModal(true);
+        }, 1500); // Show after 1.5s delay to let results appear first
+      }
+    } catch (error) {
+      console.error('❌ Error checking rating:', error);
+    }
+  };
+  
+  // Submit rating to backend
+  const submitRating = async (rating: number) => {
+    try {
+      const countStr = await AsyncStorage.getItem('@import_count');
+      const importCount = countStr ? parseInt(countStr, 10) : 0;
+      
+      await api.post('/feedback/rating', {
+        rating: rating,
+        import_count: importCount,
+        question: 'How good has been the matchmaking so far?'
+      });
+      
+      console.log('✅ Rating submitted:', rating);
+    } catch (error) {
+      console.error('❌ Error submitting rating:', error);
+    }
+  };
+  
   const fetchRecommendations = async () => {
     if (!instagramUrl && !analysis) {
       console.error('❌ Cannot fetch: no instagramUrl or analysis');
@@ -808,6 +855,9 @@ export default function FindActivityScreen() {
           };
           setAnalysis(analysisData);
           setHasAnalyzed(true);
+          
+          // ⭐ Check if we should show rating modal after successful import
+          await checkAndShowRating();
         }
       }
       
@@ -1674,6 +1724,69 @@ export default function FindActivityScreen() {
           </View>
         </ScrollView>
       )}
+      
+      {/* ⭐ Rating Modal - Shows on 3rd, 9th, 21st import */}
+      <Modal
+        visible={showRatingModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowRatingModal(false);
+          setSelectedRating(null);
+        }}
+      >
+        <View style={styles.ratingModalOverlay}>
+          <View style={styles.ratingModalContent}>
+            {/* Close button */}
+            <Pressable 
+              style={styles.ratingCloseButton}
+              onPress={() => {
+                setShowRatingModal(false);
+                setSelectedRating(null);
+              }}
+            >
+              <X size={20} color="#999" />
+            </Pressable>
+            
+            {/* Question */}
+            <Text style={styles.ratingQuestion}>
+              How good has been the matchmaking so far?
+            </Text>
+            
+            {/* Star rating */}
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Pressable
+                  key={star}
+                  onPress={() => setSelectedRating(star)}
+                  style={styles.starButton}
+                >
+                  <Star
+                    size={48}
+                    color={selectedRating && selectedRating >= star ? '#FFD700' : '#ddd'}
+                    fill={selectedRating && selectedRating >= star ? '#FFD700' : 'none'}
+                    strokeWidth={2}
+                  />
+                </Pressable>
+              ))}
+            </View>
+            
+            {/* Submit button */}
+            {selectedRating && (
+              <Pressable
+                style={styles.submitRatingButton}
+                onPress={async () => {
+                  await submitRating(selectedRating);
+                  setShowRatingModal(false);
+                  setSelectedRating(null);
+                }}
+              >
+                <Text style={styles.submitRatingText}>Submit</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2422,5 +2535,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  // Rating Modal Styles
+  ratingModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  ratingModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  ratingCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ratingQuestion: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 28,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 24,
+  },
+  starButton: {
+    padding: 4,
+  },
+  submitRatingButton: {
+    backgroundColor: '#FF6B00',
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    borderRadius: 12,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  submitRatingText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
