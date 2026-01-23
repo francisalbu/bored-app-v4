@@ -1,9 +1,50 @@
 const OpenAI = require('openai');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// Load valid activities from JSON database
+let VALID_ACTIVITIES = null;
+function loadValidActivities() {
+  if (!VALID_ACTIVITIES) {
+    try {
+      const jsonPath = path.join(__dirname, '../../assets/COMPLETE_ACTIVITIES_DATABASE_WITH_PHOTOS.json');
+      const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      VALID_ACTIVITIES = data.activities.map(a => a.activity.toLowerCase());
+      console.log(`✅ Loaded ${VALID_ACTIVITIES.length} valid activities`);
+    } catch (error) {
+      console.error('⚠️ Failed to load activities database:', error.message);
+      VALID_ACTIVITIES = [];
+    }
+  }
+  return VALID_ACTIVITIES;
+}
+
+// Check if detected activity matches any valid activity
+function isValidActivity(detectedActivity) {
+  if (!detectedActivity) return false;
+  
+  const validActivities = loadValidActivities();
+  const detected = detectedActivity.toLowerCase().trim();
+  
+  // Exact match
+  if (validActivities.includes(detected)) {
+    return true;
+  }
+  
+  // Partial match (e.g., "scuba diving" matches "diving")
+  for (const valid of validActivities) {
+    if (detected.includes(valid) || valid.includes(detected)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
 
 class SimpleVideoAnalyzer {
   /**
@@ -75,6 +116,29 @@ class SimpleVideoAnalyzer {
           confidence: metadataResult.confidence,
           source: 'metadata'
         };
+      }
+      
+      // Step 5: VALIDATE if activity is in our 315 activities database
+      // If type is 'activity' but not in our list → mark as irrelevant
+      if (finalResult.type === 'activity' && finalResult.activity) {
+        const isValid = isValidActivity(finalResult.activity);
+        if (!isValid) {
+          console.log(`❌ Activity "${finalResult.activity}" not in valid activities list - marking as irrelevant`);
+          finalResult = {
+            type: 'irrelevant',
+            activity: null,
+            location: null,
+            confidence: 0.1,
+            source: 'validation'
+          };
+        } else {
+          console.log(`✅ Activity "${finalResult.activity}" is valid`);
+        }
+      }
+      
+      // If landscape → always valid
+      if (finalResult.type === 'landscape') {
+        console.log('✅ Landscape type - always valid');
       }
       
       // Use first frame as thumbnail if no thumbnail from provider
@@ -235,23 +299,31 @@ Location Tag: ${locationTag || 'none'}
         model: "gpt-4o-mini",
         messages: [{
           role: "system",
-          content: "Extract travel activity and location from Instagram metadata. Be specific with activities."
+          content: "Extract ONLY travel/adventure activities and destinations from Instagram metadata. Reject food, home, daily life content."
         }, {
           role: "user",
-          content: `Extract activity and location from this Instagram post:
+          content: `Analyze this Instagram post metadata:
 
 ${metadataText}
 
-RULES:
-1. Extract SPECIFIC activity from hashtags and caption (e.g., #surf = surfing, #yoga = yoga, #dive = diving)
-2. If location tag exists, use it
-3. If no clear activity found, return null
-4. Return confidence 0.9 if clear hashtags, 0.5-0.7 if from caption only
+ONLY ACCEPT these types of activities:
+✅ Adventure: surfing, diving, hiking, climbing, skiing, paragliding, kayaking, safari
+✅ Cultural: temple visits, historical sites, festivals, cultural tours
+✅ Wellness: yoga retreats, meditation in nature (NOT at home)
+✅ Food: food tours, cooking classes in destinations (NOT regular eating)
+
+REJECT these:
+❌ Regular eating/cooking at home or restaurants
+❌ Home activities (cleaning, organizing, etc.)
+❌ Pets, family content, random daily life
+❌ Shopping, getting ready, fashion content
+
+If this is NOT a travel/adventure/destination post, return NULL for activity.
 
 Return JSON only:
 {
-  "activity": "specific activity or null",
-  "location": "location or null",
+  "activity": "specific travel activity or null",
+  "location": "destination name or null",
   "confidence": 0.0-1.0
 }`
         }],
@@ -360,22 +432,33 @@ Return JSON only:
             content: [
               {
                 type: 'text',
-                text: `Frame ${index + 1}/${frames.length} - Determine:
+                text: `Frame ${index + 1}/${frames.length} - Classify this video content:
 
-1. Is this an ACTIVITY (person doing something: surfing, yoga, climbing, diving, etc.)?
-2. OR is this a LANDSCAPE (beautiful place: waterfall, desert, canyon, nature, etc.)?
+VALID TYPES:
+1. ACTIVITY - Travel/adventure activities like:
+   ✅ Surfing, diving, hiking, climbing, skiing, kayaking, paragliding
+   ✅ Yoga on beach, meditation in nature, fitness outdoors
+   ✅ Food tours, cooking classes in exotic locations
+   ✅ Cultural experiences (temples, monuments, festivals)
+   ❌ NOT regular eating, shopping, home activities
 
-If ACTIVITY:
-- Return the activity name (e.g., "surfing", "yoga", "rock climbing")
-- Be specific and accurate
+2. LANDSCAPE - Beautiful destinations/places:
+   ✅ Waterfalls, canyons, deserts, mountains, beaches, cities
+   ✅ Famous landmarks, scenic viewpoints
+   ❌ NOT restaurants, cafes, homes, offices
 
-If LANDSCAPE:
-- Return the location/place name (e.g., "Namibia Desert", "Iguazu Falls", "Grand Canyon")
-- Include country if identifiable
+3. IRRELEVANT - Anything else:
+   ❌ Food videos (unless it's a food tour/class in a destination)
+   ❌ Home activities, pets, random content
+   ❌ People talking/vlogging without activity/destination focus
+
+If ACTIVITY: Return activity name (e.g., "surfing", "temple visit")
+If LANDSCAPE: Return location (e.g., "Grand Canyon, USA")
+If IRRELEVANT: Set both activity and location to null, confidence low
 
 Respond in JSON format ONLY:
 {
-  "type": "activity" or "landscape",
+  "type": "activity" or "landscape" or "irrelevant",
   "activity": "activity name" or null,
   "location": "location name" or null,
   "confidence": 0.0-1.0
