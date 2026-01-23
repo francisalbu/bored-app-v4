@@ -677,4 +677,8 @@ Respond in JSON format ONLY:
   }
 }
 
-module.exports = new SimpleVideoAnalyzer();
+// Export the analyzer instance and the isBoringActivity function
+const analyzer = new SimpleVideoAnalyzer();
+analyzer.isBoringActivity = isBoringActivity; // Attach function to instance
+
+module.exports = analyzer;

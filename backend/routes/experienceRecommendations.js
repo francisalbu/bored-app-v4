@@ -302,6 +302,39 @@ router.post('/', async (req, res) => {
       console.log('📊 Fresh analysis result:', analysis);
     }
     
+    // CRITICAL: Check if activity is BORING before any searches!
+    // This prevents wasting resources on transfers, bars, buses, etc.
+    if (analysis.type === 'activity' && analysis.activity) {
+      const simpleVideoAnalyzer = require('../services/simpleVideoAnalyzer');
+      const isBoring = await simpleVideoAnalyzer.isBoringActivity(analysis.activity);
+      
+      if (isBoring) {
+        console.log(`🚫 BORING ACTIVITY BLOCKED: "${analysis.activity}" - No search needed`);
+        
+        // Save to cache with type 'boring'
+        if (!cached) {
+          await saveToCache(instagramUrl, {
+            type: 'boring',
+            activity: analysis.activity,
+            location: analysis.location,
+            confidence: 1.0,
+            thumbnailUrl: thumbnailUrl
+          });
+        }
+        
+        return res.json({
+          success: true,
+          type: 'boring',
+          activity: analysis.activity,
+          experiences: [],
+          thumbnail: thumbnailUrl,
+          message: "Sorry, that's too boring for us! Search something more epic! 🚀"
+        });
+      }
+      
+      console.log(`✅ Activity "${analysis.activity}" is EPIC - proceeding with search`);
+    }
+    
     // Validate if video is relevant (activity or landscape)
     // If not relevant: type is 'irrelevant' OR very low confidence OR (no activity AND no location)
     const isIrrelevant = (
