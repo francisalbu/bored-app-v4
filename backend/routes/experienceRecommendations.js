@@ -398,6 +398,36 @@ router.post('/', async (req, res) => {
       
       viatorExperiences = await viatorPromise;
       
+      // CRITICAL: Filter by location FIRST (only show experiences near user's location)
+      viatorExperiences = viatorExperiences.filter(exp => {
+        const expLocation = (exp.location || '').toLowerCase();
+        const userLocation = (userCity || '').toLowerCase();
+        
+        // If no location info, skip this filter
+        if (!expLocation || !userLocation) return true;
+        
+        // Check if experience location matches user location
+        // Support variations: "Lisbon", "Lisboa", "Lisbon, Portugal"
+        const userLocationVariations = [
+          userLocation,
+          userLocation.replace('lisbon', 'lisboa'),
+          userLocation.replace('lisboa', 'lisbon'),
+          // Get the base city name (remove country)
+          userLocation.split(',')[0].trim()
+        ];
+        
+        const isNearUser = userLocationVariations.some(variation => 
+          expLocation.includes(variation)
+        );
+        
+        if (!isNearUser) {
+          console.log(`🚫 Filtered out (wrong location): ${exp.title} (${exp.location}) - User is in ${userCity}`);
+          return false;
+        }
+        
+        return true;
+      });
+      
       // Filter Viator results to only show relevant experiences (anti-bored tourist)
       viatorExperiences = viatorExperiences.filter(exp => {
         const title = exp.title.toLowerCase();

@@ -156,7 +156,9 @@ class ViatorService {
     // CRITICAL: Define boring/unwanted categories that we NEVER recommend
     const BORING_CATEGORIES = [
       // Transportation & Logistics (boring, not experiences)
-      'transfer', 'airport transfer', 'car rental', 'bus tour',
+      'transfer', 'airport transfer', 'car rental', 'bike rental', 
+      'bicycle rental', 'scooter rental', 'segway rental', 'motorcycle rental',
+      'bus tour', 'coach tour',
       
       // Accommodation (we don't book hotels)
       'hotel', 'resort', 'luxury stay', 'accommodation',
@@ -169,7 +171,8 @@ class ViatorService {
       'casino', 'gambling',
       
       // Generic/Boring Tours
-      'tuk tuk tour', 'tuktuk', 'hop-on hop-off',
+      'tuk tuk tour', 'tuktuk', 'hop-on hop-off', 'sightseeing bus',
+      'city tour bus', 'panoramic bus',
       
       // Miscellaneous Boring
       'karaoke', 'comic con', 'geek culture', 'paranormal tour',

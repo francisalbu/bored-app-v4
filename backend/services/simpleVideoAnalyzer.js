@@ -55,7 +55,8 @@ const BORING_CATEGORIES = [
   'Night Club Tours', 'Bar Tours', 'Pub Tours', 'Bar Crawls', 'Nightclub Tours',
   'Transfers', 'Airport Transfers', 'Hotel Transfers',
   'Bus Tours', 'Hop on Hop off', 'Hop', 'HopnOff', 'City Bus Tours', 'Sightseeing Bus',
-  'Car Rentals', 'Vehicle Rentals',
+  'Car Rentals', 'Vehicle Rentals', 'Bike Rentals', 'Bicycle Rentals', 'Scooter Rentals', 
+  'Segway Rentals', 'Motorcycle Rentals',
   'Hotel Bookings', 'Resort Stays', 'Luxury Stays', 'Accommodation',
   'Shopping Tours', 'Souvenir Shopping', 'Outlet Shopping',
   'Casino Tours', 'Gambling',
@@ -64,7 +65,7 @@ const BORING_CATEGORIES = [
   'Paranormal Tours', 'Ghost Tours',
   'Astrology Readings', 'Tarot Readings', 'Fortune Telling',
   'TukTuk Tours', 'Tuk Tuk Rides',
-  'Spa Services', 'Massage Services' // Added common boring categories
+  'Spa Services', 'Massage Services'
 ];
 
 /**
