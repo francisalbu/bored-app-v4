@@ -388,8 +388,7 @@ Return JSON only:
 }`
         }],
         temperature: 0.2,
-        max_tokens: 100,
-        timeout: 20000 // 20 second timeout
+        max_tokens: 100
       });
       
       const text = response.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
@@ -538,8 +537,7 @@ Respond in JSON format ONLY:
             model: visionModel,
             messages: messages,
             max_tokens: 300,
-            temperature: 0.3,
-            timeout: 25000 // 25 second timeout per frame
+            temperature: 0.3
           });
           
           const content = response.choices[0].message.content;
