@@ -7,6 +7,71 @@ const { from } = require('../config/database');
 const axios = require('axios');
 
 /**
+ * Use OpenAI to filter experiences by semantic relevance (BATCH mode)
+ * Much faster and cheaper than individual calls - processes all titles at once
+ * Example: "Ocean Dive" is relevant to "snorkeling", but "Indoor Skydiving" is not
+ */
+async function filterRelevantActivities(experiences, targetActivity) {
+  if (!experiences || experiences.length === 0) return [];
+  
+  try {
+    // Build numbered list of titles
+    const titlesList = experiences
+      .map((exp, i) => `${i + 1}. ${exp.title}`)
+      .join('\n');
+    
+    const prompt = `Activity search: "${targetActivity}"
+
+Which of these are RELEVANT?
+${titlesList}
+
+Rules:
+- Water activities (snorkeling, diving, scuba) are related
+- Land activities (hiking, biking) are related  
+- Air activities (skydiving, paragliding) are related
+- BUT different categories are NOT related (snorkeling ≠ skydiving)
+
+Return ONLY numbers of relevant activities (comma-separated).
+Example: 1,3,5`;
+
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        max_tokens: 100
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 5000
+      }
+    );
+
+    const answer = response.data.choices[0].message.content.trim();
+    console.log(`   🤖 OpenAI relevance filter: ${answer}`);
+    
+    // Parse comma-separated numbers
+    const relevantIndices = answer
+      .split(',')
+      .map(n => parseInt(n.trim()) - 1)
+      .filter(i => !isNaN(i) && i >= 0 && i < experiences.length);
+    
+    const filtered = experiences.filter((_, i) => relevantIndices.includes(i));
+    console.log(`   ✅ AI filtered: ${experiences.length} → ${filtered.length} relevant`);
+    
+    return filtered;
+    
+  } catch (error) {
+    console.error('   ⚠️ OpenAI filter failed, using all results:', error.message);
+    return experiences; // Fallback: return all if AI fails
+  }
+}
+
+/**
  * Reverse geocoding: Convert GPS coordinates to city name
  * Uses Nominatim (OpenStreetMap) - FREE, no API key required!
  */
@@ -571,27 +636,14 @@ router.post('/by-activity', async (req, res) => {
       
       console.log(`   📦 DB returned ${dbExperiences.length} experiences`);
       
-      // For Bored Tourist, be STRICT - only include if activity REALLY matches
-      // Title or description must contain the activity or a related term
-      experiences = dbExperiences.filter(exp => {
-        const title = (exp.title || '').toLowerCase();
-        const desc = (exp.description || '').toLowerCase();
-        const combined = `${title} ${desc}`;
-        
-        // Check if the TITLE contains the activity or related terms
-        // (not just description - title is more important)
-        const titleMatch = searchTerms.some(term => title.includes(term));
-        const descMatch = searchTerms.some(term => desc.includes(term));
-        
-        // Prioritize title matches, but accept strong description matches
-        const hasMatch = titleMatch || descMatch;
-        
-        if (hasMatch) {
-          console.log(`   ✅ Bored Tourist Match: ${exp.title} (title: ${titleMatch}, desc: ${descMatch})`);
-        }
-        
-        return hasMatch;
-      });
+      // Use AI to filter semantically relevant activities
+      // Example: "snorkeling" allows "scuba diving" but blocks "indoor skydiving"
+      if (dbExperiences.length > 0) {
+        console.log(`   🤖 Filtering Bored Tourist experiences with OpenAI...`);
+        experiences = await filterRelevantActivities(dbExperiences, activity);
+      } else {
+        experiences = [];
+      }
       
       // LIMIT to MAX_BORED_TOURIST experiences
       experiences = experiences.slice(0, MAX_BORED_TOURIST);
@@ -697,25 +749,12 @@ router.post('/by-activity', async (req, res) => {
       console.log(`   📦 Viator freetext returned ${viatorExperiences.length} experiences`);
     }
     
-    // For Near You: Filter to ONLY experiences that mention the activity in title
-    // Location is GUARANTEED by searchByDestinationId(538) - Lisboa only
-    if (prioritizeBored) {
-      viatorExperiences = viatorExperiences.filter(exp => {
-        const expTitle = (exp.title || '').toLowerCase();
-        
-        // CRITICAL: TITLE MUST CONTAIN the activity or related terms
-        const titleHasActivity = searchTerms.some(term => expTitle.includes(term));
-        
-        if (!titleHasActivity) {
-          console.log(`   ❌ Filtered out (title doesn't mention ${activity}): ${exp.title}`);
-          return false;
-        }
-        
-        console.log(`   ✅ Viator match: ${exp.title}`);
-        return true;
-      });
-      
-      console.log(`   📍 After title filter: ${viatorExperiences.length} Viator experiences`);
+    // For Near You: Use AI to filter semantically relevant experiences
+    // Example: "snorkeling" allows "scuba diving" but blocks "indoor skydiving"
+    if (prioritizeBored && viatorExperiences.length > 0) {
+      console.log(`   🤖 Filtering ${viatorExperiences.length} Viator experiences with OpenAI...`);
+      viatorExperiences = await filterRelevantActivities(viatorExperiences, activity);
+      console.log(`   📍 After AI filter: ${viatorExperiences.length} Viator experiences`);
     }
     
     // Combine: 
