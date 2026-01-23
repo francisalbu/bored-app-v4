@@ -1156,8 +1156,20 @@ export default function FindActivityScreen() {
             </View>
           )}
           
-          {/* Near You Section - Only show when not in specific location AND not landscape */}
-          {!isSpecificLocation && analysis?.type !== 'landscape' && (
+          {/* BORING ACTIVITY - Show rejection message */}
+          {!isSpecificLocation && analysis && analysis.type === 'boring' && (
+            <View style={styles.boringSection}>
+              <Text style={styles.boringEmoji}>😴</Text>
+              <Text style={styles.boringTitle}>Sorry, that's too boring for us!</Text>
+              <Text style={styles.boringSubtitle}>Search something more epic! 🚀</Text>
+              <Text style={styles.boringHint}>
+                We're all about authentic experiences - try activities like surfing, hiking, cooking classes, or skydiving!
+              </Text>
+            </View>
+          )}
+          
+          {/* Near You Section - Only show when not in specific location AND not landscape AND not boring */}
+          {!isSpecificLocation && analysis?.type !== 'landscape' && analysis?.type !== 'boring' && (
             <View style={styles.sectionContainer}>
               <View style={styles.nearYouHeader}>
                 <Pressable 
@@ -1830,6 +1842,44 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 8,
+  },
+  // BORING ACTIVITY SECTION STYLES
+  boringSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF9E6',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FFE08C',
+  },
+  boringEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  boringTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#000',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  boringSubtitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FF6B35',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  boringHint: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   loadingContainer: {
     flex: 1,

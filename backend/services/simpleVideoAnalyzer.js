@@ -50,6 +50,65 @@ function isValidActivity(detectedActivity) {
   return false;
 }
 
+// BORING CATEGORIES - We NEVER recommend these
+const BORING_CATEGORIES = [
+  'Night Club Tours', 'Bar Tours', 'Pub Tours', 'Bar Crawls', 'Nightclub Tours',
+  'Transfers', 'Airport Transfers', 'Hotel Transfers',
+  'Bus Tours', 'Hop on Hop off', 'City Bus Tours',
+  'Car Rentals', 'Vehicle Rentals',
+  'Hotel Bookings', 'Resort Stays', 'Luxury Stays', 'Accommodation',
+  'Shopping Tours', 'Souvenir Shopping', 'Outlet Shopping',
+  'Casino Tours', 'Gambling',
+  'Karaoke', 'Karaoke Bars',
+  'Comic Con', 'Geek Culture Events',
+  'Paranormal Tours', 'Ghost Tours',
+  'Astrology Readings', 'Tarot Readings', 'Fortune Telling',
+  'TukTuk Tours', 'Tuk Tuk Rides',
+  'Spa Services', 'Massage Services' // Added common boring categories
+];
+
+/**
+ * Check if activity is BORING using GPT-4o-mini (cheapest model)
+ * @param {string} activity - Detected activity
+ * @returns {Promise<boolean>} - True if boring, false if epic
+ */
+async function isBoringActivity(activity) {
+  if (!activity) return false;
+  
+  try {
+    const prompt = `You are a fun activity classifier. Your job is to determine if an activity is BORING or EPIC.
+
+BORING activities include:
+${BORING_CATEGORIES.map(cat => `- ${cat}`).join('\n')}
+
+User's activity: "${activity}"
+
+Rules:
+- If the activity matches ANY of the boring categories above (even with variations like "hop", "hopnoff", "transfer", "bus tour"), respond with "BORING"
+- If the activity is an authentic, active, or unique experience (like surfing, hiking, cooking classes, skydiving, etc.), respond with "EPIC"
+
+Respond with ONLY one word: "BORING" or "EPIC"`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini', // Cheapest model
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 10,
+      temperature: 0
+    });
+
+    const result = response.choices[0]?.message?.content?.trim().toUpperCase();
+    const isBoring = result === 'BORING';
+    
+    console.log(`🎯 Boring check: "${activity}" → ${isBoring ? '🚫 BORING' : '✅ EPIC'}`);
+    return isBoring;
+    
+  } catch (error) {
+    console.error('⚠️ Error checking if activity is boring:', error.message);
+    // If check fails, assume NOT boring (fail open to avoid blocking valid activities)
+    return false;
+  }
+}
+
 class SimpleVideoAnalyzer {
   /**
    * Analyze video with 2-3 frames - FAST and SIMPLE
@@ -155,7 +214,37 @@ class SimpleVideoAnalyzer {
         console.log(`🎯 Final type determined: "${resultType}" (activity: ${metadataResult.activity}, location: ${mergedLocation})`);
       }
       
-      // Step 5: VALIDATE if activity is in our 315 activities database
+      // Step 5A: CHECK if activity is BORING (transfers, bars, etc.)
+      if (finalResult.type === 'activity' && finalResult.activity) {
+        try {
+          const isBoring = await isBoringActivity(finalResult.activity);
+          if (isBoring) {
+            console.log(`🚫 Activity "${finalResult.activity}" is BORING - rejecting`);
+            finalResult = {
+              type: 'boring',
+              activity: finalResult.activity, // Keep activity for logging
+              location: null,
+              confidence: 1.0,
+              source: 'boring-check'
+            };
+            
+            // Return early with thumbnail
+            const finalThumbnail = videoData.thumbnailUrl || (frames.length > 0 ? frames[0] : null);
+            return {
+              success: true,
+              thumbnailUrl: finalThumbnail,
+              ...finalResult
+            };
+          } else {
+            console.log(`✅ Activity "${finalResult.activity}" is EPIC - proceeding`);
+          }
+        } catch (boringError) {
+          console.error('⚠️ Boring check error, proceeding with activity:', boringError.message);
+          // If boring check fails, continue with validation (fail open)
+        }
+      }
+      
+      // Step 5B: VALIDATE if activity is in our 315 activities database
       // If type is 'activity' but not in our list → mark as irrelevant
       if (finalResult.type === 'activity' && finalResult.activity) {
         try {
