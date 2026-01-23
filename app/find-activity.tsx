@@ -910,8 +910,18 @@ export default function FindActivityScreen() {
       // Keep experiences state for compatibility
       setExperiences(nearYouResponse.data?.experiences || []);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching recommendations:', error);
+      
+      // Check if it's an irrelevant video error
+      if (error.response?.data?.error === 'IRRELEVANT_VIDEO') {
+        // Show alert with fun message
+        alert(error.response.data.message);
+        // Go back to previous screen
+        router.back();
+        return;
+      }
+      
       setNearYouExperiences([]);
       setReelExperiences([]);
       setSuggestedLocations([]);

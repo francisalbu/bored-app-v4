@@ -302,6 +302,33 @@ router.post('/', async (req, res) => {
       console.log('📊 Fresh analysis result:', analysis);
     }
     
+    // Validate if video is relevant (activity or landscape)
+    // If not relevant: very low confidence OR (no activity AND no location) OR type is neither
+    const isIrrelevant = (
+      analysis.confidence < 0.3 || // Very low confidence
+      (!analysis.activity && !analysis.location) || // No activity AND no location
+      (analysis.type !== 'activity' && analysis.type !== 'landscape') // Not a valid type
+    );
+    
+    if (isIrrelevant) {
+      console.log('❌ Irrelevant video detected:', {
+        confidence: analysis.confidence,
+        activity: analysis.activity,
+        location: analysis.location,
+        type: analysis.type
+      });
+      
+      return res.status(400).json({
+        success: false,
+        message: "Not gonna lie, we're a bit confused right now... 😬 We're adventure hunters, not fortune tellers! Send us a reel with a destination or activity and we'll find you something epic 🔥",
+        error: 'IRRELEVANT_VIDEO',
+        analysis: {
+          confidence: analysis.confidence,
+          type: analysis.type
+        }
+      });
+    }
+    
     let experiences = [];
     let viatorExperiences = [];
     let message = '';
