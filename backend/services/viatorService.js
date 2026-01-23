@@ -153,8 +153,51 @@ class ViatorService {
    * Transform Viator product format to our experience format
    */
   transformViatorProducts(viatorProducts, activity, searchLocation = null) {
-    // Transform products first
-    const transformed = viatorProducts.map(product => ({
+    // CRITICAL: Define boring/unwanted categories that we NEVER recommend
+    const BORING_CATEGORIES = [
+      // Transportation & Logistics (boring, not experiences)
+      'transfer', 'airport transfer', 'car rental', 'bus tour',
+      
+      // Accommodation (we don't book hotels)
+      'hotel', 'resort', 'luxury stay', 'accommodation',
+      
+      // Shopping (boring tourist trap)
+      'shopping tour', 'souvenir shopping', 'outlet shopping',
+      
+      // Nightlife (not family-friendly, can be sketchy)
+      'night club', 'bar tour', 'pub tour', 'bar crawl', 'nightclub',
+      'casino', 'gambling',
+      
+      // Generic/Boring Tours
+      'tuk tuk tour', 'tuktuk', 'hop-on hop-off',
+      
+      // Miscellaneous Boring
+      'karaoke', 'comic con', 'geek culture', 'paranormal tour',
+      'astrology', 'tarot reading', 'fortune telling'
+    ];
+
+    // Filter out boring categories BEFORE transformation
+    const filteredProducts = viatorProducts.filter(product => {
+      const title = (product.title || '').toLowerCase();
+      const description = (product.description || '').toLowerCase();
+      
+      // Check if product matches any boring category
+      const isBoring = BORING_CATEGORIES.some(category => {
+        return title.includes(category) || description.includes(category);
+      });
+      
+      if (isBoring) {
+        logger.info(`🚫 Filtered out boring experience: "${product.title}" (matches boring category)`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    logger.info(`✅ Filtered ${viatorProducts.length - filteredProducts.length} boring experiences. ${filteredProducts.length} remain.`);
+
+    // Transform filtered products
+    const transformed = filteredProducts.map(product => ({
         // Mark as external source
         id: `viator_${product.productCode}`,
         source: 'viator',
