@@ -481,7 +481,8 @@ export default function SharedContentScreen() {
                   activity: baseActivity || '', // Use base activity (empty for landscape)
                   // Pass experiences as JSON string
                   experiences: JSON.stringify(response.data.experiences),
-                  analysis: JSON.stringify(processedAnalysis) // Pass processed analysis with both fields
+                  analysis: JSON.stringify(processedAnalysis), // Pass processed analysis with both fields
+                  from: 'instagram' // Mark that we came from Instagram share
                 }
               });
               return;
@@ -498,6 +499,7 @@ export default function SharedContentScreen() {
           params: {
             instagramUrl: url || text || '',
             thumbnail: '',
+            from: 'instagram'
           }
         });
         
@@ -510,6 +512,7 @@ export default function SharedContentScreen() {
           params: {
             instagramUrl: url || text || '',
             thumbnail: '',
+            from: 'instagram'
           }
         });
       }

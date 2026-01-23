@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -74,9 +74,14 @@ export default function FindActivityScreen() {
   
   const instagramUrl = params.instagramUrl as string;
   const thumbnailUrl = params.thumbnail as string;
+  const fromSource = params.from as string; // Track where we came from
+  const allDataLoaded = params.allDataLoaded === 'true'; // Flag to skip additional fetches
+  const fromHistory = params.fromHistory === 'true'; // Coming from history - show data immediately
   
-  // Check if data was passed from shared-content
+  // Check if data was passed from shared-content or history
   const preloadedExperiences = params.experiences ? JSON.parse(params.experiences as string) : null;
+  const preloadedNearYou = params.nearYouExperiences ? JSON.parse(params.nearYouExperiences as string) : null;
+  const preloadedReel = params.reelExperiences ? JSON.parse(params.reelExperiences as string) : null;
   const rawPreloadedAnalysis = params.analysis ? JSON.parse(params.analysis as string) : null;
   
   // Process preloaded analysis to ensure fullActivity and base activity are set
@@ -97,16 +102,16 @@ export default function FindActivityScreen() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSpecificLocation, setIsSpecificLocation] = useState(false); // Track if viewing specific location
   
-  // Separate states for 3 sections
-  const [nearYouExperiences, setNearYouExperiences] = useState<Experience[]>(preloadedExperiences || []); // Preloaded goes to Near You initially
-  const [reelExperiences, setReelExperiences] = useState<Experience[]>([]); // Will be fetched separately
+  // Separate states for 3 sections - use preloaded data if available
+  const [nearYouExperiences, setNearYouExperiences] = useState<Experience[]>(preloadedNearYou || preloadedExperiences || []);
+  const [reelExperiences, setReelExperiences] = useState<Experience[]>(preloadedReel || []);
   const [suggestedLocations, setSuggestedLocations] = useState<ActivityDestination[]>([]);
   
   const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []); // Keep for compatibility
   const [analysis, setAnalysis] = useState<Analysis | null>(preloadedAnalysis);
   const [loading, setLoading] = useState(false); // Never show loading - data must be preloaded
   const [hasAnalyzed, setHasAnalyzed] = useState(!!preloadedExperiences);
-  const [hasFetchedSections, setHasFetchedSections] = useState(false); // Track if we've fetched the 3 sections
+  const [hasFetchedSections, setHasFetchedSections] = useState(allDataLoaded); // Skip fetch if all data already loaded
   const [favorites, setFavorites] = useState<Set<string | number>>(new Set());
   
   // Rating system states
@@ -114,6 +119,47 @@ export default function FindActivityScreen() {
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   
   const cities = ['New York', 'Los Angeles', 'Miami', 'Washington DC', 'Boston', 'Atlanta', 'Lisboa', 'Porto', 'Barcelona', 'Madrid', 'Paris', 'London', 'Rome', 'Amsterdam'];
+  
+  // Save search to history
+  const saveToHistory = async (activity: string, fullActivity: string, location: string, thumbnail: string | null) => {
+    try {
+      const HISTORY_STORAGE_KEY = '@bored_search_history';
+      const historyJson = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
+      const history = historyJson ? JSON.parse(historyJson) : [];
+      
+      // Check if activity already exists
+      const existingIndex = history.findIndex((item: any) => item.activity === activity);
+      
+      const historyItem = {
+        activity,
+        fullActivity,
+        location,
+        thumbnail,
+        lastSearched: new Date().toISOString(),
+        searchCount: existingIndex >= 0 ? history[existingIndex].searchCount + 1 : 1,
+        // Store all params needed to recreate find-activity screen
+        analysis: params.analysis as string,
+        experiences: params.experiences as string,
+        instagramUrl: params.instagramUrl as string || '',
+      };
+      
+      if (existingIndex >= 0) {
+        // Update existing item
+        history[existingIndex] = historyItem;
+      } else {
+        // Add new item
+        history.unshift(historyItem);
+      }
+      
+      // Keep only last 50 searches
+      const trimmedHistory = history.slice(0, 50);
+      
+      await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(trimmedHistory));
+      console.log('✅ Saved to history:', activity);
+    } catch (error) {
+      console.error('Failed to save to history:', error);
+    }
+  };
   
   // Search for cities globally using Google Places Autocomplete API via backend
   const searchGlobalCities = async (query: string) => {
@@ -714,13 +760,70 @@ export default function FindActivityScreen() {
     })();
   }, []);
   
+  // Track if initial setup has been done
+  const initialSetupDone = useRef(false);
+  
   // Initial fetch: when we have preloaded data, fetch the 3 sections properly
   useEffect(() => {
+    // Only run once
+    if (initialSetupDone.current) return;
+    
+    // If ALL data was preloaded (from new analysis), just set up local data
+    if (allDataLoaded && preloadedAnalysis) {
+      initialSetupDone.current = true;
+      console.log('✅ All data preloaded, setting up suggested locations...');
+      
+      // Set suggested locations from local JSON database
+      const baseActivity = preloadedAnalysis.activity;
+      if (baseActivity && preloadedAnalysis.type !== 'landscape') {
+        const destinations = getActivityDestinations(baseActivity);
+        setSuggestedLocations(destinations);
+        console.log('📍 Suggested locations from database:', destinations.length);
+      }
+      
+      // Save to history
+      saveToHistory(
+        preloadedAnalysis.activity,
+        preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
+        preloadedAnalysis.location || userLocation,
+        preloadedAnalysis.thumbnailUrl || null
+      );
+      return;
+    }
+    
+    // Coming from history - show stored data immediately, fetch sections in background
+    if (fromHistory && preloadedAnalysis && preloadedExperiences) {
+      initialSetupDone.current = true;
+      console.log('📚 From history - showing stored data, fetching sections in background...');
+      
+      // Set suggested locations immediately from local JSON
+      const baseActivity = preloadedAnalysis.activity;
+      if (baseActivity && preloadedAnalysis.type !== 'landscape') {
+        const destinations = getActivityDestinations(baseActivity);
+        setSuggestedLocations(destinations);
+      }
+      
+      // Fetch fresh sections in background (won't block UI)
+      fetchRecommendations();
+      setHasFetchedSections(true);
+      return;
+    }
+    
     if (preloadedAnalysis && !hasFetchedSections) {
+      initialSetupDone.current = true;
       console.log('🚀 Have preloaded analysis, fetching 3 sections...');
       fetchRecommendations();
       setHasFetchedSections(true);
+      
+      // Save to history
+      saveToHistory(
+        preloadedAnalysis.activity,
+        preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
+        preloadedAnalysis.location || userLocation,
+        preloadedAnalysis.thumbnailUrl || null
+      );
     } else if (!preloadedExperiences && instagramUrl && !hasFetchedSections) {
+      initialSetupDone.current = true;
       console.log('⚠️ No preloaded data, but we have URL - will fetch');
       fetchRecommendations();
       setHasFetchedSections(true);
@@ -831,9 +934,14 @@ export default function FindActivityScreen() {
     console.log('🔍 Fetching recommendations...');
     console.log('   Has analyzed:', hasAnalyzed);
     console.log('   User location:', userLocation);
+    console.log('   Has preloaded experiences:', !!preloadedExperiences);
     
     try {
-      setLoading(true);
+      // DON'T show loading if we already have preloaded data - fetch in background
+      const shouldShowLoading = !preloadedExperiences;
+      if (shouldShowLoading) {
+        setLoading(true);
+      }
       
       let analysisData = analysis;
       
@@ -1016,11 +1124,21 @@ export default function FindActivityScreen() {
     }
   };
   
+  const handleClose = () => {
+    // If came from Instagram share, go to home tab
+    // Otherwise go to history tab (came from within the app)
+    if (fromSource === 'instagram') {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/(tabs)/history');
+    }
+  };
+  
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Simple header with close button */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.closeButton}>
+        <Pressable onPress={handleClose} style={styles.closeButton}>
           <X size={24} color="#333" />
         </Pressable>
       </View>
