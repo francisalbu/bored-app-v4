@@ -174,15 +174,32 @@ class ViatorService {
       'tuk tuk tour', 'tuktuk', 'hop-on hop-off', 'sightseeing bus',
       'city tour bus', 'panoramic bus',
       
+      // DAY TOURS - We don't want generic sightseeing day tours!
+      'day tour', 'day trip', 'full day tour', 'half day tour',
+      'full-day tour', 'half-day tour', 'guided tour', 'sightseeing tour',
+      'city sightseeing', 'city highlights', 'highlights tour',
+      'best of', 'must see', 'must-see', 'top attractions',
+      'walking tour', 'private tour', 'group tour',
+      
       // Miscellaneous Boring
       'karaoke', 'comic con', 'geek culture', 'paranormal tour',
       'astrology', 'tarot reading', 'fortune telling'
     ];
+    
+    // Maximum price constraint - never show experiences over 1000€
+    const MAX_PRICE_EUR = 1000;
 
-    // Filter out boring categories BEFORE transformation
+    // Filter out boring categories AND expensive experiences BEFORE transformation
     const filteredProducts = viatorProducts.filter(product => {
       const title = (product.title || '').toLowerCase();
       const description = (product.description || '').toLowerCase();
+      const price = product.pricing?.summary?.fromPrice || 0;
+      
+      // Check price constraint - never show experiences over 1000€
+      if (price > MAX_PRICE_EUR) {
+        logger.info(`💰 Filtered out expensive experience: "${product.title}" (${price}€ > ${MAX_PRICE_EUR}€)`);
+        return false;
+      }
       
       // Check if product matches any boring category
       const isBoring = BORING_CATEGORIES.some(category => {

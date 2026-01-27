@@ -1,433 +1,317 @@
-import { X, Check } from 'lucide-react-native';
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
   Modal,
-  Animated,
-  Dimensions,
-  TouchableOpacity,
+  Pressable,
+  StyleSheet,
+  ScrollView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import { X, Check } from 'lucide-react-native';
 import colors from '@/constants/colors';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { usePreferences } from '@/contexts/PreferencesContext';
-import { CATEGORIES as APP_CATEGORIES, type Experience } from '@/constants/experiences';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PANEL_WIDTH = SCREEN_WIDTH * 0.75;
-
-// All possible categories from the app (excluding "all")
-const ALL_CATEGORIES = APP_CATEGORIES
-  .filter(cat => cat.id !== 'all')
-  .map(cat => ({
-    id: cat.id,
-    label: cat.name,
-    emoji: cat.icon,
-  }));
-
-// Price ranges
-const PRICE_RANGES = [
-  { id: 'budget', label: '€1 - €30', min: 1, max: 30 },
-  { id: 'mid', label: '€31 - €60', min: 31, max: 60 },
-  { id: 'premium', label: '€61 - €100', min: 61, max: 100 },
-  { id: 'luxury', label: '€100+', min: 100, max: 9999 },
+export const PRICE_RANGES = [
+  { label: 'Free', min: 0, max: 0 },
+  { label: '€1-25', min: 1, max: 25 },
+  { label: '€25-50', min: 25, max: 50 },
+  { label: '€50-100', min: 50, max: 100 },
+  { label: '€100+', min: 100, max: 10000 },
 ];
 
-// Availability options
-const AVAILABILITY_OPTIONS = [
-  { id: 'today', label: 'Today' },
-  { id: 'tomorrow', label: 'Tomorrow' },
-  { id: 'this-week', label: 'This Week' },
+export const CATEGORIES = [
+  'All',
+  'Outdoors',
+  'Sports',
+  'Culture Dive',
+  'Local Cooking',
+  'Time Stories',
+  'Micro Adventures',
 ];
 
 export interface FilterOptions {
-  categories: string[];
-  priceRange: string | null;
-  availability: string | null;
+  priceRange: { min: number; max: number } | null;
+  category: string | null;
+  instantBooking: boolean;
+  availableToday: boolean;
 }
 
 interface FiltersModalProps {
   visible: boolean;
   onClose: () => void;
   onApply: (filters: FilterOptions) => void;
-  currentFilters: FilterOptions;
-  experiences: Experience[];
+  currentFilters?: FilterOptions;
 }
 
-export function FiltersModal({ visible, onClose, onApply, currentFilters, experiences }: FiltersModalProps) {
-  const { t } = useLanguage();
-  const { getSortedCategories } = usePreferences();
-  const insets = useSafeAreaInsets();
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(currentFilters.categories);
-  const [selectedPriceRange, setSelectedPriceRange] = useState<string | null>(currentFilters.priceRange);
-  const [selectedAvailability, setSelectedAvailability] = useState<string | null>(currentFilters.availability);
-  
-  const slideAnim = useRef(new Animated.Value(PANEL_WIDTH)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+export const FiltersModal: React.FC<FiltersModalProps> = ({
+  visible,
+  onClose,
+  onApply,
+  currentFilters,
+}) => {
+  const [selectedPrice, setSelectedPrice] = useState<{ min: number; max: number } | null>(
+    currentFilters?.priceRange || null
+  );
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(
+    currentFilters?.category || null
+  );
+  const [instantBooking, setInstantBooking] = useState(
+    currentFilters?.instantBooking || false
+  );
+  const [availableToday, setAvailableToday] = useState(
+    currentFilters?.availableToday || false
+  );
 
-  // Filter categories to only show those with at least 1 experience (same logic as explore.tsx)
-  const availableCategories = useMemo(() => {
-    const filtered = ALL_CATEGORIES.filter(category => {
-      const normalizedCategoryName = category.label.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
-      
-      return experiences.some(exp => {
-        // Check if experience category matches
-        const expCategory = (exp.category || '').toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
-        if (expCategory === normalizedCategoryName || expCategory.includes(category.id)) {
-          return true;
-        }
-        
-        // Check if any tag matches the category name
-        return (exp.tags || []).some(tag => {
-          const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
-          return normalizedTag === normalizedCategoryName || tag.toLowerCase().includes(category.label.toLowerCase());
-        });
-      });
-    });
-    
-    // Sort categories based on user preferences (favorites first)
-    return getSortedCategories(filtered);
-  }, [experiences, getSortedCategories]);
-
-  // Sync with current filters when modal opens
   useEffect(() => {
-    if (visible) {
-      setSelectedCategories(currentFilters.categories);
-      setSelectedPriceRange(currentFilters.priceRange);
-      setSelectedAvailability(currentFilters.availability);
-      // Animate in
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // Reset animation values
-      slideAnim.setValue(PANEL_WIDTH);
-      fadeAnim.setValue(0);
+    if (currentFilters) {
+      setSelectedPrice(currentFilters.priceRange);
+      setSelectedCategory(currentFilters.category);
+      setInstantBooking(currentFilters.instantBooking);
+      setAvailableToday(currentFilters.availableToday);
     }
-  }, [visible, currentFilters]);
-
-  const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: PANEL_WIDTH,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onClose();
-    });
-  };
-
-  const toggleCategory = (categoryId: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(categoryId)
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    );
-  };
+  }, [currentFilters]);
 
   const handleApply = () => {
-    console.log('🎯 Applying filters:', {
-      categories: selectedCategories,
-      priceRange: selectedPriceRange,
-      availability: selectedAvailability,
-    });
     onApply({
-      categories: selectedCategories,
-      priceRange: selectedPriceRange,
-      availability: selectedAvailability,
+      priceRange: selectedPrice,
+      category: selectedCategory,
+      instantBooking,
+      availableToday,
     });
-    handleClose();
+    onClose();
   };
 
   const handleReset = () => {
-    setSelectedCategories([]);
-    setSelectedPriceRange(null);
-    setSelectedAvailability(null);
+    setSelectedPrice(null);
+    setSelectedCategory(null);
+    setInstantBooking(false);
+    setAvailableToday(false);
   };
 
-  const hasFilters = selectedCategories.length > 0 || selectedPriceRange !== null || selectedAvailability !== null;
-
-  if (!visible) return null;
+  const hasActiveFilters = selectedPrice || selectedCategory || instantBooking || availableToday;
 
   return (
     <Modal
       visible={visible}
-      animationType="none"
-      transparent
-      onRequestClose={handleClose}
-      statusBarTranslucent
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        {/* Backdrop */}
-        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-        </Animated.View>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Filters</Text>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <X size={24} color="#333" />
+          </Pressable>
+        </View>
 
-        {/* Side Panel */}
-        <Animated.View 
-          style={[
-            styles.sidePanel,
-            { 
-              transform: [{ translateX: slideAnim }],
-              paddingTop: insets.top,
-              paddingBottom: insets.bottom,
-            }
-          ]}
-        >
-          {/* Handle bar */}
-          <View style={styles.handleBar} />
-
-          <ScrollView 
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Availability Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Availability</Text>
-              {AVAILABILITY_OPTIONS.map((option) => {
-                const isSelected = selectedAvailability === option.id;
-                return (
-                  <TouchableOpacity
-                    key={option.id}
-                    style={styles.menuItem}
-                    onPress={() => {
-                      console.log('Availability pressed:', option.id);
-                      setSelectedAvailability(isSelected ? null : option.id);
-                    }}
-                    activeOpacity={0.6}
-                  >
-                    <Text style={styles.menuItemLabel}>{option.label}</Text>
-                    {isSelected && (
-                      <View style={styles.checkmark}>
-                        <Check size={18} color="#1C1C1E" strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Divider */}
-            <View style={styles.divider} />
-
-            {/* Categories Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Categories</Text>
-              {availableCategories.map((category) => {
-                const isSelected = selectedCategories.includes(category.id);
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={styles.menuItem}
-                    onPress={() => {
-                      console.log('Category pressed:', category.id);
-                      toggleCategory(category.id);
-                    }}
-                    activeOpacity={0.6}
-                  >
-                    <View style={styles.menuItemLeft}>
-                      <Text style={styles.menuItemEmoji}>{category.emoji}</Text>
-                      <Text style={styles.menuItemLabel}>{category.label}</Text>
-                    </View>
-                    {isSelected && (
-                      <View style={styles.checkmark}>
-                        <Check size={18} color="#1C1C1E" strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Divider */}
-            <View style={styles.divider} />
-
-            {/* Price Range Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Price Range</Text>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Price Range */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Price Range</Text>
+            <View style={styles.optionsRow}>
               {PRICE_RANGES.map((range) => {
-                const isSelected = selectedPriceRange === range.id;
+                const isSelected =
+                  selectedPrice?.min === range.min && selectedPrice?.max === range.max;
                 return (
-                  <TouchableOpacity
-                    key={range.id}
-                    style={styles.menuItem}
-                    onPress={() => {
-                      console.log('Price pressed:', range.id);
-                      setSelectedPriceRange(isSelected ? null : range.id);
-                    }}
-                    activeOpacity={0.6}
+                  <Pressable
+                    key={range.label}
+                    style={[styles.chip, isSelected && styles.chipSelected]}
+                    onPress={() =>
+                      setSelectedPrice(isSelected ? null : { min: range.min, max: range.max })
+                    }
                   >
-                    <Text style={styles.menuItemLabel}>{range.label}</Text>
-                    {isSelected && (
-                      <View style={styles.checkmark}>
-                        <Check size={18} color="#1C1C1E" strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                      {range.label}
+                    </Text>
+                  </Pressable>
                 );
               })}
             </View>
-
-            {/* Divider */}
-            <View style={styles.divider} />
-
-            {/* Reset Action */}
-            <View style={styles.section}>
-              <TouchableOpacity 
-                style={styles.menuItem} 
-                onPress={handleReset}
-                disabled={!hasFilters}
-                activeOpacity={0.6}
-              >
-                <Text style={[styles.menuItemLabel, !hasFilters && styles.menuItemLabelDisabled]}>
-                  Reset Filters
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-
-          {/* Apply Button - Fixed at bottom */}
-          <View style={styles.applyButtonContainer}>
-            <TouchableOpacity style={styles.applyButton} onPress={handleApply} activeOpacity={0.8}>
-              <Text style={styles.applyButtonText}>Apply</Text>
-            </TouchableOpacity>
           </View>
-        </Animated.View>
+
+          {/* Category */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Category</Text>
+            <View style={styles.optionsRow}>
+              {CATEGORIES.map((category) => {
+                const isSelected = selectedCategory === category || (category === 'All' && !selectedCategory);
+                return (
+                  <Pressable
+                    key={category}
+                    style={[styles.chip, isSelected && styles.chipSelected]}
+                    onPress={() =>
+                      setSelectedCategory(category === 'All' ? null : (isSelected ? null : category))
+                    }
+                  >
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                      {category}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Toggle Options */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Availability</Text>
+            
+            <Pressable
+              style={styles.toggleRow}
+              onPress={() => setInstantBooking(!instantBooking)}
+            >
+              <Text style={styles.toggleLabel}>Instant Booking</Text>
+              <View style={[styles.checkbox, instantBooking && styles.checkboxSelected]}>
+                {instantBooking && <Check size={16} color="#fff" />}
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={styles.toggleRow}
+              onPress={() => setAvailableToday(!availableToday)}
+            >
+              <Text style={styles.toggleLabel}>Available Today</Text>
+              <View style={[styles.checkbox, availableToday && styles.checkboxSelected]}>
+                {availableToday && <Check size={16} color="#fff" />}
+              </View>
+            </Pressable>
+          </View>
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          {hasActiveFilters && (
+            <Pressable style={styles.resetButton} onPress={handleReset}>
+              <Text style={styles.resetButtonText}>Reset</Text>
+            </Pressable>
+          )}
+          <Pressable style={styles.applyButton} onPress={handleApply}>
+            <Text style={styles.applyButtonText}>Apply Filters</Text>
+          </Pressable>
+        </View>
       </View>
     </Modal>
   );
-}
-
-// Export price ranges, categories and availability options for use in filtering
-export { PRICE_RANGES, ALL_CATEGORIES as CATEGORIES, AVAILABILITY_OPTIONS };
+};
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
+    backgroundColor: '#fff',
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  sidePanel: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: PANEL_WIDTH,
-    backgroundColor: '#FAFAFA',
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: -4, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 20,
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
   },
-  handleBar: {
-    width: 36,
-    height: 4,
-    backgroundColor: '#D1D1D6',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 8,
+  closeButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
-  },
-  contentContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
   },
   section: {
-    marginBottom: 8,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 12,
-    marginTop: 16,
   },
-  menuItem: {
+  optionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  chipSelected: {
+    backgroundColor: colors.coral,
+    borderColor: colors.coral,
+  },
+  chipText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#fff',
+  },
+  toggleRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E5EA',
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    paddingVertical: 12,
   },
-  menuItemEmoji: {
-    fontSize: 20,
-    width: 28,
+  toggleLabel: {
+    fontSize: 15,
+    color: '#333',
   },
-  menuItemLabel: {
-    fontSize: 17,
-    color: '#1C1C1E',
-    fontWeight: '400' as const,
-  },
-  menuItemLabelDisabled: {
-    color: '#C7C7CC',
-  },
-  checkmark: {
+  checkbox: {
     width: 24,
     height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#ddd',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E5EA',
-    marginVertical: 8,
+  checkboxSelected: {
+    backgroundColor: colors.coral,
+    borderColor: colors.coral,
   },
-  applyButtonContainer: {
-    padding: 16,
-    paddingTop: 12,
+  footer: {
+    flexDirection: 'row',
+    padding: 20,
+    paddingBottom: 34,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: '#eee',
+    gap: 12,
+  },
+  resetButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  resetButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
   applyButton: {
-    backgroundColor: colors.dark.primary,
-    borderRadius: 12,
+    flex: 1,
     paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.coral,
     alignItems: 'center',
   },
   applyButtonText: {
-    fontSize: 17,
-    fontWeight: '600' as const,
-    color: '#1C1C1E',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 
+export default FiltersModal;
