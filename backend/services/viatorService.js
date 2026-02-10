@@ -237,9 +237,9 @@ class ViatorService {
         // Location - use extracted location or fallback to search location
         location: this.extractLocation(product, searchLocation),
         
-        // Media - use imageUrl for consistency with frontend
-        imageUrl: product.images?.[0]?.variants?.[0]?.url || null,
-        images: product.images?.map(img => img.variants?.[0]?.url).filter(Boolean) || [],
+        // Media - use highest quality variant available
+        imageUrl: this.getHighestQualityImage(product.images?.[0]),
+        images: product.images?.map(img => this.getHighestQualityImage(img)).filter(Boolean) || [],
         
         // Rating
         rating: product.reviews?.combinedAverageRating || 0,
@@ -338,6 +338,31 @@ class ViatorService {
     }
     
     return 'Duration varies';
+  }
+
+  /**
+   * Get the highest quality image variant from Viator image object
+   * Viator provides multiple variants - we want the largest one
+   */
+  getHighestQualityImage(imageObj) {
+    if (!imageObj?.variants || imageObj.variants.length === 0) {
+      return null;
+    }
+
+    // Sort variants by total pixel count (width * height) for best quality
+    const sortedVariants = [...imageObj.variants].sort((a, b) => {
+      const areaA = (a.width || 0) * (a.height || 0);
+      const areaB = (b.width || 0) * (b.height || 0);
+      return areaB - areaA; // Largest area first
+    });
+
+    const highestQuality = sortedVariants[0];
+    
+    // Log the selected variant dimensions for debugging
+    logger.info(`📸 Selected image variant: ${highestQuality.width}x${highestQuality.height} (${Math.round((highestQuality.width * highestQuality.height) / 1000)}K pixels)`);
+
+    // Return the URL of the highest resolution variant
+    return highestQuality?.url || null;
   }
 
   /**

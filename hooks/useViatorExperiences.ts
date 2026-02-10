@@ -21,7 +21,7 @@ interface ViatorExperience {
   matchedTag?: string; // Which user preference tag matched this experience
 }
 
-export function useViatorExperiences(location: string, enabled: boolean = true) {
+export function useViatorExperiences(location: string, categoryFilter: string | null = null) {
   const [experiences, setExperiences] = useState<ViatorExperience[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,19 +29,25 @@ export function useViatorExperiences(location: string, enabled: boolean = true) 
   const { favoriteCategories } = usePreferences();
 
   const fetchViatorExperiences = async () => {
-    if (!enabled || !location) {
+    if (!location) {
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      console.log('🔄 Fetching Viator experiences...', { location, tags: favoriteCategories });
+      
+      // Use category filter if provided, otherwise use user preferences
+      const tagsToUse = categoryFilter 
+        ? [categoryFilter] 
+        : (favoriteCategories.length > 0 ? favoriteCategories : undefined);
+      
+      console.log('🔄 Fetching Viator experiences...', { location, tags: tagsToUse, categoryFilter });
       
       const response = await apiService.getViatorExperiences(
         location,
-        favoriteCategories.length > 0 ? favoriteCategories : undefined,
-        10
+        tagsToUse,
+        20 // Get 20 experiences when filtering by category
       );
       
       if (!response.success) {
@@ -66,7 +72,7 @@ export function useViatorExperiences(location: string, enabled: boolean = true) 
 
   useEffect(() => {
     fetchViatorExperiences();
-  }, [location, enabled, favoriteCategories.join(',')]); // Re-fetch when location or preferences change
+  }, [location, categoryFilter, favoriteCategories.join(',')]); // Re-fetch when location, category or preferences change
 
   return {
     experiences,

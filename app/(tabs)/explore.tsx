@@ -41,11 +41,12 @@ export default function ExploreScreen() {
   // Fetch experiences from API
   const { experiences: EXPERIENCES, loading, error } = useExperiences();
   
-  // Fetch Viator experiences based on location and user preferences
+  // Fetch Viator experiences based on location and selected category
+  // Pass the selected category to get relevant Viator experiences
   const { 
     experiences: viatorExperiences, 
     loading: viatorLoading 
-  } = useViatorExperiences(selectedLocation, true);
+  } = useViatorExperiences(selectedLocation, selectedCategory !== 'all' ? selectedCategory : null);
   
   // Get user preferences for sorting categories
   const { getSortedCategories } = usePreferences();
@@ -200,53 +201,6 @@ export default function ExploreScreen() {
           ))}
         </ScrollView>
 
-        {/* Trending Now - Only when "All" is selected */}
-        {selectedCategory === 'all' && trendingExperiences.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>TRENDING NOW</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.trendingContainer}
-            >
-              {trendingExperiences.slice(0, 4).map((experience) => (
-                <TrendingCard key={experience.id} experience={experience} />
-              ))}
-            </ScrollView>
-          </>
-        )}
-
-        {/* Viator Experiences - Based on user preferences and location */}
-        {selectedCategory === 'all' && viatorExperiences.length > 0 && (
-          <>
-            <View style={styles.viatorHeader}>
-              <Text style={styles.sectionTitle}>DISCOVER MORE</Text>
-              <Text style={styles.viatorSubtitle}>
-                Powered by Viator • Based on your interests
-              </Text>
-            </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.trendingContainer}
-            >
-              {viatorExperiences.slice(0, 6).map((experience) => (
-                <ViatorCard key={experience.id} experience={experience} />
-              ))}
-            </ScrollView>
-          </>
-        )}
-
-        {/* Show loading state for Viator */}
-        {selectedCategory === 'all' && viatorLoading && (
-          <>
-            <Text style={styles.sectionTitle}>DISCOVER MORE</Text>
-            <View style={styles.viatorLoadingContainer}>
-              <Text style={styles.loadingText}>Loading more experiences...</Text>
-            </View>
-          </>
-        )}
-
         {/* All Experiences Grid */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
@@ -283,6 +237,30 @@ export default function ExploreScreen() {
             <ExperienceCard key={experience.id} experience={experience} />
           ))}
         </View>
+
+        {/* Viator Experiences - Show when category is selected or all */}
+        {viatorExperiences.length > 0 && (
+          <>
+            <View style={styles.viatorHeader}>
+              <Text style={styles.sectionTitle}>MORE OPTIONS</Text>
+              <Text style={styles.viatorSubtitle}>
+                Powered by Viator • Similar experiences
+              </Text>
+            </View>
+            <View style={styles.grid}>
+              {viatorExperiences.map((experience) => (
+                <ViatorCard key={experience.id} experience={experience} />
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Show loading state for Viator */}
+        {viatorLoading && (
+          <View style={styles.viatorLoadingContainer}>
+            <Text style={styles.loadingText}>Loading more options...</Text>
+          </View>
+        )}
       </ScrollView>
       )}
 
@@ -402,31 +380,35 @@ function ViatorCard({ experience }: ViatorExperienceCardProps) {
 
   return (
     <Pressable 
-      style={styles.trendingCard}
+      style={styles.card}
       onPress={handlePress}
     >
       <Image
-        source={{ uri: experience.imageUrl }}
-        style={styles.trendingImage}
+        source={{ 
+          uri: experience.imageUrl,
+          cache: 'reload' // Force reload to get high quality image
+        }}
+        style={styles.cardImage}
         contentFit="cover"
+        priority="high"
       />
       {/* Gradient overlay */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)']}
         locations={[0, 0.5, 1]}
-        style={styles.trendingGradient}
+        style={styles.cardGradient}
       />
       {/* Viator badge */}
       <View style={styles.viatorBadge}>
         <Text style={styles.viatorBadgeText}>VIATOR</Text>
       </View>
       {/* Content inside the image */}
-      <View style={styles.trendingContent}>
-        <Text style={styles.trendingTitle} numberOfLines={2}>
+      <View style={styles.cardContent}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
           {experience.title.toUpperCase()}
         </Text>
         <View style={styles.viatorCardFooter}>
-          <Text style={styles.trendingPrice}>
+          <Text style={styles.cardPrice}>
             {experience.currency}{experience.price}
           </Text>
           {experience.rating > 0 && (
