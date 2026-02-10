@@ -248,6 +248,12 @@ class ViatorService {
         // Booking - add affiliate tracking parameters
         productUrl: this.addAffiliateParams(product.productUrl),
         
+        // Additional details for product page
+        highlights: product.inclusions?.map(inc => inc.otherDescription || inc.description).filter(Boolean) || [],
+        included: product.inclusions?.map(inc => inc.otherDescription || inc.description).filter(Boolean) || [],
+        category: product.productOptions?.[0]?.description || 'Experience',
+        tags: product.tags || [],
+        
         // Additional metadata
         tags: product.tags || [],
         flags: product.flags || []
@@ -565,12 +571,11 @@ class ViatorService {
             'Accept-Language': 'en-US',
             'Content-Type': 'application/json'
           },
-          timeout: 10000
+          timeout: 15000
         }
       );
 
       logger.info(`📦 Viator API response status: ${response.status}`);
-      logger.info(`📦 Response data structure:`, JSON.stringify(response.data, null, 2).substring(0, 500));
 
       if (!response.data || response.data.length === 0) {
         logger.warn(`Product ${productCode} not found in response`);
@@ -590,6 +595,71 @@ class ViatorService {
       // Extract all images with highest quality
       const images = [];
       if (product.images && product.images.length > 0) {
+        product.images.forEach(img => {
+          const highQualityUrl = this.getHighestQualityImage(img);
+          if (highQualityUrl) {
+            images.push(highQualityUrl);
+          }
+        });
+      }
+
+      // Extract highlights from inclusions
+      const highlights = [];
+      const included = [];
+      if (product.inclusions && product.inclusions.length > 0) {
+        product.inclusions.forEach(inc => {
+          const text = inc.otherDescription || inc.description;
+          if (text) {
+            highlights.push(text);
+            included.push(text);
+          }
+        });
+      }
+
+      // Format duration
+      let duration = 'Duration varies';
+      if (product.duration) {
+        duration = this.formatDuration(product.duration);
+      }
+
+      // Get location
+      const location = this.extractLocation(product);
+
+      // Build product URL with affiliate params
+      let productUrl = product.productUrl;
+      if (!productUrl) {
+        productUrl = `https://www.viator.com/tours/${productCode}`;
+      }
+      productUrl = this.addAffiliateParams(productUrl);
+
+      const details = {
+        id: `viator_${product.productCode}`,
+        productCode: product.productCode,
+        title: product.title,
+        description: product.description || product.title,
+        images: images.length > 0 ? images : [this.getHighestQualityImage(product.images?.[0])].filter(Boolean),
+        price: product.pricing?.summary?.fromPrice || 0,
+        currency: product.pricing?.currency || 'EUR',
+        rating: product.reviews?.combinedAverageRating || 0,
+        reviewCount: product.reviews?.totalReviews || 0,
+        duration: duration,
+        location: location,
+        highlights: highlights.length > 0 ? highlights : ['Experience the best of ' + location],
+        included: included.length > 0 ? included : ['Tour guide', 'Entry tickets'],
+        productUrl: productUrl,
+        category: product.productOptions?.[0]?.description || 'Experience',
+        tags: product.tags || []
+      };
+
+      logger.info(`✅ Successfully fetched details for ${productCode}`);
+      return details;
+
+    } catch (error) {
+      if (error.response) {
+        logger.error('Viator product details error:', {
+          status: error.response.status,
+          data: error.response.data,
+          message: error.response.data?.message || error.message,
         product.images.forEach(img => {
           const highQualityUrl = this.getHighestQualityImage(img);
           if (highQualityUrl) {

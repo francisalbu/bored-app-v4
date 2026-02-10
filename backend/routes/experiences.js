@@ -11,6 +11,10 @@ const { optionalAuth } = require('../middleware/auth');
 const { authenticateSupabase } = require('../middleware/supabaseAuth');
 const viatorService = require('../services/viatorService');
 
+// Simple in-memory cache for Viator products (expires after 1 hour)
+const viatorCache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
 /**
  * GET /api/experiences
  * Get all experiences for the feed
@@ -171,7 +175,15 @@ router.get('/viator', optionalAuth, async (req, res, next) => {
       })
       .slice(0, parseInt(limit));
     
-    console.log(`✅ Total unique Viator experiences found: ${sortedExperiences.length}`);
+    // Cache the experiences for later retrieval
+    sortedExperiences.forEach(exp => {
+      viatorCache.set(exp.productCode, {
+        data: exp,
+        timestamp: Date.now()
+      });
+    });
+    
+    console.log(`✅ Total unique Viator experiences found: ${sortedExperiences.length}, cached ${sortedExperiences.length} products`);
     
     res.json({
       success: true,
@@ -203,21 +215,54 @@ router.get('/viator/:productCode', optionalAuth, async (req, res, next) => {
     
     console.log(`🔍 Fetching Viator product details for: ${productCode}`);
     
-    const productDetails = await viatorService.getProductDetails(productCode);
-    
-    if (!productDetails) {
-      return res.status(404).json({
-        success: false,
-        message: 'Viator product not found'
+    // Check cache first
+    const cached = viatorCache.get(productCode);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+      console.log(`✅ Returning cached data for ${productCode}`);
+      return res.json({
+        success: true,
+        data: cached.data,
+        cached: true
       });
     }
     
+    // If not in cache, try to fetch from API
+    const productDetails = await viatorService.getProductDetails(productCode);
+    
+    if (!productDetails) {
+      console.log(`❌ Product ${productCode} not found in API or cache`);
+      return res.status(404).json({
+        success: false,
+        message: 'Viator product not found. Please try searching for experiences first.'
+      });
+    }
+    
+    // Cache the result
+    viatorCache.set(productCode, {
+      data: productDetails,
+      timestamp: Date.now()
+    });
+    
     res.json({
       success: true,
-      data: productDetails
+      data: productDetails,
+      cached: false
     });
   } catch (error) {
     console.error('❌ Error fetching Viator product details:', error);
+    
+    // Try cache as last resort
+    const cached = viatorCache.get(req.params.productCode);
+    if (cached) {
+      console.log(`⚠️ API failed, returning stale cache for ${req.params.productCode}`);
+      return res.json({
+        success: true,
+        data: cached.data,
+        cached: true,
+        stale: true
+      });
+    }
+    
     next(error);
   }
 });
