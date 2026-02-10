@@ -190,6 +190,39 @@ router.get('/viator', optionalAuth, async (req, res, next) => {
 });
 
 /**
+ * GET /api/experiences/viator/:productCode
+ * Get detailed information for a specific Viator product
+ * Path params:
+ * - productCode: Viator product code (e.g., "123456P1")
+ * 
+ * Returns full product details including images, highlights, inclusions, reviews, etc.
+ */
+router.get('/viator/:productCode', optionalAuth, async (req, res, next) => {
+  try {
+    const { productCode } = req.params;
+    
+    console.log(`🔍 Fetching Viator product details for: ${productCode}`);
+    
+    const productDetails = await viatorService.getProductDetails(productCode);
+    
+    if (!productDetails) {
+      return res.status(404).json({
+        success: false,
+        message: 'Viator product not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: productDetails
+    });
+  } catch (error) {
+    console.error('❌ Error fetching Viator product details:', error);
+    next(error);
+  }
+});
+
+/**
  * GET /api/experiences/available
  * Get experiences that have available slots for a date/period
  * Query params:

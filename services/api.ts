@@ -220,6 +220,11 @@ class ApiService {
     return this.request(`/experiences/viator?${params.toString()}`);
   }
 
+  // Get detailed info for a specific Viator experience
+  async getViatorExperienceDetails(productCode: string) {
+    return this.request(`/experiences/viator/${productCode}`);
+  }
+
   // Booking APIs
   async createBooking(bookingData: {
     experienceId: string;

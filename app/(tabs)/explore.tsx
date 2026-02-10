@@ -366,20 +366,12 @@ interface ViatorExperienceCardProps {
 }
 
 function ViatorCard({ experience }: ViatorExperienceCardProps) {
-  const handlePress = async () => {
-    // Open Viator link in external browser since these are external experiences
-    if (experience.productUrl) {
-      try {
-        const supported = await Linking.canOpenURL(experience.productUrl);
-        if (supported) {
-          await Linking.openURL(experience.productUrl);
-        } else {
-          console.error('Cannot open URL:', experience.productUrl);
-        }
-      } catch (error) {
-        console.error('Error opening Viator URL:', error);
-      }
-    }
+  const router = useRouter();
+  
+  const handlePress = () => {
+    // Extract product code from viator ID (format: viator_PRODUCTCODE)
+    const productCode = experience.id.replace('viator_', '');
+    router.push(`/viator/${productCode}`);
   };
 
   return (

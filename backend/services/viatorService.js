@@ -536,6 +536,126 @@ class ViatorService {
       return [];
     }
   }
+
+  /**
+   * Get detailed information for a specific Viator product
+   * @param {string} productCode - Viator product code (e.g., "123456P1")
+   * @returns {Promise<Object|null>} Detailed product information or null if not found
+   */
+  async getProductDetails(productCode) {
+    if (!this.apiKey) {
+      logger.warn('Viator API key not configured');
+      return null;
+    }
+
+    try {
+      logger.info(`🔍 Fetching Viator product details for: ${productCode}`);
+
+      const response = await axios.post(
+        `${this.apiUrl}/products/modified-since`,
+        {
+          productCodes: [productCode]
+        },
+        {
+          headers: {
+            'exp-api-key': this.apiKey,
+            'Accept': 'application/json;version=2.0',
+            'Accept-Language': 'en-US',
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (!response.data?.products || response.data.products.length === 0) {
+        logger.warn(`Product ${productCode} not found`);
+        return null;
+      }
+
+      const product = response.data.products[0];
+
+      // Extract all images with highest quality
+      const images = [];
+      if (product.images && product.images.length > 0) {
+        product.images.forEach(img => {
+          const highQualityUrl = this.getHighestQualityImage(img);
+          if (highQualityUrl) {
+            images.push(highQualityUrl);
+          }
+        });
+      }
+
+      // Extract highlights from product description or inclusions
+      const highlights = [];
+      if (product.inclusions && product.inclusions.length > 0) {
+        product.inclusions.forEach(inc => {
+          if (inc.otherDescription || inc.description) {
+            highlights.push(inc.otherDescription || inc.description);
+          }
+        });
+      }
+
+      // Extract what's included
+      const included = [];
+      if (product.inclusions && product.inclusions.length > 0) {
+        product.inclusions.forEach(inc => {
+          if (inc.otherDescription || inc.description) {
+            included.push(inc.otherDescription || inc.description);
+          }
+        });
+      }
+
+      // Format duration
+      let duration = 'Duration varies';
+      if (product.duration) {
+        duration = this.formatDuration(product.duration);
+      }
+
+      // Get location
+      const location = this.extractLocation(product);
+
+      // Build product URL with affiliate params
+      let productUrl = product.productUrl;
+      if (!productUrl) {
+        productUrl = `https://www.viator.com/tours/${productCode}`;
+      }
+      productUrl = this.addAffiliateParams(productUrl);
+
+      const details = {
+        id: `viator_${product.productCode}`,
+        productCode: product.productCode,
+        title: product.title,
+        description: product.description || product.title,
+        images: images.length > 0 ? images : [product.images?.[0]?.variants?.[0]?.url].filter(Boolean),
+        price: product.pricing?.summary?.fromPrice || 0,
+        currency: product.pricing?.currency || 'EUR',
+        rating: product.reviews?.combinedAverageRating || 0,
+        reviewCount: product.reviews?.totalReviews || 0,
+        duration: duration,
+        location: location,
+        highlights: highlights,
+        included: included,
+        productUrl: productUrl,
+        category: product.productOptions?.[0]?.description || 'Experience',
+        tags: product.tags || []
+      };
+
+      logger.info(`✅ Successfully fetched details for ${productCode}`);
+      return details;
+
+    } catch (error) {
+      if (error.response) {
+        logger.error('Viator product details error:', {
+          status: error.response.status,
+          message: error.response.data?.message || error.message,
+          productCode
+        });
+      } else {
+        logger.error('Viator product details error:', error.message);
+      }
+      return null;
+    }
+  }
 }
 
 module.exports = new ViatorService();
