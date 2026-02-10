@@ -337,11 +337,21 @@ export default function HistoryScreen() {
   const getActivityImage = (activity: string) => {
     // Map activities to representative images
     const activityImages: { [key: string]: string } = {
-      'surfing': 'https://storage.googleapis.com/bored_tourist_media/activities/surfing.jpg',
-      'hiking': 'https://storage.googleapis.com/bored_tourist_media/activities/hiking.jpg',
-      'cooking': 'https://storage.googleapis.com/bored_tourist_media/activities/cooking.jpg',
-      'diving': 'https://storage.googleapis.com/bored_tourist_media/activities/diving.jpg',
-      'climbing': 'https://storage.googleapis.com/bored_tourist_media/activities/climbing.jpg',
+      'surfing': 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&h=600&fit=crop',
+      'surf': 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&h=600&fit=crop',
+      'hiking': 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=600&fit=crop',
+      'cooking': 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=400&h=600&fit=crop',
+      'diving': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=600&fit=crop',
+      'scuba': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=600&fit=crop',
+      'climbing': 'https://images.unsplash.com/photo-1522163182402-834f871fd851?w=400&h=600&fit=crop',
+      'kayak': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=600&fit=crop',
+      'yoga': 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=600&fit=crop',
+      'zip': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
+      'zipline': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
+      'zip-line': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
+      'ziplining': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
+      'paragliding': 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=400&h=600&fit=crop',
+      'skydiving': 'https://images.unsplash.com/photo-1521651201144-634f700b36ef?w=400&h=600&fit=crop',
       // Add more mappings as needed
     };
 
@@ -352,8 +362,8 @@ export default function HistoryScreen() {
       }
     }
 
-    // Fallback to thumbnail or placeholder
-    return 'https://storage.googleapis.com/bored_tourist_media/images/placeholder_activity.jpg';
+    // Return null so the fallback in renderHistoryCard works
+    return null;
   };
 
   const formatDate = (dateString: string) => {
@@ -376,7 +386,8 @@ export default function HistoryScreen() {
   };
 
   const renderHistoryCard = ({ item }: { item: HistoryItem }) => {
-    const imageUrl = item.thumbnail || getActivityImage(item.activity);
+    // Priority: 1) Real thumbnail from reel, 2) Activity-specific icon, 3) Generic adventure placeholder
+    const imageUrl = item.thumbnail || getActivityImage(item.activity) || 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop';
 
     return (
       <TouchableOpacity
@@ -420,10 +431,10 @@ export default function HistoryScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyEmoji}>🕐</Text>
-      <Text style={styles.emptyTitle}>No search history yet</Text>
+      <Text style={styles.emptyEmoji}>�️</Text>
+      <Text style={styles.emptyTitle}>No adventures yet</Text>
       <Text style={styles.emptyText}>
-        Convert Instagram reels to experiences{'\n'}and they'll appear here!
+        Convert Instagram reels to experiences{'\n'}and save them here!
       </Text>
     </View>
   );
@@ -432,7 +443,7 @@ export default function HistoryScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Search History</Text>
+          <Text style={styles.title}>Adventures Saved</Text>
           <Text style={styles.subtitle}>
             {history.length} {history.length === 1 ? 'activity' : 'activities'}
           </Text>
