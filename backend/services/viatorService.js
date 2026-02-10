@@ -11,6 +11,10 @@ class ViatorService {
     this.apiKey = process.env.VIATOR_API_KEY;
     this.apiUrl = 'https://api.viator.com/partner';
     
+    // Cache for destination IDs to avoid repeated API calls
+    this.destinationCache = new Map();
+    this.CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+    
     logger.info(`ViatorService initialized - API Key: ${this.apiKey ? '✓' : '✗'}`);
   }
 
@@ -418,9 +422,20 @@ class ViatorService {
   /**
    * Get destination ID from location name (city/country)
    * This requires calling /destinations endpoint first
+   * NOW WITH AGGRESSIVE CACHING to prevent rate limiting
    */
   async getDestinationId(locationName) {
-    if (!this.apiKey) return null;
+    if (!this.apiKey || !locationName) return null;
+
+    // Normalize location for cache key
+    const cacheKey = locationName.toLowerCase().trim();
+    
+    // Check cache first
+    const cached = this.destinationCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL)) {
+      logger.info(`✅ Cache HIT for destination: ${locationName} → ${cached.id}`);
+      return cached.id;
+    }
 
     try {
       const response = await axios.get(
@@ -431,24 +446,42 @@ class ViatorService {
             'Accept': 'application/json;version=2.0',
             'Accept-Language': 'en-US'
           },
-          timeout: 10000
+          timeout: 15000 // Increased timeout
         }
       );
 
       if (!response.data || !response.data.destinations) {
+        // Cache null result to avoid repeated failed calls
+        this.destinationCache.set(cacheKey, { id: null, timestamp: Date.now() });
         return null;
       }
 
       // Search for destination by name (case-insensitive)
       const destination = response.data.destinations.find(dest =>
-        dest.destinationName.toLowerCase().includes(locationName.toLowerCase()) ||
-        locationName.toLowerCase().includes(dest.destinationName.toLowerCase())
+        dest.destinationName.toLowerCase().includes(cacheKey) ||
+        cacheKey.includes(dest.destinationName.toLowerCase())
       );
 
-      return destination?.destinationId || null;
+      const destinationId = destination?.destinationId || null;
+      
+      // Cache the result (even if null)
+      this.destinationCache.set(cacheKey, {
+        id: destinationId,
+        timestamp: Date.now()
+      });
+      
+      logger.info(`📍 Destination ID for "${locationName}": ${destinationId || 'NOT FOUND'}`);
+      return destinationId;
 
     } catch (error) {
-      logger.error('Viator getDestinationId error:', error.message);
+      // Check if it's a rate limit error (429)
+      if (error.response?.status === 429) {
+        logger.warn(`⚠️ Rate limited getting destination ID for "${locationName}" - caching null for 1 hour`);
+        // Cache null to prevent repeated rate limit errors
+        this.destinationCache.set(cacheKey, { id: null, timestamp: Date.now() });
+      } else {
+        logger.error('Viator getDestinationId error:', error.message);
+      }
       return null;
     }
   }

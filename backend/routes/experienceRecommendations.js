@@ -6,6 +6,10 @@ const Experience = require('../models/Experience');
 const { from } = require('../config/database');
 const axios = require('axios');
 
+// Cache for experience searches to avoid duplicate API calls
+const searchCache = new Map();
+const SEARCH_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 /**
  * Use OpenAI to filter experiences by semantic relevance (BATCH mode)
  * Much faster and cheaper than individual calls - processes all titles at once
@@ -662,6 +666,16 @@ router.post('/by-activity', async (req, res) => {
       });
     }
     
+    // Create cache key
+    const cacheKey = `${activity}_${userLocation}_${prioritizeBored}`;
+    
+    // Check cache first
+    const cached = searchCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < SEARCH_CACHE_TTL)) {
+      console.log(`⚡ CACHE HIT for: ${cacheKey} (${Math.round((Date.now() - cached.timestamp)/1000)}s old)`);
+      return res.json(cached.data);
+    }
+    
     // Extract location from userLocation
     const location = userLocation;
     
@@ -726,13 +740,16 @@ router.post('/by-activity', async (req, res) => {
       
       console.log(`   📦 DB returned ${dbExperiences.length} experiences`);
       
-      // Use AI to filter semantically relevant activities
-      // Example: "snorkeling" allows "scuba diving" but blocks "indoor skydiving"
-      if (dbExperiences.length > 0) {
-        console.log(`   🤖 Filtering Bored Tourist experiences with OpenAI...`);
+      // OPTIMIZATION: Only use AI filter if we have many results (>10)
+      // For smaller result sets, the scoring algorithm is already good enough
+      if (dbExperiences.length > 10) {
+        console.log(`   🤖 Filtering ${dbExperiences.length} Bored Tourist experiences with OpenAI...`);
         experiences = await filterRelevantActivities(dbExperiences, activity);
+        console.log(`   ✅ AI filtered: ${dbExperiences.length} → ${experiences.length} relevant`);
       } else {
-        experiences = [];
+        // Use DB results directly (already scored and sorted)
+        experiences = dbExperiences;
+        console.log(`   ⚡ Skipping AI filter (${dbExperiences.length} results already good)`);
       }
       
       // LIMIT to MAX_BORED_TOURIST experiences
@@ -839,12 +856,14 @@ router.post('/by-activity', async (req, res) => {
       console.log(`   📦 Viator freetext returned ${viatorExperiences.length} experiences`);
     }
     
-    // For Near You: Use AI to filter semantically relevant experiences
+    // For Near You: Use AI to filter semantically relevant experiences ONLY if we have many results
     // Example: "snorkeling" allows "scuba diving" but blocks "indoor skydiving"
-    if (prioritizeBored && viatorExperiences.length > 0) {
+    if (prioritizeBored && viatorExperiences.length > 15) {
       console.log(`   🤖 Filtering ${viatorExperiences.length} Viator experiences with OpenAI...`);
       viatorExperiences = await filterRelevantActivities(viatorExperiences, activity);
-      console.log(`   📍 After AI filter: ${viatorExperiences.length} Viator experiences`);
+      console.log(`   ✅ AI filtered: ${viatorExperiences.length} relevant`);
+    } else if (prioritizeBored) {
+      console.log(`   ⚡ Skipping AI filter for Viator (${viatorExperiences.length} results already filtered by smartSearch)`);
     }
     
     // Combine: 
@@ -865,7 +884,7 @@ router.post('/by-activity', async (req, res) => {
     
     console.log(`✅ Found ${experiences.length} experiences (${experiences.filter(e => e.source === 'database').length} DB + ${experiences.filter(e => e.source === 'viator').length} Viator)`);
     
-    res.json({
+    const response = {
       success: true,
       data: {
         experiences: experiences.slice(0, TARGET_COUNT),
@@ -875,7 +894,16 @@ router.post('/by-activity', async (req, res) => {
           viator: experiences.filter(e => e.source === 'viator').length
         }
       }
+    };
+    
+    // Cache the response
+    searchCache.set(cacheKey, {
+      data: response,
+      timestamp: Date.now()
     });
+    console.log(`💾 Cached search result: ${cacheKey}`);
+    
+    res.json(response);
     
   } catch (error) {
     console.error('❌ Error searching by activity:', error);
