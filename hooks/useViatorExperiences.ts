@@ -44,16 +44,20 @@ export function useViatorExperiences(location: string, enabled: boolean = true) 
         10
       );
       
-      if (!response.success || !response.data) {
-        throw new Error(response.error || 'Failed to fetch Viator experiences');
+      if (!response.success) {
+        console.warn('⚠️ Viator API returned error:', response.error);
+        setExperiences([]);
+        setError(null); // Don't show error to user, just show no results
+        return;
       }
       
-      const viatorData = response.data as ViatorExperience[];
+      const viatorData = (response.data as ViatorExperience[]) || [];
       console.log('✅ Viator experiences fetched:', viatorData.length);
       setExperiences(viatorData);
+      setError(null);
     } catch (err: any) {
       console.error('❌ Error fetching Viator experiences:', err);
-      setError(err.message || 'Failed to load Viator experiences');
+      setError(null); // Don't show error to user, just fail silently
       setExperiences([]);
     } finally {
       setLoading(false);

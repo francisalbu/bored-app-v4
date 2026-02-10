@@ -66,6 +66,130 @@ router.get('/trending', async (req, res, next) => {
 });
 
 /**
+ * GET /api/experiences/viator
+ * Get Viator experiences filtered by user preferences (tags) and location
+ * Query params:
+ * - tags: comma-separated list of user preference tags (e.g., "outdoors,sports,water-activities")
+ * - location: city name (e.g., "Lisbon", "Porto")
+ * - limit: max number of results (default: 10)
+ * 
+ * This endpoint intelligently searches Viator for each user preference tag
+ * and aggregates results, removing duplicates.
+ */
+router.get('/viator', optionalAuth, async (req, res, next) => {
+  try {
+    const { tags, location, limit = 10 } = req.query;
+    
+    if (!location) {
+      return res.status(400).json({
+        success: false,
+        message: 'Location parameter is required'
+      });
+    }
+    
+    console.log(`🔍 Searching Viator for location: ${location}, tags: ${tags || 'none'}`);
+    
+    // Parse tags (comma-separated string to array)
+    const userTags = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+    
+    if (userTags.length === 0) {
+      // No tags provided - return popular experiences for the location
+      console.log('⚠️ No tags provided, searching for popular experiences...');
+      const experiences = await viatorService.smartSearch(
+        'popular attractions',
+        location,
+        'EUR',
+        parseInt(limit)
+      );
+      
+      return res.json({
+        success: true,
+        data: experiences,
+        meta: {
+          location,
+          tags: [],
+          count: experiences.length,
+          source: 'viator'
+        }
+      });
+    }
+    
+    // Search Viator for each tag and aggregate results
+    const allExperiences = [];
+    const seenProductCodes = new Set();
+    
+    for (const tag of userTags) {
+      console.log(`  🏷️ Searching Viator for tag: "${tag}" in ${location}...`);
+      
+      // Map frontend tags to searchable activities
+      // Examples: "outdoors" -> "outdoor activities", "sports" -> "sports activities"
+      const searchActivity = tag.includes('outdoor') ? 'outdoor activities' :
+                            tag.includes('sport') ? 'sports activities' :
+                            tag.includes('water') ? 'water sports' :
+                            tag.includes('food') || tag.includes('cook') ? 'food and cooking' :
+                            tag.includes('culture') ? 'cultural tours' :
+                            tag.includes('adventure') ? 'adventure activities' :
+                            tag.includes('night') ? 'nightlife' :
+                            tag; // Use tag as-is if no mapping
+      
+      try {
+        const experiences = await viatorService.smartSearch(
+          searchActivity,
+          location,
+          'EUR',
+          5 // Get 5 per tag, then we'll limit total
+        );
+        
+        // Add to results, avoiding duplicates
+        for (const exp of experiences) {
+          const productCode = exp.productCode || exp.id;
+          if (!seenProductCodes.has(productCode)) {
+            seenProductCodes.add(productCode);
+            allExperiences.push({
+              ...exp,
+              matchedTag: tag // Track which tag matched this experience
+            });
+          }
+        }
+        
+        console.log(`    ✅ Found ${experiences.length} experiences for "${tag}"`);
+      } catch (error) {
+        console.error(`    ❌ Error searching for tag "${tag}":`, error.message);
+        // Continue with other tags even if one fails
+      }
+    }
+    
+    // Sort by rating and limit results
+    const sortedExperiences = allExperiences
+      .sort((a, b) => {
+        // Prioritize experiences with more reviews (more trustworthy)
+        if (a.reviewCount !== b.reviewCount) {
+          return b.reviewCount - a.reviewCount;
+        }
+        // Then by rating
+        return b.rating - a.rating;
+      })
+      .slice(0, parseInt(limit));
+    
+    console.log(`✅ Total unique Viator experiences found: ${sortedExperiences.length}`);
+    
+    res.json({
+      success: true,
+      data: sortedExperiences,
+      meta: {
+        location,
+        tags: userTags,
+        count: sortedExperiences.length,
+        source: 'viator'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching Viator experiences:', error);
+    next(error);
+  }
+});
+
+/**
  * GET /api/experiences/available
  * Get experiences that have available slots for a date/period
  * Query params:
@@ -332,129 +456,5 @@ router.post('/:id/reviews', authenticateSupabase, async (req, res, next) => {
     }
   }
 );
-
-/**
- * GET /api/experiences/viator
- * Get Viator experiences filtered by user preferences (tags) and location
- * Query params:
- * - tags: comma-separated list of user preference tags (e.g., "outdoors,sports,water-activities")
- * - location: city name (e.g., "Lisbon", "Porto")
- * - limit: max number of results (default: 10)
- * 
- * This endpoint intelligently searches Viator for each user preference tag
- * and aggregates results, removing duplicates.
- */
-router.get('/viator', optionalAuth, async (req, res, next) => {
-  try {
-    const { tags, location, limit = 10 } = req.query;
-    
-    if (!location) {
-      return res.status(400).json({
-        success: false,
-        message: 'Location parameter is required'
-      });
-    }
-    
-    console.log(`🔍 Searching Viator for location: ${location}, tags: ${tags || 'none'}`);
-    
-    // Parse tags (comma-separated string to array)
-    const userTags = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-    
-    if (userTags.length === 0) {
-      // No tags provided - return popular experiences for the location
-      console.log('⚠️ No tags provided, searching for popular experiences...');
-      const experiences = await viatorService.smartSearch(
-        'popular attractions',
-        location,
-        'EUR',
-        parseInt(limit)
-      );
-      
-      return res.json({
-        success: true,
-        data: experiences,
-        meta: {
-          location,
-          tags: [],
-          count: experiences.length,
-          source: 'viator'
-        }
-      });
-    }
-    
-    // Search Viator for each tag and aggregate results
-    const allExperiences = [];
-    const seenProductCodes = new Set();
-    
-    for (const tag of userTags) {
-      console.log(`  🏷️ Searching Viator for tag: "${tag}" in ${location}...`);
-      
-      // Map frontend tags to searchable activities
-      // Examples: "outdoors" -> "outdoor activities", "sports" -> "sports activities"
-      const searchActivity = tag.includes('outdoor') ? 'outdoor activities' :
-                            tag.includes('sport') ? 'sports activities' :
-                            tag.includes('water') ? 'water sports' :
-                            tag.includes('food') || tag.includes('cook') ? 'food and cooking' :
-                            tag.includes('culture') ? 'cultural tours' :
-                            tag.includes('adventure') ? 'adventure activities' :
-                            tag.includes('night') ? 'nightlife' :
-                            tag; // Use tag as-is if no mapping
-      
-      try {
-        const experiences = await viatorService.smartSearch(
-          searchActivity,
-          location,
-          'EUR',
-          5 // Get 5 per tag, then we'll limit total
-        );
-        
-        // Add to results, avoiding duplicates
-        for (const exp of experiences) {
-          const productCode = exp.productCode || exp.id;
-          if (!seenProductCodes.has(productCode)) {
-            seenProductCodes.add(productCode);
-            allExperiences.push({
-              ...exp,
-              matchedTag: tag // Track which tag matched this experience
-            });
-          }
-        }
-        
-        console.log(`    ✅ Found ${experiences.length} experiences for "${tag}"`);
-      } catch (error) {
-        console.error(`    ❌ Error searching for tag "${tag}":`, error.message);
-        // Continue with other tags even if one fails
-      }
-    }
-    
-    // Sort by rating and limit results
-    const sortedExperiences = allExperiences
-      .sort((a, b) => {
-        // Prioritize experiences with more reviews (more trustworthy)
-        if (a.reviewCount !== b.reviewCount) {
-          return b.reviewCount - a.reviewCount;
-        }
-        // Then by rating
-        return b.rating - a.rating;
-      })
-      .slice(0, parseInt(limit));
-    
-    console.log(`✅ Total unique Viator experiences found: ${sortedExperiences.length}`);
-    
-    res.json({
-      success: true,
-      data: sortedExperiences,
-      meta: {
-        location,
-        tags: userTags,
-        count: sortedExperiences.length,
-        source: 'viator'
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching Viator experiences:', error);
-    next(error);
-  }
-});
 
 module.exports = router;

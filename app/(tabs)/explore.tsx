@@ -10,6 +10,7 @@ import {
   View,
   Dimensions,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -383,17 +384,26 @@ interface ViatorExperienceCardProps {
 }
 
 function ViatorCard({ experience }: ViatorExperienceCardProps) {
-  const router = useRouter();
+  const handlePress = async () => {
+    // Open Viator link in external browser since these are external experiences
+    if (experience.productUrl) {
+      try {
+        const supported = await Linking.canOpenURL(experience.productUrl);
+        if (supported) {
+          await Linking.openURL(experience.productUrl);
+        } else {
+          console.error('Cannot open URL:', experience.productUrl);
+        }
+      } catch (error) {
+        console.error('Error opening Viator URL:', error);
+      }
+    }
+  };
 
   return (
     <Pressable 
       style={styles.trendingCard}
-      onPress={() => {
-        // Open Viator link in browser since these are external experiences
-        if (experience.productUrl) {
-          router.push(`/experience/${experience.id}`);
-        }
-      }}
+      onPress={handlePress}
     >
       <Image
         source={{ uri: experience.imageUrl }}
