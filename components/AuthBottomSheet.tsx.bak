@@ -1,0 +1,573 @@
+/**
+ * Auth Bottom Sheet Component
+ * 
+  // Listen for deep links when app comes back from OAuth
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 DEEP LINK RECEIVED:', event.url);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Check if this is an auth callback (contains code parameter OR auth/callback path)
+      const hasCode = event.url.includes('?code=') || event.url.includes('&code=');
+      const hasAuthPath = event.url.includes('/auth/callback') || event.url.includes('auth/callback');
+      
+      if (hasCode || hasAuthPath) {
+        console.log('✅ Auth callback detected! (hasCode:', hasCode, ', hasAuthPath:', hasAuthPath, ')');ottom sheet with social login options
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from 'react-native';
+import { X } from 'lucide-react-native';
+import colors from '@/constants/colors';
+import { supabase } from '@/lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
+
+WebBrowser.maybeCompleteAuthSession();
+
+interface AuthBottomSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  onSuccess?: () => void; // Optional callback for successful auth
+}
+
+export default function AuthBottomSheet({ visible, onClose, onSuccess }: AuthBottomSheetProps) {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
+
+  // Listen for deep links when app comes back from OAuth
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 DEEP LINK RECEIVED:', event.url);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Check if this is an auth callback
+      const hasCode = event.url.includes('?code=') || event.url.includes('&code=');
+      const hasCallback = event.url.includes('callback');
+      
+      if (!hasCode && !hasCallback) {
+        console.log('ℹ️ Not an auth callback, ignoring...');
+        return;
+      }
+      
+      console.log('✅ AUTH CALLBACK DETECTED!');
+      
+      try {
+        const url = new URL(event.url);
+        const params = new URLSearchParams(url.search);
+        const code = params.get('code');
+        
+        console.log('🔍 Authorization code:', code ? `${code.substring(0, 15)}...` : 'NOT FOUND');
+        
+        if (!code) {
+          console.error('❌ No authorization code in callback URL!');
+          Alert.alert('Authentication Error', 'No authorization code received.');
+          return;
+        }
+        
+        console.log('🔄 Exchanging code for session...');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        
+        if (error) {
+          console.error('❌ Exchange error:', error);
+          Alert.alert('Authentication Error', error.message || 'Failed to complete sign in.');
+          return;
+        }
+        
+        if (data?.session) {
+          console.log('✅✅✅ SESSION ESTABLISHED! ✅✅✅');
+          console.log('📧 User:', data.session.user.email);
+          onClose();
+          if (onSuccess) onSuccess();
+        } else {
+          console.error('❌ No session created after code exchange');
+          Alert.alert('Authentication Error', 'Failed to create session.');
+        }
+      } catch (error) {
+        console.error('❌ Error processing callback:', error);
+        Alert.alert('Authentication Error', 'An error occurred during sign in.');
+      }
+          
+          console.log('🔑 Token extraction result:', { 
+            hasAccessToken: !!access_token,
+            accessTokenLength: access_token?.length || 0,
+            hasRefreshToken: !!refresh_token,
+            refreshTokenLength: refresh_token?.length || 0
+          });
+          
+          if (access_token && refresh_token) {
+            console.log('🔐 Setting session with tokens...');
+            
+            const { data, error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
+            
+            if (error) {
+              console.error('❌ Error setting session:', error);
+            } else if (data.session) {
+              console.log('✅✅✅ SESSION ESTABLISHED! ✅✅✅');
+              console.log('📧 User:', data.session.user.email);
+              console.log('� User ID:', data.session.user.id);
+              
+              // Close modal and call success callback
+              onClose();
+              if (onSuccess) {
+                console.log('📞 Calling onSuccess callback...');
+                onSuccess();
+              }
+            }
+          } else {
+            console.error('❌ No tokens found in URL!');
+            console.log('💡 This might mean:');
+            console.log('   - OAuth failed');
+            console.log('   - Redirect URL mismatch');
+            console.log('   - Supabase configuration issue');
+          }
+        } catch (error) {
+          console.error('❌ Error processing deep link:', error);
+        }
+      } else {
+        console.log('ℹ️ Not an auth callback, ignoring...');
+      }
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    };
+    
+    // Add event listener
+    console.log('👂 Setting up deep link listener...');
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    
+    // Check if app was opened with a URL
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('🚀 App opened with initial URL:', url);
+        handleDeepLink({ url });
+      }
+    });
+    
+    // Cleanup
+    return () => {
+      console.log('🧹 Cleaning up deep link listener...');
+      subscription.remove();
+    };
+  }, [onSuccess, onClose]);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoadingProvider('google');
+      setIsLoading(true);
+
+      console.log('🔐 Starting Google Sign-In...');
+      console.log('📱 Platform:', Platform.OS);
+      
+      // HARDCODED redirect URL to match Supabase configuration exactly
+      const redirectUrl = 'boredtourist://auth/callback';
+      console.log('🔗 Redirect URL:', redirectUrl);
+      
+      // Start the OAuth flow with skipBrowserRedirect for mobile
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true, // Important for mobile deep linking!
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        console.error('❌ OAuth error:', error);
+        Alert.alert(
+          'Configuration Error',
+          'Google OAuth is not configured in Supabase.\n\nPlease configure Google OAuth in Supabase Dashboard first.'
+        );
+        throw error;
+      }
+
+      if (!data?.url) {
+        console.error('❌ No OAuth URL returned');
+        Alert.alert('Error', 'Unable to start authentication.');
+        return;
+      }
+
+      console.log('🌐 Opening OAuth URL in-app browser...');
+      console.log('📍 URL:', data.url.substring(0, 100) + '...');
+      
+      // Open in-app browser (Safari View Controller)
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectUrl
+      );
+      
+      console.log('🔙 WebBrowser closed, result type:', result.type);
+      
+      if (result.type === 'success' && result.url) {
+        console.log('✅ OAuth success!');
+        console.log('📦 Full result URL:', result.url);
+        
+        // Process the URL directly instead of waiting for deep link
+        try {
+          const url = new URL(result.url);
+          console.log('🔍 URL protocol:', url.protocol);
+          console.log('� URL pathname:', url.pathname);
+          console.log('🔍 URL hash:', url.hash);
+          console.log('🔍 URL search:', url.search);
+          
+          // Supabase sends tokens in the fragment (#) part
+          let fragment = url.hash;
+          if (fragment.startsWith('#')) {
+            fragment = fragment.substring(1);
+          }
+          
+          console.log('🔍 Fragment to parse:', fragment);
+          const params = new URLSearchParams(fragment);
+          
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          
+          console.log('🔑 Tokens found:', { 
+            hasAccessToken: !!access_token, 
+            hasRefreshToken: !!refresh_token,
+            accessTokenLength: access_token?.length,
+            refreshTokenLength: refresh_token?.length
+          });
+          
+          if (access_token && refresh_token) {
+            console.log('🔐 Setting session with tokens...');
+            
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
+            
+            if (sessionError) {
+              console.error('❌ Error setting session:', sessionError);
+              Alert.alert('Error', 'Failed to establish session: ' + sessionError.message);
+            } else if (sessionData.session) {
+              console.log('✅ Session established!');
+              console.log('📧 User:', sessionData.session.user.email);
+              
+              // Close modal and call success callback
+              onClose();
+              if (onSuccess) {
+                onSuccess();
+              }
+            } else {
+              console.log('⚠️ No session data returned');
+            }
+          } else {
+            console.log('⚠️ No tokens found in URL');
+          }
+        } catch (urlError) {
+          console.error('❌ Error parsing URL:', urlError);
+        }
+      } else if (result.type === 'cancel') {
+        console.log('ℹ️ User cancelled OAuth');
+        onClose();
+      } else {
+        console.log('❌ OAuth did not complete successfully, type:', result.type);
+        onClose();
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Google sign in error:', error);
+      Alert.alert(
+        'Error', 
+        error.message || 'Failed to sign in with Google.'
+      );
+    } finally {
+      setIsLoading(false);
+      setLoadingProvider(null);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    Alert.alert('Coming Soon', 'Apple sign in will be available soon!');
+  };
+
+  const handleFacebookSignIn = async () => {
+    Alert.alert('Coming Soon', 'Facebook sign in will be available soon!');
+  };
+
+  const handleEmailContinue = () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email');
+      return;
+    }
+
+    onClose();
+    // Route to login page (not signup) - users with existing accounts want to sign in
+    router.push({
+      pathname: '/auth/login',
+      params: { 
+        email,
+        returnTo: onSuccess ? 'payment' : 'home' // Tell login where to go after success
+      },
+    });
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
+    >
+      <Pressable 
+        style={styles.overlay} 
+        onPress={onClose}
+      >
+        <Pressable 
+          style={styles.container}
+          onPress={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <X size={24} color={colors.dark.text} />
+            </Pressable>
+            <Text style={styles.headerTitle}>Sign in or sign up</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* Content */}
+          <View style={styles.content}>
+            <Text style={styles.subtitle}>
+              Access your tickets easily from any device with your Bored Tourist account.
+            </Text>
+
+            {/* Social Sign In Buttons */}
+            <View style={styles.socialButtons}>
+              {/* Apple Sign In - TEMPORARILY DISABLED */}
+              <Pressable
+                style={[styles.socialButton, styles.appleButton, { opacity: 0.5 }]}
+                disabled={true}
+              >
+                <Text style={styles.appleIcon}></Text>
+                <Text style={styles.socialButtonText}>Continue with Apple (coming soon)</Text>
+              </Pressable>
+
+              {/* Google Sign In */}
+              <Pressable
+                style={[styles.socialButton, styles.googleButton]}
+                onPress={handleGoogleSignIn}
+                disabled={isLoading}
+              >
+                {loadingProvider === 'google' ? (
+                  <ActivityIndicator color={colors.dark.text} />
+                ) : (
+                  <>
+                    <Text style={styles.googleIcon}>G</Text>
+                    <Text style={[styles.socialButtonText, styles.googleButtonText]}>
+                      Continue with Google
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+
+              {/* Facebook Sign In - TEMPORARILY DISABLED */}
+              <Pressable
+                style={[styles.socialButton, styles.facebookButton, { opacity: 0.5 }]}
+                disabled={true}
+              >
+                <Text style={styles.facebookIcon}>f</Text>
+                <Text style={[styles.socialButtonText, styles.facebookButtonText]}>
+                  Continue with Facebook (coming soon)
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Email Input */}
+            <View style={styles.emailSection}>
+              <TextInput
+                style={styles.input}
+                placeholder="Email address"
+                placeholderTextColor={colors.dark.textTertiary}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isLoading}
+              />
+
+              <Pressable
+                style={[styles.continueButton, (!email || isLoading) && styles.continueButtonDisabled]}
+                onPress={handleEmailContinue}
+                disabled={!email || isLoading}
+              >
+                <Text style={styles.continueButtonText}>Continue with email</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  container: {
+    backgroundColor: colors.dark.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.dark.border,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.dark.text,
+  },
+  content: {
+    padding: 24,
+    paddingBottom: 40,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.dark.textSecondary,
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  socialButtons: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 12,
+    gap: 12,
+  },
+  appleButton: {
+    backgroundColor: '#fff',
+  },
+  googleButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: colors.dark.border,
+  },
+  facebookButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: colors.dark.border,
+  },
+  socialButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.dark.background,
+  },
+  googleButtonText: {
+    color: colors.dark.text,
+  },
+  facebookButtonText: {
+    color: colors.dark.text,
+  },
+  appleIcon: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.dark.background,
+  },
+  googleIcon: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#4285F4',
+    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
+  },
+  facebookIcon: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1877F2',
+    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.dark.border,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: colors.dark.textTertiary,
+  },
+  emailSection: {
+    gap: 12,
+  },
+  input: {
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.dark.border,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: colors.dark.text,
+    backgroundColor: colors.dark.card,
+  },
+  continueButton: {
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: colors.dark.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueButtonDisabled: {
+    opacity: 0.5,
+  },
+  continueButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.dark.background,
+  },
+});

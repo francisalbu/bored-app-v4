@@ -1,0 +1,145 @@
+{
+  "expo": {
+    "name": "Bored Tourist",
+    "slug": "bored-tourist",
+    "version": "1.0.5",
+    "runtimeVersion": "1.0.5",
+    "orientation": "portrait",
+    "icon": "./assets/images/appstore_Bored.png",
+    "scheme": "app.rork.bored-explorer",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/appstore_Bored.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#fff100"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.rork.bored-explorer",
+      "buildNumber": "1",
+      "config": {
+        "googleMapsApiKey": "YOUR_IOS_API_KEY",
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsArbitraryLoadsForMedia": true,
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "googleapis.com": {
+              "NSIncludesSubdomains": true,
+              "NSThirdPartyExceptionAllowsInsecureHTTPLoads": false,
+              "NSThirdPartyExceptionRequiresForwardSecrecy": true
+            },
+            "supabase.co": {
+              "NSIncludesSubdomains": true,
+              "NSThirdPartyExceptionAllowsInsecureHTTPLoads": false,
+              "NSThirdPartyExceptionRequiresForwardSecrecy": true
+            }
+          }
+        },
+        "NSCameraUsageDescription": "Bored Tourist uses your camera to scan your credit or debit card when making a payment for booking an experience. For example, when you book a Sunset Kayak Tour in Cascais for €45, you can point your camera at your card to automatically fill in the card number, expiry date, and cardholder name instead of typing manually. This is powered by Stripe's secure payment system and your card details are never stored on our servers.",
+        "NSPhotoLibraryUsageDescription": "Bored Tourist needs access to your photo library so you can select an existing photo for your profile picture. For example, you can choose a vacation photo to help activity hosts and other participants recognize you when meeting for group experiences like surf lessons or food tours. Photos are only accessed when you tap Choose from Library.",
+        "NSLocationWhenInUseUsageDescription": "Bored Tourist needs your location to show you nearby activities and experiences sorted by distance from your current position. For example, if you are in Lisbon, you will see Sunset Kayak Tour in Cascais - 25km away so you can easily find activities close to you. Your location data is processed locally on your device to calculate distances and is never shared with third parties, other users, or used for advertising.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "com.rork.boredtourist.oauth",
+            "CFBundleURLSchemes": [
+              "app.rork.bored-explorer",
+              "boredtourist",
+              "com.googleusercontent.apps.2440322136358i7hsc8mco161ahd0bc5jgnnnlcsc851"
+            ]
+          }
+        ]
+      },
+      "associatedDomains": [
+        "applinks:hnivuisqktlrusyqywaz.supabase.co"
+      ]
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/appstore_Bored.png",
+        "backgroundColor": "#fff100"
+      },
+      "package": "app.rork.bored_explorer",
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_ANDROID_API_KEY"
+        }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/appstore_Bored.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://rork.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Bored Tourist needs access to your photo library to let you choose an existing photo for your profile picture. This helps activity hosts recognize you when you join group experiences.",
+          "cameraPermission": "Bored Tourist uses your camera to scan your credit or debit card when making a payment for booking an experience. For example, when you book a Sunset Kayak Tour for €45, you can scan your card to automatically fill in the payment details. This is powered by Stripe's secure payment system."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes.",
+          "locationWhenInUsePermission": "Bored Tourist needs your location to display nearby experiences sorted by distance. For example, if you are near Cascais, the app will show 'Kayak Tour - 2km away' at the top of your feed. Your location is only used to calculate distances and is never shared with other users, activity providers, or used for advertising purposes."
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.app.rork.bored-explorer",
+          "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosShareExtensionName": "Save to Bored Tourist",
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          }
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://rork.com/"
+      },
+      "eas": {
+        "projectId": "cd4bc13b-fb4a-4d0d-82ed-3faf6e991bba"
+      },
+      "googleAiKey": "AIzaSyAlvnCcn8ndC6avTq2BlW7LJ-H3VgCEAk4"
+    },
+    "owner": "boredtourist",
+    "updates": {
+      "url": "https://u.expo.dev/cd4bc13b-fb4a-4d0d-82ed-3faf6e991bba",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
+  }
+}

@@ -1,0 +1,1232 @@
+const ffmpeg = require('fluent-ffmpeg');
+const OpenAI = require('openai');
+const axios = require('axios');
+const fs = require('fs').promises;
+const path = require('path');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+
+const execAsync = promisify(exec);
+
+class VideoAnalyzer {
+  constructor() {
+    this.openaiClient = null; // Lazy load
+    this.tempDir = path.join(__dirname, '../temp');
+    // Create temp dir synchronously to avoid race conditions
+    try {
+      const fsSync = require('fs');
+      console.log('🔍 Checking temp directory:', this.tempDir);
+      console.log('📂 __dirname:', __dirname);
+      if (!fsSync.existsSync(this.tempDir)) {
+        fsSync.mkdirSync(this.tempDir, { recursive: true });
+        console.log('✅ Created temp directory:', this.tempDir);
+      } else {
+        console.log('✅ Temp directory already exists:', this.tempDir);
+      }
+    } catch (error) {
+      console.error('❌ Error creating temp directory:', error);
+      console.error('Stack:', error.stack);
+    }
+  }
+
+  // Lazy load OpenAI client
+  get openai() {
+    if (!this.openaiClient) {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY environment variable is required for video analysis');
+      }
+      this.openaiClient = new OpenAI({ 
+        apiKey: process.env.OPENAI_API_KEY 
+      });
+    }
+    return this.openaiClient;
+  }
+
+  async ensureTempDir() {
+    try {
+      await fs.mkdir(this.tempDir, { recursive: true });
+    } catch (error) {
+      console.error('Error creating temp directory:', error);
+    }
+  }
+
+  /**
+   * Get direct video URL from Instagram using multiple methods
+   * Priority: RapidAPI → Direct Scraping → oEmbed
+   */
+  async getDirectVideoUrl(url) {
+    console.log('🔗 Getting video URL for:', url);
+    
+    // Method 1: Try RapidAPI (Instagram Scraper Stable API)
+    try {
+      const rapidApiKey = process.env.RAPIDAPI_KEY || '13e6fed9b4msh7770b0604d16a75p11d71ejsn0d42966b3d99';
+      const mediaCode = this.extractInstagramId(url);
+      
+      if (!mediaCode) {
+        throw new Error('Could not extract media code from URL');
+      }
+      
+      console.log('📡 Calling RapidAPI with media_code:', mediaCode);
+      
+      const response = await axios.get('https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php', {
+        params: { media_code: mediaCode },
+        headers: {
+          'x-rapidapi-key': rapidApiKey,
+          'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com'
+        },
+        timeout: 15000
+      });
+      
+      console.log('📦 RapidAPI Response Status:', response.status);
+      console.log('📦 RapidAPI Response Data:', JSON.stringify(response.data, null, 2));
+      
+      const videoUrl = response.data?.video_url || response.data?.video_versions?.[0]?.url;
+      const caption = response.data?.caption || response.data?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
+      const locationName = response.data?.location?.name || null;
+      const thumbnailSrc = response.data?.thumbnail_src || response.data?.thumbnail_url || response.data?.display_url;
+      
+      if (videoUrl) {
+        console.log('✅ Got video via RapidAPI');
+        console.log('🔗 URL length:', videoUrl.length, 'chars (NOT truncating to avoid hash errors)');
+        if (locationName) {
+          console.log('📍 Instagram location tag:', locationName);
+        }
+        if (thumbnailSrc) {
+          console.log('🖼️ Thumbnail URL:', thumbnailSrc.substring(0, 50) + '...');
+        }
+        return {
+          videoUrl, // NEVER log or truncate - contains security hash!
+          caption,
+          hashtags: this.extractHashtags(caption),
+          location: locationName,
+          thumbnailUrl: thumbnailSrc
+        };
+      }
+      
+      console.log('⚠️ No video URL found in RapidAPI response');
+    } catch (error) {
+      console.error('❌ RapidAPI error:', error.response?.status, error.response?.data || error.message);
+    }
+    
+    // Method 2: Try Apify as fallback
+    if (process.env.APIFY_API_TOKEN) {
+      try {
+        console.log('🔄 Trying Apify Instagram Scraper as fallback...');
+        const apifyToken = process.env.APIFY_API_TOKEN;
+        
+        // Call Apify Instagram Scraper (supports direct reel URLs)
+        const apifyResponse = await axios.post(
+          'https://api.apify.com/v2/acts/apify~instagram-scraper/runs',
+          {
+            directUrls: [url],
+            resultsType: 'posts'
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apifyToken}`
+            },
+            params: {
+              waitForFinish: 120 // Wait up to 2 minutes
+            },
+            timeout: 150000
+          }
+        );
+        
+        const runId = apifyResponse.data.data.id;
+        const datasetId = apifyResponse.data.data.defaultDatasetId;
+        console.log('✅ Apify run completed:', runId);
+        
+        // Get results directly from dataset (waitForFinish ensures it's ready)
+        const resultsResponse = await axios.get(
+          `https://api.apify.com/v2/datasets/${datasetId}/items`,
+          {
+            headers: { 'Authorization': `Bearer ${apifyToken}` }
+          }
+        );
+        
+        if (resultsResponse.data && resultsResponse.data.length > 0) {
+          const item = resultsResponse.data[0];
+          console.log('✅ Got video URL from Apify:', item.videoUrl?.substring(0, 80));
+          
+          return {
+            videoUrl: item.videoUrl || item.displayUrl,
+            caption: item.caption || '',
+            hashtags: this.extractHashtags(item.caption || ''),
+            location: item.locationName || null,
+            thumbnailUrl: item.displayUrl || item.thumbnailUrl
+          };
+        }
+        
+        console.log('❌ Apify returned no data');
+      } catch (error) {
+        console.error('❌ Apify error:', error.response?.data || error.message);
+      }
+    } else {
+      console.log('⚠️ APIFY_API_TOKEN not set, skipping Apify fallback');
+    }
+    
+    // Method 3: Direct Instagram scraping
+    try {
+      const postId = this.extractInstagramId(url);
+      const response = await axios.get(
+        `https://www.instagram.com/p/${postId}/?__a=1&__d=dis`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+          timeout: 10000
+        }
+      );
+      
+      const videoUrl = response.data?.items?.[0]?.video_versions?.[0]?.url ||
+                       response.data?.graphql?.shortcode_media?.video_url;
+      const caption = response.data?.items?.[0]?.caption?.text ||
+                      response.data?.graphql?.shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text || '';
+      
+      if (videoUrl) {
+        console.log('✅ Got video via direct scraping');
+        return {
+          videoUrl,
+          caption,
+          hashtags: this.extractHashtags(caption)
+        };
+      }
+    } catch (error) {
+      console.log('⚠️ Direct scraping failed, trying oEmbed...');
+    }
+    
+    // Method 3: oEmbed (thumbnail only, but better than nothing)
+    try {
+      const response = await axios.get(
+        `https://www.instagram.com/p/oembed/?url=${encodeURIComponent(url)}`,
+        { timeout: 10000 }
+      );
+      
+      console.log('⚠️ Using thumbnail URL (oEmbed)');
+      return {
+        videoUrl: response.data.thumbnail_url, // Will be an image, not video
+        caption: response.data.title || '',
+        hashtags: [],
+        isThumbna: true
+      };
+    } catch (error) {
+      console.error('❌ All methods failed');
+    }
+    
+    throw new Error('Could not get video URL. Instagram may be blocking requests.');
+  }
+
+  /**
+   * Extract multiple frames - Download from CDN with proper headers
+   */
+  async extractFramesFromUrl(videoUrl, numFrames = 3) {
+    await this.ensureTempDir();
+    
+    // Clean old frames and videos first
+    try {
+      const fsSync = require('fs');
+      const files = fsSync.readdirSync(this.tempDir);
+      for (const file of files) {
+        if (file.endsWith('.jpg') || file.endsWith('.mp4')) {
+          fsSync.unlinkSync(path.join(this.tempDir, file));
+        }
+      }
+      console.log('🧹 Cleaned temp directory');
+    } catch (err) {
+      console.log('⚠️ Could not clean temp directory:', err.message);
+    }
+    
+    const videoPath = path.join(this.tempDir, `video_${Date.now()}.mp4`);
+    
+    try {
+      console.log('⬇️ Downloading video from CDN (with browser headers)...');
+      console.log('🔗 URL length:', videoUrl.length, 'chars');
+      
+      // CRITICAL: Use full browser headers to avoid "Bad URL hash"
+      const response = await axios({
+        url: videoUrl, // NEVER truncate this!
+        method: 'GET',
+        responseType: 'stream',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'identity',
+          'Referer': 'https://www.instagram.com/',
+          'Origin': 'https://www.instagram.com',
+          'Sec-Fetch-Dest': 'video',
+          'Sec-Fetch-Mode': 'no-cors',
+          'Sec-Fetch-Site': 'cross-site'
+        },
+        timeout: 30000,
+        maxContentLength: 50 * 1024 * 1024, // 50MB
+        maxBodyLength: 50 * 1024 * 1024
+      });
+      
+      const writer = require('fs').createWriteStream(videoPath);
+      response.data.pipe(writer);
+      
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+      
+      console.log('✅ Video downloaded to:', videoPath);
+    } catch (error) {
+      console.error('❌ CDN download failed:', error.message);
+      if (error.response?.status) {
+        console.error('HTTP Status:', error.response.status);
+      }
+      throw new Error('Could not download video from CDN - link may have expired or headers rejected');
+    }
+    
+    return new Promise(async (resolve, reject) => {
+      const frameFiles = [];
+      
+      for (let i = 1; i <= numFrames; i++) {
+        frameFiles.push(path.join(this.tempDir, `frame-${i}.jpg`));
+      }
+      
+      console.log(`📸 Extracting ${numFrames} frames from downloaded video...`);
+      
+      // Use direct FFmpeg command instead of fluent-ffmpeg (more reliable)
+      const framePattern = path.join(this.tempDir, 'frame-%d.jpg');
+      const ffmpegCmd = `ffmpeg -i "${videoPath}" -t 10 -vf "select='not(mod(n\\,${Math.floor(300/numFrames)}))'" -vsync vfr -frames:v ${numFrames} -qscale:v 2 "${framePattern}" -y 2>&1`;
+      
+      try {
+        const { stdout, stderr } = await execAsync(ffmpegCmd);
+        console.log('✅ FFmpeg output:', stderr.split('\n').slice(-5).join('\n'));
+        
+        // Verify frames were created
+        const fsSync = require('fs');
+        let framesCreated = 0;
+        for (const framePath of frameFiles) {
+          if (fsSync.existsSync(framePath)) {
+            framesCreated++;
+          }
+        }
+        
+        if (framesCreated === 0) {
+          throw new Error('No frames were extracted');
+        }
+        
+        console.log(`✅ ${framesCreated} frames extracted!`);
+        // Delete video after successful extraction
+        require('fs').unlink(videoPath, () => {});
+        resolve(frameFiles.filter(f => fsSync.existsSync(f)));
+      } catch (err) {
+        console.error('❌ Frame extraction failed:', err.message);
+        console.error('⚠️ Video kept at:', videoPath, 'for debugging');
+        reject(new Error(`Failed to extract frames: ${err.message}`));
+      }
+    });
+  }
+
+  /**
+   * Extract activity and location from Instagram metadata (caption, hashtags, location tag)
+   * This is PRIORITY 1 - always check metadata first!
+   */
+  async extractFromMetadata(caption = '', hashtags = [], locationTag = '') {
+    console.log('📝 Analyzing Instagram metadata first...');
+    console.log('📍 Location tag:', locationTag || 'none');
+    console.log('🏷️ Hashtags:', hashtags.join(', ') || 'none');
+    
+    const metadataText = `
+Caption: ${caption}
+Hashtags: ${hashtags.join(' ')}
+Location Tag: ${locationTag}
+`.trim();
+    
+    if (!metadataText || metadataText.length < 10) {
+      console.log('⚠️ No metadata available');
+      return { activity: null, location: null, confidence: 0, source: 'none' };
+    }
+    
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{
+          role: "system",
+          content: "You extract travel activity and location from Instagram metadata. If location tag exists, USE IT as primary location. Extract activity from hashtags and caption."
+        }, {
+          role: "user",
+          content: `Extract activity and location from this Instagram post:
+
+${metadataText}
+
+RULES:
+1. If "Location Tag" exists, USE IT as the primary location (it's official Instagram tag)
+2. Extract activity from hashtags (e.g., #surf = surfing, #ski = skiing)
+3. If no clear activity, return null
+4. Return high confidence (0.9+) if location tag exists
+
+Return JSON only:
+{
+  "activity": "specific activity or null",
+  "location": "location from tag or caption or null",
+  "confidence": 0.0-1.0
+}`
+        }],
+        temperature: 0.3,
+        max_tokens: 150
+      });
+      
+      const text = response.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
+      const result = JSON.parse(text);
+      
+      console.log(`📊 Metadata extraction: activity="${result.activity}", location="${result.location}", confidence=${result.confidence}`);
+      
+      return {
+        activity: result.activity,
+        location: result.location,
+        confidence: result.confidence || 0,
+        source: 'metadata'
+      };
+    } catch (error) {
+      console.error('❌ Metadata extraction failed:', error.message);
+      return { activity: null, location: null, confidence: 0, source: 'error' };
+    }
+  }
+
+  /**
+   * Analyze single frame with GPT-4 Vision (OpenAI)
+   * NOW includes metadata context for better accuracy
+   */
+  async analyzeFrame(framePath, frameNumber, totalFrames, description = '', metadataInfo = null, imageBase64Override = null) {
+    const imageBase64 = imageBase64Override || await fs.readFile(framePath, 'base64');
+    
+    // Build context from metadata
+    let metadataContext = '';
+    if (metadataInfo) {
+      if (metadataInfo.location) metadataContext += `\n🏷️ Instagram Location Tag: ${metadataInfo.location}`;
+      if (metadataInfo.activity) metadataContext += `\n🎯 Detected Activity: ${metadataInfo.activity}`;
+      if (metadataInfo.hashtags?.length) metadataContext += `\n#️⃣ Hashtags: ${metadataInfo.hashtags.join(' ')}`;
+    }
+    
+    const prompt = `You are a PROFESSIONAL TRAVEL DETECTIVE analyzing frame ${frameNumber}/${totalFrames} from an Instagram/TikTok travel video.
+
+${metadataContext}
+
+🔍 YOUR MISSION: Identify ALL specific locations/POIs (Points of Interest) shown in this frame.
+
+⚠️ CRITICAL: If this is a travel montage video, it may show MULTIPLE different locations/POIs. List ALL of them!
+
+VISUAL CLUES TO ANALYZE:
+1. **Specific Landmarks & POIs**:
+   - Churches, cathedrals, basilicas (which one specifically?)
+   - Fountains (Trevi? Neptune?)
+   - Castles, fortresses (Castel Sant'Angelo? Edinburgh Castle?)
+   - Historic monuments (Pantheon? Colosseum? Eiffel Tower?)
+   - Museums, palaces
+   - Famous statues, bridges, squares
+   - Text visible on buildings or signs
+
+2. **Geographic Features**:
+   - Mountains, rivers, coastlines
+   - Vegetation type (Mediterranean, tropical, alpine?)
+   - Climate indicators
+
+3. **Architecture & Culture**:
+   - Building styles (Baroque, Renaissance, Gothic?)
+   - Urban layout (piazzas, narrow streets?)
+   - Infrastructure
+
+4. **Activity Details**:
+   - What is happening? (sightseeing, walking tour, etc.)
+
+EXAMPLES FOR ROME:
+Frame showing baroque fountain → "Trevi Fountain"
+Frame showing circular temple → "Pantheon"  
+Frame showing dome church → "Saint Peter's Basilica"
+Frame showing cylindrical fortress → "Castel Sant'Angelo"
+
+${description ? `Context: ${description}` : ''}
+
+Return ONLY valid JSON:
+{
+  "activity": "primary activity shown (sightseeing, surfing, etc.)",
+  "location": "City, Country (e.g., Rome, Italy)",
+  "landmarks": ["List ALL specific POIs/landmarks visible - BE SPECIFIC with names"],
+  "features": ["architectural/geographic details that helped identify POIs"],
+  "confidence": 0.0-1.0,
+  "content_type": "place" or "activity" (place = landmarks/monuments/scenery, activity = experiences like surf/hiking/cooking class)
+}`;
+
+    try {
+      const visionModel = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
+      const response = await this.openai.chat.completions.create({
+        model: visionModel,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: prompt
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${imageBase64}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 600,
+        temperature: 0.4
+      });
+
+      const responseText = response.choices[0].message.content;
+      const jsonText = responseText.replace(/```json\n?|\n?```/g, '').trim();
+      
+      const parsed = JSON.parse(jsonText);
+      
+      return {
+        frameNumber,
+        activity: parsed.activity || null,
+        location: parsed.location || null,
+        landmarks: parsed.landmarks || [],
+        features: parsed.features || [],
+        confidence: parsed.confidence || 0.5,
+        content_type: parsed.content_type || 'place'
+      };
+    } catch (error) {
+      console.error(`❌ Error analyzing frame ${frameNumber}:`, error);
+      return {
+        frameNumber,
+        activity: null,
+        location: null,
+        landmarks: [],
+        features: [],
+        confidence: 0,
+        content_type: 'place'
+      };
+    }
+  }
+
+  /**
+   * Analyze all frames in parallel for speed
+   */
+  async analyzeAllFrames(framePaths, description) {
+    console.log(`🔍 Analyzing ${framePaths.length} frames in parallel...`);
+    
+    const analysisPromises = framePaths.map((framePath, index) =>
+      this.analyzeFrame(framePath, index + 1, framePaths.length, description)
+    );
+    
+    const results = await Promise.all(analysisPromises);
+    console.log('✅ All frames analyzed!');
+    
+    return results;
+  }
+
+  /**
+   * Filter generic/non-specific landmarks
+   */
+  isGenericLandmark(landmark) {
+    const genericTerms = [
+      'typical', 'traditional', 'historic', 'ancient', 'modern',
+      'street', 'road', 'alley', 'pathway', 'building', 'architecture',
+      'view', 'scene', 'area', 'district', 'neighborhood',
+      'restaurant', 'cafe', 'shop', 'store', 'market' // unless specific name
+    ];
+    
+    const landmarkLower = landmark.toLowerCase();
+    return genericTerms.some(term => landmarkLower.includes(term) && 
+                                    !landmarkLower.includes('fountain') && 
+                                    !landmarkLower.includes('basilica') &&
+                                    !landmarkLower.includes('castle') &&
+                                    !landmarkLower.includes('cathedral'));
+  }
+
+  /**
+   * Remove duplicate landmarks from consecutive frames
+   * Uses similarity matching to catch variations (e.g., "Múlafossur" vs "Mulafossur")
+   */
+  removeDuplicateLandmarks(frameAnalyses) {
+    const uniqueLandmarks = [];
+    const seen = new Set();
+    
+    // Helper function to normalize landmark names for comparison
+    const normalize = (name) => {
+      return name
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+        .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+    };
+    
+    // Helper to check if two landmarks are similar
+    const areSimilar = (landmark1, landmark2) => {
+      const norm1 = normalize(landmark1);
+      const norm2 = normalize(landmark2);
+      
+      // Exact match after normalization
+      if (norm1 === norm2) return true;
+      
+      // Check if one contains the other (for "X Waterfall" vs "Waterfall X")
+      if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+      
+      // Levenshtein-like: check character overlap
+      const shorter = norm1.length < norm2.length ? norm1 : norm2;
+      const longer = norm1.length >= norm2.length ? norm1 : norm2;
+      if (shorter.length >= 5 && longer.includes(shorter)) return true;
+      
+      return false;
+    };
+    
+    frameAnalyses.forEach((frame, index) => {
+      if (frame.landmarks && frame.landmarks.length > 0) {
+        frame.landmarks.forEach(landmark => {
+          // Check if this landmark was in previous frame
+          const prevFrame = index > 0 ? frameAnalyses[index - 1] : null;
+          const isDuplicateFromPrev = prevFrame?.landmarks?.some(prev => areSimilar(landmark, prev));
+          
+          // Check against all previously seen landmarks
+          const isDuplicateGlobal = Array.from(seen).some(seenLandmark => areSimilar(landmark, seenLandmark));
+          
+          if (!isDuplicateFromPrev && !isDuplicateGlobal && !this.isGenericLandmark(landmark)) {
+            uniqueLandmarks.push(landmark);
+            seen.add(landmark);
+          }
+        });
+      }
+    });
+    
+    return uniqueLandmarks;
+  }
+
+  /**
+   * Detect content type based on analysis
+   */
+  detectContentType(frameAnalyses) {
+    const locations = frameAnalyses.map(f => f.location).filter(Boolean);
+    
+    // Extract countries and cities
+    const countries = new Set();
+    const cities = new Set();
+    
+    locations.forEach(loc => {
+      const parts = loc.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        cities.add(parts[0]); // First part is usually city
+        countries.add(parts[parts.length - 1]); // Last part is country
+      } else if (parts.length === 1) {
+        countries.add(parts[0]); // Only country mentioned
+      }
+    });
+    
+    // Get unique landmarks (non-generic, non-duplicate)
+    const landmarks = this.removeDuplicateLandmarks(frameAnalyses);
+    
+    // Decision logic
+    if (countries.size >= 3) {
+      return { type: 'multi-country', countries: Array.from(countries), landmarks: [] };
+    } else if (countries.size === 1 && cities.size >= 3) {
+      return { type: 'country-tour', country: Array.from(countries)[0], cities: Array.from(cities), landmarks: [] };
+    } else if (landmarks.length >= 3) {
+      return { type: 'city-tour', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks };
+    } else if (landmarks.length === 1) {
+      return { type: 'single-poi', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks }; // FIX: use landmarks array
+    } else {
+      // Default to city tour with whatever landmarks we have
+      return { type: 'city-tour', city: Array.from(cities)[0] || 'Unknown', landmarks: landmarks };
+    }
+  }
+
+  /**
+   * Combine multiple frame analyses using voting + confidence
+   */
+  combineFrameAnalyses(frameAnalyses) {
+    console.log('🧮 Combining frame analyses...');
+    
+    // Detect content type first
+    const contentType = this.detectContentType(frameAnalyses);
+    console.log('📊 Content type detected:', contentType.type);
+    
+    // Activity voting (weighted by confidence)
+    const activityVotes = {};
+    const locationVotes = {};
+    const allFeatures = [];
+    
+    frameAnalyses.forEach(analysis => {
+      if (analysis.activity) {
+        const activity = analysis.activity.toLowerCase();
+        activityVotes[activity] = (activityVotes[activity] || 0) + analysis.confidence;
+      }
+      if (analysis.location) {
+        locationVotes[analysis.location] = (locationVotes[analysis.location] || 0) + analysis.confidence;
+      }
+      if (analysis.features) {
+        allFeatures.push(...analysis.features);
+      }
+    });
+    
+    // Get winners
+    const topActivity = Object.entries(activityVotes)
+      .sort((a, b) => b[1] - a[1])[0];
+    
+    const topLocation = Object.entries(locationVotes)
+      .sort((a, b) => b[1] - a[1])[0];
+    
+    // Calculate overall confidence
+    const avgConfidence = frameAnalyses.reduce((sum, a) => sum + a.confidence, 0) / frameAnalyses.length;
+    
+    const uniqueFeatures = [...new Set(allFeatures.filter(Boolean))];
+    
+    return {
+      activity: topActivity ? topActivity[0] : 'unknown',
+      location: topLocation ? topLocation[0] : 'unknown',
+      confidence: Math.min(avgConfidence * 1.1, 1.0),
+      landmarks: contentType.landmarks, // Filtered, deduplicated landmarks
+      features: uniqueFeatures,
+      frameAnalyses: frameAnalyses,
+      contentType: contentType, // New: type of content detected
+      votingScores: {
+        activities: activityVotes,
+        locations: locationVotes
+      }
+    };
+  }
+
+  /**
+   * Get video thumbnail from Instagram/TikTok (quick alternative)
+   */
+  async getVideoThumbnail(url) {
+    try {
+      if (url.includes('instagram.com')) {
+        const postId = this.extractInstagramId(url);
+        const response = await axios.get(
+          `https://www.instagram.com/p/${postId}/?__a=1&__d=dis`,
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            timeout: 10000
+          }
+        );
+        return response.data?.graphql?.shortcode_media?.display_url;
+      }
+      
+      if (url.includes('tiktok.com')) {
+        const response = await axios.get(
+          `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`,
+          { timeout: 10000 }
+        );
+        return response.data.thumbnail_url;
+      }
+    } catch (error) {
+      console.error('⚠️ Thumbnail extraction failed:', error);
+      return null;
+    }
+  }
+
+  extractInstagramId(url) {
+    const match = url.match(/\/p\/([^\/\?]+)|\/reel\/([^\/\?]+)/);
+    return match ? (match[1] || match[2]) : null;
+  }
+  
+  extractHashtags(text) {
+    if (!text) return [];
+    const matches = text.match(/#[\w]+/g);
+    return matches || [];
+  }
+
+  /**
+   * Main analysis pipeline - NO VIDEO DOWNLOAD NEEDED!
+   */
+  async analyzeVideoUrl(url, description = '') {
+    const startTime = Date.now();
+    let framePaths = [];
+    let metadata = {};
+    
+    try {
+      console.log(`\n🎬 Starting video analysis for: ${url}`);
+      console.log('⚡ Using RapidAPI + OpenAI Vision (multimodal approach)');
+      
+      // Step 1: Get video URL + metadata via RapidAPI
+      console.log('🔗 Step 1: Getting video URL via RapidAPI...');
+      const videoData = await this.getDirectVideoUrl(url);
+      metadata.caption = videoData.caption;
+      metadata.hashtags = videoData.hashtags;
+      metadata.location = videoData.location; // Instagram location tag!
+      metadata.thumbnailUrl = videoData.thumbnailUrl; // Thumbnail for UI
+      console.log(`✅ Got video URL + metadata`);
+      
+      const envFrames = Number.parseInt(process.env.VIDEO_ANALYSIS_FRAMES || '', 10);
+      const frameCount = Number.isFinite(envFrames) && envFrames > 0 ? envFrames : 8;
+
+      // Step 2-3: Run metadata/text extraction and frame extraction in parallel
+      console.log('📝 Step 2: Extracting from Instagram metadata (PRIORITY 1)...');
+      console.log('📝 Step 2.5: Extracting POIs from caption/description...');
+      console.log(`🎞️ Step 3: Extracting ${frameCount} key frames to capture all POIs throughout the video...`);
+
+      const metadataPromise = this.extractFromMetadata(
+        metadata.caption,
+        metadata.hashtags,
+        metadata.location
+      );
+      const textLandmarksPromise = this.extractLandmarksFromText(
+        metadata.caption,
+        metadata.hashtags,
+        metadata.location
+      );
+      const framesPromise = this.extractFramesFromUrl(videoData.videoUrl, frameCount);
+
+      const [metadataAnalysis, textLandmarks, extractedFramePaths] = await Promise.all([
+        metadataPromise,
+        textLandmarksPromise,
+        framesPromise
+      ]);
+
+      framePaths = extractedFramePaths;
+      console.log(`✅ Metadata analysis: activity="${metadataAnalysis.activity}", location="${metadataAnalysis.location}"`);
+      console.log(`✅ Found ${textLandmarks.length} POIs in text`);
+      console.log(`✅ Extracted ${framePaths.length} frames`);
+      
+      // Step 4: Analyze frames to COMPLEMENT metadata (not replace!)
+      console.log('🤖 Step 4: Analyzing frames to complement metadata...');
+      const analysisResult = await this.analyzeFramesSequentially(
+        framePaths, 
+        description,
+        metadata.caption,
+        metadata.hashtags,
+        metadata.location // Instagram location tag!
+      );
+      
+      const frameAnalyses = analysisResult.analyses;
+      const extractedFrames = analysisResult.frames;
+      
+      // Step 5: Combine results - PRIORITIZE metadata over frame analysis
+      console.log('🧮 Step 5: Combining metadata + frame analysis (metadata priority)...');
+      const framesCombined = this.combineFrameAnalyses(frameAnalyses);
+      
+      // MERGE: Metadata takes priority, frames complement
+      // CRITICAL: Combine text landmarks with frame landmarks
+      const allLandmarks = [
+        ...textLandmarks, // From caption/description
+        ...(framesCombined.landmarks || []) // From frame analysis (safe)
+      ];
+      
+      // Deduplicate using similarity matching
+      const uniqueLandmarks = this.deduplicateLandmarks(allLandmarks);
+      
+      // Determine if this is an activity experience or place/landmark
+      const isActivity = this.detectActivityContent(
+        metadataAnalysis.activity || framesCombined.activity,
+        frameAnalyses
+      );
+      
+      const finalAnalysis = {
+        activity: metadataAnalysis.activity || framesCombined.activity,
+        location: metadataAnalysis.location || framesCombined.location,
+        confidence: metadataAnalysis.confidence > 0 ? 
+          Math.max(metadataAnalysis.confidence, framesCombined.confidence) : 
+          framesCombined.confidence,
+        landmarks: uniqueLandmarks, // Combined + deduplicated
+        features: framesCombined.features || [],
+        votingScores: framesCombined.votingScores,
+        frameAnalyses: frameAnalyses,
+        metadataUsed: metadataAnalysis.confidence > 0,
+        source: metadataAnalysis.confidence > 0 ? 'metadata+frames+text' : 'frames_only',
+        textLandmarksCount: textLandmarks.length,
+        frameLandmarksCount: framesCombined.landmarks.length,
+        isActivity: isActivity // NEW: true if experience/activity, false if place/landmark
+      };
+      console.log('📊 DEBUG - frameAnalyses count:', frameAnalyses.length);
+      console.log('📊 DEBUG - finalAnalysis.frameAnalyses:', finalAnalysis.frameAnalyses);
+      
+      const processingTime = Date.now() - startTime;
+      console.log(`\n✅ Analysis complete in ${(processingTime/1000).toFixed(1)}s`);
+      console.log(`📍 Activity: ${finalAnalysis.activity}`);
+      console.log(`🌍 Location: ${finalAnalysis.location}`);
+      console.log(`💯 Confidence: ${(finalAnalysis.confidence * 100).toFixed(1)}%`);
+      console.log(`⚡ Used RapidAPI + multimodal analysis!`);
+      
+      return {
+        activity: finalAnalysis.activity,
+        location: finalAnalysis.location,
+        confidence: finalAnalysis.confidence,
+        landmarks: finalAnalysis.landmarks,
+        features: finalAnalysis.features,
+        contentType: finalAnalysis.contentType, // NEW: type detection (multi-country, city-tour, etc)
+        isActivity: finalAnalysis.isActivity, // NEW: true if experience/activity, false if place/landmark
+        votingScores: finalAnalysis.votingScores,
+        processingTime,
+        method: 'rapidapi_multimodal',
+        userDescription: description,
+        caption: metadata.caption,
+        hashtags: metadata.hashtags,
+        instagramLocation: metadata.location, // Original Instagram tag
+        thumbnailUrl: metadata.thumbnailUrl, // Thumbnail for UI
+        // Include individual frame analysis to verify frames were extracted
+        detailedFrameAnalysis: finalAnalysis.frameAnalyses,
+        // Debug: show frame paths (frames exist in these paths)
+        _debug_framePaths: framePaths,
+        // CRITICAL: Include extracted frames as base64 to verify they're correct
+        extractedFrames: extractedFrames.map(f => ({
+          frameNumber: f.frameNumber,
+          imageBase64: `data:image/jpeg;base64,${f.base64}`
+        }))
+      };
+      
+    } catch (error) {
+      console.error('❌ Video analysis failed:', error);
+      throw error;
+    } finally {
+      // TEMP: Skip cleanup to verify frames are being extracted
+      // await this.cleanup(null, framePaths);
+      console.log('⚠️ Skipping cleanup - frames kept in temp/ for verification');
+    }
+  }
+
+  /**
+   * Detect if content is an activity/experience vs a static place/landmark
+   */
+  detectActivityContent(activityString, frameAnalyses) {
+    // Activity keywords grouped by category
+    const activityKeywords = [
+      // Food & Culinary
+      'cooking', 'cook', 'wine tasting', 'food tour', 'cocktail making', 'mixology', 
+      'chocolate making', 'baking', 'brewing', 'coffee tasting', 'culinary',
+      
+      // Adventure & Adrenaline
+      'skydiving', 'paragliding', 'bungee', 'rafting', 'white water', 'climbing', 
+      'rock climbing', 'abseiling', 'zip line', 'ziplining', 'canyoning', 'via ferrata',
+      
+      // Water Sports
+      'surf', 'surfing', 'diving', 'scuba', 'snorkeling', 'kayaking', 'kayak',
+      'paddleboarding', 'paddle board', 'kitesurfing', 'kitesurf', 'wakeboard',
+      'jet ski', 'sailing', 'windsurfing',
+      
+      // Nature & Wildlife
+      'hiking', 'hike', 'safari', 'birdwatching', 'wildlife watching', 'horseback',
+      'horse riding', 'trekking', 'trek', 'nature walk', 'camping', 'glamping',
+      
+      // Winter & Snow
+      'skiing', 'ski', 'snowboarding', 'snowboard', 'dog sledding', 'ice climbing',
+      'snowshoeing', 'ice skating', 'snowmobile',
+      
+      // Wellness & Lifestyle
+      'yoga', 'meditation', 'spa', 'massage', 'dance', 'dancing', 'salsa',
+      'tango', 'martial arts', 'pilates', 'wellness retreat',
+      
+      // Additional activity indicators
+      'class', 'lesson', 'course', 'workshop', 'experience', 'tour guide',
+      'instructor', 'training', 'session'
+    ];
+    
+    // Check activity string
+    const activityLower = (activityString || '').toLowerCase();
+    const hasActivityKeyword = activityKeywords.some(keyword => 
+      activityLower.includes(keyword)
+    );
+    
+    // Check frame analyses - count how many frames detected as activity
+    if (frameAnalyses && frameAnalyses.length > 0) {
+      const activityFrames = frameAnalyses.filter(f => 
+        f.content_type === 'activity'
+      ).length;
+      
+      const activityPercentage = activityFrames / frameAnalyses.length;
+      
+      // If majority of frames or activity keyword found
+      if (activityPercentage > 0.5 || hasActivityKeyword) {
+        console.log(`🎯 Activity detected: ${activityPercentage * 100}% frames, keyword: ${hasActivityKeyword}`);
+        return true;
+      }
+    }
+    
+    // Fallback to keyword only
+    if (hasActivityKeyword) {
+      console.log(`🎯 Activity detected from keyword in: "${activityString}"`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Deduplicate landmarks using similarity matching
+   */
+  deduplicateLandmarks(landmarks) {
+    if (!landmarks || landmarks.length === 0) return [];
+    
+    const unique = [];
+    const seen = new Set();
+    
+    for (const landmark of landmarks) {
+      const normalized = landmark.toLowerCase().trim();
+      
+      // Check if it's too similar to any existing landmark
+      let isDuplicate = false;
+      for (const existing of unique) {
+        const existingNorm = existing.toLowerCase().trim();
+        
+        // Exact match
+        if (normalized === existingNorm) {
+          isDuplicate = true;
+          break;
+        }
+        
+        // One contains the other (e.g., "Trevi Fountain" vs "Trevi")
+        if (normalized.includes(existingNorm) || existingNorm.includes(normalized)) {
+          // Keep the longer one
+          if (normalized.length > existingNorm.length) {
+            // Replace with longer version
+            const index = unique.indexOf(existing);
+            unique[index] = landmark;
+          }
+          isDuplicate = true;
+          break;
+        }
+        
+        // Levenshtein distance for typos/variations
+        const distance = this.levenshteinDistance(normalized, existingNorm);
+        const maxLen = Math.max(normalized.length, existingNorm.length);
+        const similarity = 1 - (distance / maxLen);
+        
+        if (similarity > 0.85) { // 85% similar
+          isDuplicate = true;
+          break;
+        }
+      }
+      
+      if (!isDuplicate) {
+        unique.push(landmark);
+      }
+    }
+    
+    console.log(`🔍 Deduplicated: ${landmarks.length} → ${unique.length} landmarks`);
+    return unique;
+  }
+
+  /**
+   * Calculate Levenshtein distance between two strings
+   */
+  levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            matrix[i][j - 1] + 1,     // insertion
+            matrix[i - 1][j] + 1      // deletion
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+
+  /**
+   * Extract landmarks from caption/description using GPT
+   */
+  async extractLandmarksFromText(caption, hashtags, location) {
+    if (!caption || caption.length < 20) return [];
+    
+    console.log('📝 Extracting POIs from caption text...');
+    console.log(`Caption length: ${caption.length} chars`);
+    
+    const prompt = `Extract ALL specific tourist attractions, landmarks, and POIs mentioned in this text.
+
+CAPTION/DESCRIPTION:
+${caption}
+
+${hashtags ? `HASHTAGS: ${hashtags.join(' ')}` : ''}
+${location ? `LOCATION TAG: ${location}` : ''}
+
+CRITICAL RULES:
+1. Extract EVERY specific place name mentioned (cities, parks, landmarks, harbors, deserts, mountains, etc.)
+2. Include: National parks, deserts, harbors, bays, canyons, waterfalls, peaks, beaches, viewpoints
+3. EXCLUDE ONLY: Hotels, lodges, resorts, camps, accommodations
+4. Return the FULL NAME (e.g., "Sandwich Harbour Historic" NOT "Sandwich Harbour")
+5. If a place is mentioned multiple times, include it only once
+6. Extract places from "TOP THINGS TO DO" sections especially carefully
+
+EXAMPLES of what to extract:
+- "Namib Desert" ✅
+- "Sandwich Harbour" ✅
+- "Etosha National Park" ✅
+- "Sossusvlei" ✅
+- "Spitzkoppe" ✅
+- "Zannier Omaanda" ❌ (accommodation)
+
+Return ONLY a JSON array of place names:
+["Place 1", "Place 2", ...]`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        temperature: 0.3
+      });
+
+      const responseText = response.choices[0].message.content;
+      console.log('🤖 GPT response:', responseText);
+      const jsonText = responseText.replace(/```json\n?|\n?```/g, '').trim();
+      const landmarks = JSON.parse(jsonText);
+      
+      console.log(`✅ Extracted ${landmarks.length} POIs from text:`, landmarks);
+      return landmarks;
+    } catch (error) {
+      console.error('❌ Error extracting landmarks from text:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Analyze frames with limited concurrency to balance speed and memory usage
+   */
+  async analyzeFramesSequentially(framePaths, userDescription, caption, hashtags, instagramLocation, options = {}) {
+    const envConcurrency = Number.parseInt(process.env.VIDEO_ANALYSIS_CONCURRENCY || '', 10);
+    const defaultConcurrency = Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : 2;
+    const requestedConcurrency = Number.isFinite(options.concurrency) && options.concurrency > 0 ? options.concurrency : defaultConcurrency;
+    const concurrency = Math.max(1, Math.min(requestedConcurrency, framePaths.length));
+
+    const debugFramesEnv = (process.env.VIDEO_ANALYSIS_DEBUG_FRAMES || '').toLowerCase();
+    const defaultIncludeFrameData = debugFramesEnv === '1' || debugFramesEnv === 'true' || debugFramesEnv === 'yes';
+    const includeFrameData = typeof options.includeFrameData === 'boolean' ? options.includeFrameData : defaultIncludeFrameData;
+
+    console.log(`🔍 Analyzing ${framePaths.length} frames with concurrency=${concurrency}...`);
+    
+    // Build context from all available info
+    const contextInfo = [];
+    if (instagramLocation) contextInfo.push(`📍 INSTAGRAM LOCATION TAG: "${instagramLocation}" (USE THIS!)`);
+    if (caption) contextInfo.push(`Caption: "${caption}"`);
+    if (hashtags && hashtags.length > 0) contextInfo.push(`Hashtags: ${hashtags.join(' ')}`);
+    if (userDescription) contextInfo.push(`User note: "${userDescription}"`);
+    
+    const fullContext = contextInfo.join('\n');
+    
+    const results = new Array(framePaths.length);
+    const framesBase64 = includeFrameData ? new Array(framePaths.length) : [];
+    let nextIndex = 0;
+
+    const processNext = async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= framePaths.length) return;
+
+        console.log(`📊 Analyzing frame ${index + 1}/${framePaths.length}...`);
+        let frameData = null;
+
+        if (includeFrameData) {
+          try {
+            frameData = await fs.readFile(framePaths[index], 'base64');
+            framesBase64[index] = {
+              frameNumber: index + 1,
+              base64: frameData,
+              path: framePaths[index]
+            };
+          } catch (err) {
+            console.error(`Failed to read frame ${index + 1}:`, err.message);
+          }
+        }
+
+        const analysis = await this.analyzeFrame(
+          framePaths[index],
+          index + 1,
+          framePaths.length,
+          fullContext,
+          { location: instagramLocation, hashtags: hashtags },
+          frameData
+        );
+        results[index] = analysis;
+
+        // TEMP: Keep frames to verify extraction is working
+        // try {
+        //   await fs.unlink(framePaths[index]);
+        //   console.log(`🗑️ Cleaned frame ${index + 1}`);
+        // } catch (e) {
+        //   console.error(`Failed to cleanup frame ${index + 1}:`, e.message);
+        // }
+
+        if (global.gc) global.gc();
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < concurrency; i++) {
+      workers.push(processNext());
+    }
+    await Promise.all(workers);
+
+    console.log('✅ All frames analyzed!');
+    return {
+      analyses: results.filter(Boolean),
+      frames: includeFrameData ? framesBase64.filter(Boolean) : []
+    };
+  }
+  
+  /**
+   * Analyze frames with full context (caption + hashtags) - PARALLEL VERSION (kept for reference)
+   */
+  async analyzeAllFramesWithContext(framePaths, userDescription, caption, hashtags) {
+    console.log(`🔍 Analyzing ${framePaths.length} frames with full context...`);
+    
+    // Build context from all available info
+    const contextInfo = [];
+    if (caption) contextInfo.push(`Caption: "${caption}"`);
+    if (hashtags && hashtags.length > 0) contextInfo.push(`Hashtags: ${hashtags.join(' ')}`);
+    if (userDescription) contextInfo.push(`User note: "${userDescription}"`);
+    
+    const fullContext = contextInfo.join('\n');
+    
+    const analysisPromises = framePaths.map((framePath, index) =>
+      this.analyzeFrame(framePath, index + 1, framePaths.length, fullContext)
+    );
+    
+    const results = await Promise.all(analysisPromises);
+    console.log('✅ All frames analyzed with context!');
+    
+    return results;
+  }
+
+  /**
+   * Cleanup temporary files (most are already cleaned sequentially)
+   */
+  async cleanup(videoPath, framePaths) {
+    console.log('🧹 Final cleanup check...');
+    
+    // Only frames to delete now (no video!)
+    const filesToDelete = [...framePaths].filter(Boolean);
+    
+    let deletedCount = 0;
+    for (const file of filesToDelete) {
+      try {
+        await fs.unlink(file);
+        deletedCount++;
+        console.log(`🗑️ Deleted: ${path.basename(file)}`);
+      } catch (error) {
+        // File already deleted sequentially - no problem
+        if (error.code !== 'ENOENT') {
+          console.error(`Failed to delete ${file}:`, error.message);
+        }
+      }
+    }
+    
+    console.log(`✅ Cleanup complete (${deletedCount} files remaining)`);
+  }
+}
+
+module.exports = new VideoAnalyzer();
