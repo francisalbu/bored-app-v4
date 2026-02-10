@@ -42,12 +42,15 @@ export function useViatorExperiences(location: string, categoryFilter: string | 
         ? [categoryFilter] 
         : (favoriteCategories.length > 0 ? favoriteCategories : undefined);
       
-      console.log('🔄 Fetching Viator experiences...', { location, tags: tagsToUse, categoryFilter });
+      // Increase limit when showing all categories (no filter) to have more variety
+      const limit = !categoryFilter && favoriteCategories.length > 0 ? 20 : 10;
+      
+      console.log('🔄 Fetching Viator experiences...', { location, tags: tagsToUse, categoryFilter, limit });
       
       const response = await apiService.getViatorExperiences(
         location,
         tagsToUse,
-        10 // Get 10 experiences minimum
+        limit
       );
       
       if (!response.success) {

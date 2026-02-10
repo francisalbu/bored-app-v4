@@ -572,7 +572,7 @@ Return JSON only:
   async analyzeFramesWithVision(frames) {
     try {
       const envConcurrency = Number.parseInt(process.env.VIDEO_ANALYSIS_CONCURRENCY || '', 10);
-      const concurrency = Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : 2;
+      const concurrency = Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : 10;
       const visionModel = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
       
       console.log(`🔍 Analyzing ${frames.length} frames with concurrency=${concurrency}, model=${visionModel}`);
@@ -584,8 +584,6 @@ Return JSON only:
         while (true) {
           const index = nextIndex++;
           if (index >= frames.length) return;
-          
-          console.log(`📊 Analyzing frame ${index + 1}/${frames.length}...`);
           
           const messages = [{
             role: 'user',

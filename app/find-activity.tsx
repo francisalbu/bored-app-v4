@@ -786,7 +786,7 @@ export default function FindActivityScreen() {
         preloadedAnalysis.activity,
         preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
         preloadedAnalysis.location || userLocation,
-        preloadedAnalysis.thumbnailUrl || null
+        thumbnailUrl || preloadedAnalysis.thumbnailUrl || null
       );
       return;
     }
@@ -820,7 +820,7 @@ export default function FindActivityScreen() {
         preloadedAnalysis.activity,
         preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
         preloadedAnalysis.location || userLocation,
-        preloadedAnalysis.thumbnailUrl || null
+        thumbnailUrl || preloadedAnalysis.thumbnailUrl || null
       );
     } else if (!preloadedExperiences && instagramUrl && !hasFetchedSections) {
       initialSetupDone.current = true;

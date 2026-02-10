@@ -122,6 +122,13 @@ router.get('/viator', optionalAuth, async (req, res, next) => {
     const allExperiences = [];
     const seenProductCodes = new Set();
     
+    // Determine how many experiences to fetch per tag based on total limit
+    const experiencesPerTag = Math.ceil(parseInt(limit) / Math.max(userTags.length, 1));
+    const minPerTag = 5;
+    const resultsPerTag = Math.max(minPerTag, experiencesPerTag);
+    
+    console.log(`📊 Fetching ${resultsPerTag} experiences per tag (${userTags.length} tags, limit: ${limit})`);
+    
     for (const tag of userTags) {
       console.log(`  🏷️ Searching Viator for tag: "${tag}" in ${location}...`);
       
@@ -141,7 +148,7 @@ router.get('/viator', optionalAuth, async (req, res, next) => {
           searchActivity,
           location,
           'EUR',
-          5 // Get 5 per tag, then we'll limit total
+          resultsPerTag
         );
         
         // Add to results, avoiding duplicates

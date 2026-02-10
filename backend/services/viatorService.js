@@ -364,9 +364,6 @@ class ViatorService {
 
     const highestQuality = sortedVariants[0];
     
-    // Log the selected variant dimensions for debugging
-    logger.info(`📸 Selected image variant: ${highestQuality.width}x${highestQuality.height} (${Math.round((highestQuality.width * highestQuality.height) / 1000)}K pixels)`);
-
     // Return the URL of the highest resolution variant
     return highestQuality?.url || null;
   }

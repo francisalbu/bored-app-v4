@@ -92,14 +92,18 @@ export default function ExploreScreen() {
       isViator: true
     }));
     
-    const boredMapped = filteredExperiences.map(exp => ({
+    // Only show Bored experiences when location is Lisbon
+    const isLisbon = selectedLocation.toLowerCase().includes('lisbon') || 
+                     selectedLocation.toLowerCase().includes('lisboa');
+    
+    const boredMapped = isLisbon ? filteredExperiences.map(exp => ({
       ...exp,
       isViator: false
-    }));
+    })) : [];
     
-    // Bored experiences first, then Viator
+    // Bored experiences first (only for Lisbon), then Viator
     return [...boredMapped, ...viatorMapped];
-  }, [filteredExperiences, viatorExperiences]);
+  }, [filteredExperiences, viatorExperiences, selectedLocation]);
 
   // Sort combined experiences by price
   const sortedExperiences = [...combinedExperiences].sort((a, b) => {
@@ -248,6 +252,17 @@ export default function ExploreScreen() {
             </Pressable>
           </ScrollView>
         </View>
+        
+        {/* Info message when not in Lisbon */}
+        {!selectedLocation.toLowerCase().includes('lisbon') && 
+         !selectedLocation.toLowerCase().includes('lisboa') && 
+         sortedExperiences.length > 0 && (
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationInfoText}>
+              Showing experiences powered by Viator in {selectedLocation}
+            </Text>
+          </View>
+        )}
         
         <View style={styles.grid}>
           {sortedExperiences.map((experience) => (
@@ -489,6 +504,22 @@ const styles = StyleSheet.create({
   },
   sortTextActive: {
     color: colors.dark.background,
+  },
+  locationInfo: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: 'rgba(255, 217, 0, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 217, 0, 0.3)',
+  },
+  locationInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.dark.primary,
+    textAlign: 'center',
   },
   content: {
     flex: 1,

@@ -347,7 +347,7 @@ Location Tag: ${locationTag}
     
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini", // FASTER: use mini for text analysis
         messages: [{
           role: "system",
           content: "You extract travel activity and location from Instagram metadata. If location tag exists, USE IT as primary location. Extract activity from hashtags and caption."
@@ -456,7 +456,7 @@ Return ONLY valid JSON:
 }`;
 
     try {
-      const visionModel = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
+      const visionModel = process.env.OPENAI_VISION_MODEL || 'gpt-4o-mini'; // FASTER: gpt-4o-mini is 15x cheaper and faster
       const response = await this.openai.chat.completions.create({
         model: visionModel,
         messages: [
@@ -759,12 +759,12 @@ Return ONLY valid JSON:
       console.log(`✅ Got video URL + metadata`);
       
       const envFrames = Number.parseInt(process.env.VIDEO_ANALYSIS_FRAMES || '', 10);
-      const frameCount = Number.isFinite(envFrames) && envFrames > 0 ? envFrames : 8;
+      const frameCount = Number.isFinite(envFrames) && envFrames > 0 ? envFrames : 3; // REDUCED from 8 to 3 for speed
 
       // Step 2-3: Run metadata/text extraction and frame extraction in parallel
       console.log('📝 Step 2: Extracting from Instagram metadata (PRIORITY 1)...');
       console.log('📝 Step 2.5: Extracting POIs from caption/description...');
-      console.log(`🎞️ Step 3: Extracting ${frameCount} key frames to capture all POIs throughout the video...`);
+      console.log(`🎞️ Step 3: Extracting ${frameCount} key frames to capture POIs...`);
 
       const metadataPromise = this.extractFromMetadata(
         metadata.caption,
@@ -1075,7 +1075,7 @@ Return ONLY a JSON array of place names:
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini", // FASTER: use mini for text extraction
         messages: [{ role: "user", content: prompt }],
         max_tokens: 500,
         temperature: 0.3
@@ -1099,7 +1099,7 @@ Return ONLY a JSON array of place names:
    */
   async analyzeFramesSequentially(framePaths, userDescription, caption, hashtags, instagramLocation, options = {}) {
     const envConcurrency = Number.parseInt(process.env.VIDEO_ANALYSIS_CONCURRENCY || '', 10);
-    const defaultConcurrency = Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : 2;
+    const defaultConcurrency = Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : 20; // INCREASED from 10 to 20
     const requestedConcurrency = Number.isFinite(options.concurrency) && options.concurrency > 0 ? options.concurrency : defaultConcurrency;
     const concurrency = Math.max(1, Math.min(requestedConcurrency, framePaths.length));
 

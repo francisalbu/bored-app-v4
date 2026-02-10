@@ -108,6 +108,7 @@ export function SuggestActivityModal({
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <Pressable style={styles.overlay} onPress={handleClose} />
         <View style={styles.content}>
@@ -120,7 +121,10 @@ export function SuggestActivityModal({
 
           <ScrollView
             style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
             <Text style={styles.subtitle}>
               Know an amazing activity we should feature? Share it with us!
@@ -224,6 +228,9 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 40,
