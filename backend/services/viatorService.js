@@ -551,10 +551,12 @@ class ViatorService {
     try {
       logger.info(`🔍 Fetching Viator product details for: ${productCode}`);
 
+      // Use the products bulk endpoint to get product details
       const response = await axios.post(
-        `${this.apiUrl}/products/modified-since`,
+        `${this.apiUrl}/products`,
         {
-          productCodes: [productCode]
+          productCodes: [productCode],
+          currency: 'EUR'
         },
         {
           headers: {
@@ -567,12 +569,23 @@ class ViatorService {
         }
       );
 
-      if (!response.data?.products || response.data.products.length === 0) {
+      logger.info(`📦 Viator API response status: ${response.status}`);
+      logger.info(`📦 Response data structure:`, JSON.stringify(response.data, null, 2).substring(0, 500));
+
+      if (!response.data || response.data.length === 0) {
+        logger.warn(`Product ${productCode} not found in response`);
+        return null;
+      }
+
+      // The /products endpoint returns an array directly
+      const product = Array.isArray(response.data) ? response.data[0] : response.data;
+      
+      if (!product) {
         logger.warn(`Product ${productCode} not found`);
         return null;
       }
 
-      const product = response.data.products[0];
+      logger.info(`✅ Found product: ${product.title || 'Unknown title'}`);
 
       // Extract all images with highest quality
       const images = [];
