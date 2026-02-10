@@ -47,7 +47,7 @@ export function useViatorExperiences(location: string, categoryFilter: string | 
       const response = await apiService.getViatorExperiences(
         location,
         tagsToUse,
-        20 // Get 20 experiences when filtering by category
+        10 // Get 10 experiences minimum
       );
       
       if (!response.success) {

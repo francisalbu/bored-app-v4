@@ -84,8 +84,25 @@ export default function ExploreScreen() {
     return matchesSearch && (matchesCategory || matchesTag);
   });
 
-  // Sort experiences by price
-  const sortedExperiences = [...filteredExperiences].sort((a, b) => {
+  // Combine Bored and Viator experiences (Bored first, then Viator)
+  const combinedExperiences = useMemo(() => {
+    // Map Viator experiences to have a consistent structure
+    const viatorMapped = viatorExperiences.map(exp => ({
+      ...exp,
+      isViator: true
+    }));
+    
+    const boredMapped = filteredExperiences.map(exp => ({
+      ...exp,
+      isViator: false
+    }));
+    
+    // Bored experiences first, then Viator
+    return [...boredMapped, ...viatorMapped];
+  }, [filteredExperiences, viatorExperiences]);
+
+  // Sort combined experiences by price
+  const sortedExperiences = [...combinedExperiences].sort((a, b) => {
     if (sortBy === 'price-low') {
       return (a.price || 0) - (b.price || 0);
     } else if (sortBy === 'price-high') {
@@ -234,26 +251,13 @@ export default function ExploreScreen() {
         
         <View style={styles.grid}>
           {sortedExperiences.map((experience) => (
-            <ExperienceCard key={experience.id} experience={experience} />
+            experience.isViator ? (
+              <ViatorCard key={experience.id} experience={experience} />
+            ) : (
+              <ExperienceCard key={experience.id} experience={experience} />
+            )
           ))}
         </View>
-
-        {/* Viator Experiences - Show when category is selected or all */}
-        {viatorExperiences.length > 0 && (
-          <>
-            <View style={styles.viatorHeader}>
-              <Text style={styles.sectionTitle}>MORE OPTIONS</Text>
-              <Text style={styles.viatorSubtitle}>
-                Powered by Viator • Similar experiences
-              </Text>
-            </View>
-            <View style={styles.grid}>
-              {viatorExperiences.map((experience) => (
-                <ViatorCard key={experience.id} experience={experience} />
-              ))}
-            </View>
-          </>
-        )}
 
         {/* Show loading state for Viator */}
         {viatorLoading && (
