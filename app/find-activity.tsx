@@ -22,6 +22,7 @@ import * as Location from 'expo-location';
 import colors from '@/constants/colors';
 import api from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
 
 // Import activities database with destinations and photos
 import activitiesDatabase from '@/assets/COMPLETE_ACTIVITIES_DATABASE_WITH_PHOTOS.json';
@@ -190,6 +191,31 @@ export default function FindActivityScreen() {
       
       await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(trimmedHistory));
       console.log('✅ Saved to history:', activity, processedThumbnail ? '(with thumbnail)' : '(without thumbnail - will use activity image)');
+      
+      // ALSO save to Supabase for centralized tracking
+      try {
+        const deviceId = Application.androidId || await Application.getIosIdForVendorAsync() || 'unknown';
+        
+        const analysisData = params.analysis ? JSON.parse(params.analysis as string) : null;
+        const experiencesData = params.experiences ? JSON.parse(params.experiences as string) : null;
+        
+        await api.post('/search-history', {
+          device_id: deviceId,
+          activity,
+          full_activity: fullActivity,
+          location,
+          instagram_url: params.instagramUrl as string || '',
+          thumbnail_url: processedThumbnail,
+          analysis_type: analysisData?.type || 'activity',
+          experiences: experiencesData,
+          analysis: analysisData,
+        });
+        
+        console.log('📊 Saved to Supabase search history');
+      } catch (supabaseError) {
+        console.error('Failed to save to Supabase (non-critical):', supabaseError);
+        // Don't throw - local save is still successful
+      }
     } catch (error) {
       console.error('Failed to save to history:', error);
     }
@@ -815,18 +841,22 @@ export default function FindActivityScreen() {
         console.log('📍 Suggested locations from database:', destinations.length);
       }
       
-      // Save to history
-      const thumbnailToSave = thumbnailUrl || preloadedAnalysis.thumbnailUrl || null;
-      console.log('🎯 CALLING saveToHistory with:');
-      console.log('  - Activity:', preloadedAnalysis.activity);
-      console.log('  - Thumbnail:', thumbnailToSave ? (thumbnailToSave.startsWith('http') ? 'URL: ' + thumbnailToSave.substring(0, 80) : 'BASE64 (' + Math.round(thumbnailToSave.length/1024) + 'KB)') : 'NULL');
-      
-      saveToHistory(
-        preloadedAnalysis.activity,
-        preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
-        preloadedAnalysis.location || userLocation,
-        thumbnailToSave
-      );
+      // Save to history (ONLY activities, NOT landscapes)
+      if (preloadedAnalysis.type !== 'landscape') {
+        const thumbnailToSave = thumbnailUrl || preloadedAnalysis.thumbnailUrl || null;
+        console.log('🎯 CALLING saveToHistory with:');
+        console.log('  - Activity:', preloadedAnalysis.activity);
+        console.log('  - Thumbnail:', thumbnailToSave ? (thumbnailToSave.startsWith('http') ? 'URL: ' + thumbnailToSave.substring(0, 80) : 'BASE64 (' + Math.round(thumbnailToSave.length/1024) + 'KB)') : 'NULL');
+        
+        saveToHistory(
+          preloadedAnalysis.activity,
+          preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
+          preloadedAnalysis.location || userLocation,
+          thumbnailToSave
+        );
+      } else {
+        console.log('🏞️ Landscape detected - NOT saving to history');
+      }
       return;
     }
     
@@ -854,18 +884,22 @@ export default function FindActivityScreen() {
       fetchRecommendations();
       setHasFetchedSections(true);
       
-      // Save to history
-      const thumbnailToSave = thumbnailUrl || preloadedAnalysis.thumbnailUrl || null;
-      console.log('🎯 CALLING saveToHistory with:');
-      console.log('  - Activity:', preloadedAnalysis.activity);
-      console.log('  - Thumbnail:', thumbnailToSave ? (thumbnailToSave.startsWith('http') ? 'URL: ' + thumbnailToSave.substring(0, 80) : 'BASE64 (' + Math.round(thumbnailToSave.length/1024) + 'KB)') : 'NULL');
-      
-      saveToHistory(
-        preloadedAnalysis.activity,
-        preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
-        preloadedAnalysis.location || userLocation,
-        thumbnailToSave
-      );
+      // Save to history (ONLY activities, NOT landscapes)
+      if (preloadedAnalysis.type !== 'landscape') {
+        const thumbnailToSave = thumbnailUrl || preloadedAnalysis.thumbnailUrl || null;
+        console.log('🎯 CALLING saveToHistory with:');
+        console.log('  - Activity:', preloadedAnalysis.activity);
+        console.log('  - Thumbnail:', thumbnailToSave ? (thumbnailToSave.startsWith('http') ? 'URL: ' + thumbnailToSave.substring(0, 80) : 'BASE64 (' + Math.round(thumbnailToSave.length/1024) + 'KB)') : 'NULL');
+        
+        saveToHistory(
+          preloadedAnalysis.activity,
+          preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
+          preloadedAnalysis.location || userLocation,
+          thumbnailToSave
+        );
+      } else {
+        console.log('🏞️ Landscape detected - NOT saving to history');
+      }
     } else if (!preloadedExperiences && instagramUrl && !hasFetchedSections) {
       initialSetupDone.current = true;
       console.log('⚠️ No preloaded data, but we have URL - will fetch');
