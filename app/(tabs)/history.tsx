@@ -142,6 +142,18 @@ export default function HistoryScreen() {
       const historyJson = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
       if (historyJson) {
         const historyData = JSON.parse(historyJson);
+        
+        // DEBUG: Log each item's thumbnail
+        console.log('🔍 LOADING HISTORY - DEBUG:');
+        historyData.forEach((item: HistoryItem, index: number) => {
+          const thumbPreview = item.thumbnail 
+            ? (item.thumbnail.startsWith('http') 
+                ? `URL: ${item.thumbnail.substring(0, 60)}...` 
+                : `BASE64: ${item.thumbnail.substring(0, 50)}...`)
+            : 'NULL';
+          console.log(`[${index}] ${item.activity}: ${thumbPreview}`);
+        });
+        
         // Sort by lastSearched (most recent first)
         const sorted = historyData.sort((a: HistoryItem, b: HistoryItem) => 
           new Date(b.lastSearched).getTime() - new Date(a.lastSearched).getTime()
@@ -339,6 +351,9 @@ export default function HistoryScreen() {
     const activityImages: { [key: string]: string } = {
       'surfing': 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&h=600&fit=crop',
       'surf': 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&h=600&fit=crop',
+      'sandboarding': 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop',
+      'sandboard': 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop',
+      'sand': 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop',
       'hiking': 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=600&fit=crop',
       'cooking': 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=400&h=600&fit=crop',
       'diving': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=600&fit=crop',
@@ -352,10 +367,12 @@ export default function HistoryScreen() {
       'ziplining': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
       'paragliding': 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=400&h=600&fit=crop',
       'skydiving': 'https://images.unsplash.com/photo-1521651201144-634f700b36ef?w=400&h=600&fit=crop',
-      // Add more mappings as needed
+      'biking': 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=400&h=600&fit=crop',
+      'cycling': 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=400&h=600&fit=crop',
     };
 
     const normalizedActivity = activity.toLowerCase();
+    
     for (const [key, image] of Object.entries(activityImages)) {
       if (normalizedActivity.includes(key)) {
         return image;
@@ -396,7 +413,8 @@ export default function HistoryScreen() {
     }
     
     // Fallback chain: thumbnail → activity image → generic placeholder
-    const finalImageUrl = imageUrl || getActivityImage(item.activity) || 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop';
+    const activityImage = getActivityImage(item.activity);
+    const finalImageUrl = imageUrl || activityImage || 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop';
 
     return (
       <TouchableOpacity

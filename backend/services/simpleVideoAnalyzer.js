@@ -283,16 +283,20 @@ class SimpleVideoAnalyzer {
         console.log('✅ Landscape type - always valid');
       }
       
-      // Use first frame as thumbnail if no thumbnail from provider
-      // CRITICAL: Always ensure we have a thumbnail - prefer videoData.thumbnailUrl, fallback to first frame
-      let finalThumbnail = videoData.thumbnailUrl || (frames.length > 0 ? frames[0] : null);
+      // CRITICAL: ALWAYS use first frame, NEVER use Instagram CDN URLs (they expire)
+      // Priority: 1) First frame (base64), 2) Provider URL (only if NOT Instagram)
+      let finalThumbnail = null;
       
-      // If still no thumbnail, log error (this shouldn't happen if frames were extracted)
-      if (!finalThumbnail) {
-        console.error('⚠️ WARNING: No thumbnail available - neither from provider nor from frames!');
+      if (frames.length > 0) {
+        // Always prefer first frame
+        finalThumbnail = frames[0];
+        console.log(`✅ Using first frame as thumbnail (${Math.round(frames[0].length/1024)}KB base64)`);
+      } else if (videoData.thumbnailUrl && !videoData.thumbnailUrl.includes('cdninstagram')) {
+        // Only use provider URL if NOT Instagram and no frames available
+        finalThumbnail = videoData.thumbnailUrl;
+        console.log(`✅ Using provider URL as thumbnail (not Instagram)`);
       } else {
-        const thumbnailSource = videoData.thumbnailUrl ? 'provider' : 'first frame';
-        console.log(`✅ Thumbnail ready (source: ${thumbnailSource})`);
+        console.error('⚠️ WARNING: No thumbnail available - no frames and provider URL is Instagram (expires)!');
       }
       
       return {

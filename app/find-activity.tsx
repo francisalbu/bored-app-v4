@@ -130,18 +130,33 @@ export default function FindActivityScreen() {
       // Check if activity already exists
       const existingIndex = history.findIndex((item: any) => item.activity === activity);
       
-      // Process thumbnail: if it's base64 and too large, keep URL or skip
-      // AsyncStorage has limits (~6MB on iOS), and base64 images can be 200KB+
+      // Process thumbnail: 
+      // 1. NEVER save Instagram CDN URLs (they expire)
+      // 2. Only save base64 if < 75KB
+      // 3. Otherwise null → will use activity image fallback
       let processedThumbnail = thumbnail;
-      if (thumbnail && !thumbnail.startsWith('http')) {
-        // It's base64 - check size
-        const base64Size = thumbnail.length;
-        if (base64Size > 100000) { // > ~75KB when decoded
-          console.log(`⚠️ Base64 thumbnail too large (${Math.round(base64Size/1024)}KB) - not saving to history`);
+      
+      if (thumbnail) {
+        // Check if it's an Instagram CDN URL (these expire!)
+        if (thumbnail.startsWith('http') && thumbnail.includes('cdninstagram')) {
+          console.log('⚠️ Instagram CDN URL detected - not saving (will expire). Using fallback.');
           processedThumbnail = null; // Will fallback to activity image in history.tsx
+        } else if (thumbnail.startsWith('http')) {
+          // Other HTTP URLs (not Instagram) - keep them
+          console.log('✅ External URL thumbnail - saving:', thumbnail.substring(0, 80));
+          processedThumbnail = thumbnail;
         } else {
-          console.log(`✅ Base64 thumbnail OK (${Math.round(base64Size/1024)}KB)`);
+          // It's base64 - check size
+          const base64Size = thumbnail.length;
+          if (base64Size > 100000) { // > ~75KB when decoded
+            console.log(`⚠️ Base64 thumbnail too large (${Math.round(base64Size/1024)}KB) - not saving to history`);
+            processedThumbnail = null; // Will fallback to activity image in history.tsx
+          } else {
+            console.log(`✅ Base64 thumbnail OK (${Math.round(base64Size/1024)}KB) - saving for ${activity}`);
+          }
         }
+      } else {
+        console.log(`⚠️ No thumbnail provided for ${activity}`);
       }
       
       const historyItem = {
@@ -157,12 +172,16 @@ export default function FindActivityScreen() {
         instagramUrl: params.instagramUrl as string || '',
       };
       
+      console.log(`💾 Saving to history: ${activity}, thumbnail: ${processedThumbnail ? (processedThumbnail.startsWith('http') ? 'URL' : 'base64') : 'NULL'}`);
+      
       if (existingIndex >= 0) {
-        // Update existing item
+        // Update existing item - ALWAYS update thumbnail with new one
         history[existingIndex] = historyItem;
+        console.log(`♻️ Updated existing activity: ${activity}`);
       } else {
         // Add new item
         history.unshift(historyItem);
+        console.log(`➕ Added new activity: ${activity}`);
       }
       
       // Keep only last 50 searches
@@ -796,11 +815,16 @@ export default function FindActivityScreen() {
       }
       
       // Save to history
+      const thumbnailToSave = thumbnailUrl || preloadedAnalysis.thumbnailUrl || null;
+      console.log('🎯 CALLING saveToHistory with:');
+      console.log('  - Activity:', preloadedAnalysis.activity);
+      console.log('  - Thumbnail:', thumbnailToSave ? (thumbnailToSave.startsWith('http') ? 'URL: ' + thumbnailToSave.substring(0, 80) : 'BASE64 (' + Math.round(thumbnailToSave.length/1024) + 'KB)') : 'NULL');
+      
       saveToHistory(
         preloadedAnalysis.activity,
         preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
         preloadedAnalysis.location || userLocation,
-        thumbnailUrl || preloadedAnalysis.thumbnailUrl || null
+        thumbnailToSave
       );
       return;
     }
@@ -830,11 +854,16 @@ export default function FindActivityScreen() {
       setHasFetchedSections(true);
       
       // Save to history
+      const thumbnailToSave = thumbnailUrl || preloadedAnalysis.thumbnailUrl || null;
+      console.log('🎯 CALLING saveToHistory with:');
+      console.log('  - Activity:', preloadedAnalysis.activity);
+      console.log('  - Thumbnail:', thumbnailToSave ? (thumbnailToSave.startsWith('http') ? 'URL: ' + thumbnailToSave.substring(0, 80) : 'BASE64 (' + Math.round(thumbnailToSave.length/1024) + 'KB)') : 'NULL');
+      
       saveToHistory(
         preloadedAnalysis.activity,
         preloadedAnalysis.fullActivity || preloadedAnalysis.activity,
         preloadedAnalysis.location || userLocation,
-        thumbnailUrl || preloadedAnalysis.thumbnailUrl || null
+        thumbnailToSave
       );
     } else if (!preloadedExperiences && instagramUrl && !hasFetchedSections) {
       initialSetupDone.current = true;
