@@ -515,22 +515,18 @@ ${JSON.stringify(experiencesForAI, null, 2)}`;
         return { ...exp, matchScore: score };
       });
       
-      // FLEXIBLE FILTER for Bored Tourist: Show similar activities
-      // Score >= 50 is good enough (snorkeling can show diving, quad can show buggy)
-      let MINIMUM_SCORE = 50;
+      // STRICT FILTER for Bored Tourist: ONLY show if there's a REAL match
+      // Score >= 60 means it's truly related (same activity or very similar)
+      // NO FALLBACKS - if we don't have it, don't show random experiences!
+      const MINIMUM_SCORE = 60;
       let filtered = scoredExperiences.filter(exp => exp.matchScore >= MINIMUM_SCORE);
       
-      // If no results, lower threshold to 30 (more permissive for Bored Tourist)
+      // If no matches with score >= 60, return EMPTY array
+      // Better to show NOTHING than to show irrelevant experiences
       if (filtered.length === 0) {
-        MINIMUM_SCORE = 30;
-        filtered = scoredExperiences.filter(exp => exp.matchScore >= MINIMUM_SCORE);
-        console.log(`   Lowered threshold to ${MINIMUM_SCORE} (Bored Tourist mode), found ${filtered.length} matches`);
-      }
-      
-      // Last resort - if still nothing, show top 3 by score
-      if (filtered.length === 0 && scoredExperiences.length > 0) {
-        filtered = scoredExperiences.slice(0, 3);
-        console.log(`   No matches - showing top ${filtered.length} experiences by relevance`);
+        console.log(`   ❌ No quality matches found (minimum score ${MINIMUM_SCORE} required)`);
+        console.log(`   Top scores were: ${scoredExperiences.slice(0, 3).map(e => `${e.title}: ${e.matchScore}`).join(', ')}`);
+        return []; // Return empty - Viator will handle it
       }
       
       sortedExperiences = filtered

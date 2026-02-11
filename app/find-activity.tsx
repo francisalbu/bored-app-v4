@@ -1332,8 +1332,8 @@ export default function FindActivityScreen() {
             </View>
           )}
           
-          {/* Near You Section - Only show when not in specific location AND not landscape AND not boring */}
-          {!isSpecificLocation && analysis?.type !== 'landscape' && analysis?.type !== 'boring' && (
+          {/* Near You Section - Only show when: not in specific location, not landscape, not boring, AND has experiences */}
+          {!isSpecificLocation && analysis?.type !== 'landscape' && analysis?.type !== 'boring' && nearYouExperiences.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.nearYouHeader}>
                 <Pressable 

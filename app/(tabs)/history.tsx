@@ -23,6 +23,9 @@ import { Clock, Trash2, Plus, X } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import apiService from '@/services/api';
 
+// Import 200 activities with Pexels photos
+import activitiesPhotosData from '@/assets/activities_200_pexels_photos.json';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2; // 2 columns with padding
 
@@ -220,9 +223,9 @@ export default function HistoryScreen() {
     Keyboard.dismiss();
 
     try {
-      console.log('🎬 Step 1: Calling experience-recommendations API...');
+      console.log('🎬 Calling experience-recommendations API...');
       
-      // Step 1: Analyze the video and get initial recommendations
+      // Call API to analyze video and get recommendations (same as shared-content.tsx)
       const response = await apiService.post('/experience-recommendations', {
         instagramUrl: urlToAnalyze,
         userLocation: 'Lisboa'
@@ -253,8 +256,6 @@ export default function HistoryScreen() {
         
         const originalActivity = response.data.analysis.activity;
         const baseActivity = originalActivity ? getBaseActivity(originalActivity) : null;
-        const reelLocation = response.data.analysis.location;
-        const isLandscape = response.data.analysis.type === 'landscape';
         
         const processedAnalysis = {
           ...response.data.analysis,
@@ -263,55 +264,10 @@ export default function HistoryScreen() {
         };
         
         console.log('🎯 Base activity:', baseActivity);
-        console.log('🌍 Reel location:', reelLocation);
-        console.log('🏔️ Is landscape:', isLandscape);
+        console.log('🏔️ Analysis type:', response.data.analysis.type);
         
-        // For landscapes, we already have what we need
-        if (isLandscape) {
-          console.log('🏔️ Landscape mode - navigating with initial data');
-          setInstagramLink('');
-          router.replace({
-            pathname: '/find-activity',
-            params: {
-              instagramUrl: urlToAnalyze,
-              thumbnail: response.data.analysis?.thumbnailUrl || '',
-              activity: '',
-              experiences: JSON.stringify(response.data.experiences),
-              nearYouExperiences: JSON.stringify(response.data.experiences),
-              reelExperiences: JSON.stringify([]),
-              analysis: JSON.stringify(processedAnalysis),
-              allDataLoaded: 'true'
-            }
-          });
-          return;
-        }
-        
-        // Step 2: Fetch Near You and As Seen on Reel in parallel
-        console.log('🎬 Step 2: Fetching Near You and As Seen on Reel...');
-        
-        const [nearYouResponse, reelResponse] = await Promise.all([
-          // Near You: activity + user location (Lisboa)
-          apiService.post('/experience-recommendations/by-activity', {
-            activity: baseActivity,
-            userLocation: 'Lisboa',
-            strictActivityMatch: true,
-            prioritizeBored: true
-          }),
-          // As Seen on Reel: full activity + reel location
-          apiService.post('/experience-recommendations/by-activity', {
-            activity: originalActivity,
-            userLocation: reelLocation || null,
-            prioritizeBored: false
-          })
-        ]);
-        
-        const nearYouExperiences = nearYouResponse.data?.experiences || response.data.experiences || [];
-        const reelExperiences = reelResponse.data?.experiences || [];
-        
-        console.log('✅ Near You:', nearYouExperiences.length, 'experiences');
-        console.log('✅ As Seen on Reel:', reelExperiences.length, 'experiences');
-        
-        // Navigate with ALL data ready
+        // Navigate to find-activity with initial data (same as shared-content)
+        // The find-activity screen will handle fetching the 3 sections
         setInstagramLink('');
         router.replace({
           pathname: '/find-activity',
@@ -320,10 +276,8 @@ export default function HistoryScreen() {
             thumbnail: response.data.analysis?.thumbnailUrl || '',
             activity: baseActivity || '',
             experiences: JSON.stringify(response.data.experiences),
-            nearYouExperiences: JSON.stringify(nearYouExperiences),
-            reelExperiences: JSON.stringify(reelExperiences),
             analysis: JSON.stringify(processedAnalysis),
-            allDataLoaded: 'true' // Flag to skip additional fetches
+            from: 'history' // Mark that we came from history screen
           }
         });
       } else {
@@ -347,39 +301,49 @@ export default function HistoryScreen() {
   };
 
   const getActivityImage = (activity: string) => {
-    // Map activities to representative images
-    const activityImages: { [key: string]: string } = {
-      'surfing': 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&h=600&fit=crop',
-      'surf': 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&h=600&fit=crop',
-      'sandboarding': 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop',
-      'sandboard': 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop',
-      'sand': 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop',
-      'hiking': 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=600&fit=crop',
-      'cooking': 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=400&h=600&fit=crop',
-      'diving': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=600&fit=crop',
-      'scuba': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=600&fit=crop',
-      'climbing': 'https://images.unsplash.com/photo-1522163182402-834f871fd851?w=400&h=600&fit=crop',
-      'kayak': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=600&fit=crop',
-      'yoga': 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=600&fit=crop',
-      'zip': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
-      'zipline': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
-      'zip-line': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
-      'ziplining': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=600&fit=crop',
-      'paragliding': 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=400&h=600&fit=crop',
-      'skydiving': 'https://images.unsplash.com/photo-1521651201144-634f700b36ef?w=400&h=600&fit=crop',
-      'biking': 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=400&h=600&fit=crop',
-      'cycling': 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=400&h=600&fit=crop',
-    };
-
-    const normalizedActivity = activity.toLowerCase();
+    // Use 200 activities database with Pexels photos
+    // Smart matching: "snorkeling with mantas" → finds "snorkeling"
     
-    for (const [key, image] of Object.entries(activityImages)) {
-      if (normalizedActivity.includes(key)) {
-        return image;
-      }
+    if (!activity) return null;
+    
+    const normalizedSearch = activity.toLowerCase().trim();
+    
+    // Try exact match first (case insensitive)
+    let found = activitiesPhotosData.activities.find(
+      (a: any) => a.activity.toLowerCase() === normalizedSearch
+    );
+    
+    // If no exact match, try partial match (e.g., "snorkeling with mantas" matches "snorkeling")
+    if (!found) {
+      found = activitiesPhotosData.activities.find(
+        (a: any) => {
+          const activityName = a.activity.toLowerCase();
+          // Check if search contains activity name (e.g., "snorkeling with mantas" contains "snorkeling")
+          return normalizedSearch.includes(activityName) || activityName.includes(normalizedSearch);
+        }
+      );
     }
-
-    // Return null so the fallback in renderHistoryCard works
+    
+    // If still no match, try word-by-word matching (e.g., "paddle boarding" matches "Paddle Boarding")
+    if (!found) {
+      const searchWords = normalizedSearch.split(/[\s\-_]+/); // Split by space, dash, underscore
+      found = activitiesPhotosData.activities.find(
+        (a: any) => {
+          const activityWords = a.activity.toLowerCase().split(/[\s\-_]+/);
+          // Check if any significant word matches (skip words < 4 chars)
+          return searchWords.some(sw => 
+            sw.length >= 4 && activityWords.some(aw => aw.includes(sw) || sw.includes(aw))
+          );
+        }
+      );
+    }
+    
+    if (found && found.photo_url) {
+      console.log(`🖼️ Found photo for "${activity}": "${found.activity}" from Pexels`);
+      return found.photo_url;
+    }
+    
+    console.log(`⚠️ No photo found for "${activity}" in 200 activities database`);
     return null;
   };
 

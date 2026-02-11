@@ -26,17 +26,25 @@ async function filterRelevantActivities(experiences, targetActivity) {
     
     const prompt = `Activity search: "${targetActivity}"
 
-Which of these are RELEVANT?
+Which of these are TRULY RELEVANT and make sense to show?
 ${titlesList}
 
-Rules:
+STRICT RULES:
+- ONLY show if it's the SAME activity or VERY similar
 - Water activities (snorkeling, diving, scuba) are related
-- Land activities (hiking, biking) are related  
-- Air activities (skydiving, paragliding) are related
-- BUT different categories are NOT related (snorkeling ≠ skydiving)
+- Land activities (quad, buggy, ATV) are related
+- Paddle sports (kayaking, SUP, canoeing) are related
+- BUT completely different categories are NOT related
+- "Yoga with Puppies" is NOT related to "paddleboarding" ❌
+- "Buggy Tour" is NOT related to "paddleboarding" ❌
+- "Beer Bike Tour" is NOT related to water sports ❌
 
-Return ONLY numbers of relevant activities (comma-separated).
-Example: 1,3,5`;
+If NONE are truly relevant, return: NONE
+
+Return ONLY numbers of relevant activities (comma-separated), or NONE.
+Examples: 
+- "1,3,5" if relevant found
+- "NONE" if nothing matches`;
 
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
@@ -58,11 +66,23 @@ Example: 1,3,5`;
     const answer = response.data.choices[0].message.content.trim();
     console.log(`   🤖 OpenAI relevance filter: ${answer}`);
     
+    // Check if AI said NONE
+    if (answer.toUpperCase() === 'NONE' || answer.includes('NONE')) {
+      console.log(`   ❌ AI found NO relevant matches - returning empty array`);
+      return [];
+    }
+    
     // Parse comma-separated numbers
     const relevantIndices = answer
       .split(',')
       .map(n => parseInt(n.trim()) - 1)
       .filter(i => !isNaN(i) && i >= 0 && i < experiences.length);
+    
+    // If no valid indices parsed, return empty
+    if (relevantIndices.length === 0) {
+      console.log(`   ❌ No valid indices from AI - returning empty array`);
+      return [];
+    }
     
     const filtered = experiences.filter((_, i) => relevantIndices.includes(i));
     console.log(`   ✅ AI filtered: ${experiences.length} → ${filtered.length} relevant`);
