@@ -109,7 +109,8 @@ export default function FindActivityScreen() {
   
   const [experiences, setExperiences] = useState<Experience[]>(preloadedExperiences || []); // Keep for compatibility
   const [analysis, setAnalysis] = useState<Analysis | null>(preloadedAnalysis);
-  const [loading, setLoading] = useState(false); // Never show loading - data must be preloaded
+  const [loading, setLoading] = useState(false); // For manual location changes
+  const [fetchingSections, setFetchingSections] = useState(!allDataLoaded && !!preloadedAnalysis); // Show loading when fetching 3 sections
   const [hasAnalyzed, setHasAnalyzed] = useState(!!preloadedExperiences);
   const [hasFetchedSections, setHasFetchedSections] = useState(allDataLoaded); // Skip fetch if all data already loaded
   const [favorites, setFavorites] = useState<Set<string | number>>(new Set());
@@ -980,11 +981,8 @@ export default function FindActivityScreen() {
     console.log('   Has preloaded experiences:', !!preloadedExperiences);
     
     try {
-      // DON'T show loading if we already have preloaded data - fetch in background
-      const shouldShowLoading = !preloadedExperiences;
-      if (shouldShowLoading) {
-        setLoading(true);
-      }
+      // Show loading state while fetching sections
+      setFetchingSections(true);
       
       let analysisData = analysis;
       
@@ -1061,7 +1059,7 @@ export default function FindActivityScreen() {
         }
         setReelExperiences([]);
         setSuggestedLocations([]);
-        setLoading(false);
+        setFetchingSections(false);
         return;
       }
       
@@ -1127,7 +1125,7 @@ export default function FindActivityScreen() {
       setReelExperiences([]);
       setSuggestedLocations([]);
     } finally {
-      setLoading(false);
+      setFetchingSections(false);
     }
   };
   
@@ -1186,9 +1184,16 @@ export default function FindActivityScreen() {
         </Pressable>
       </View>
       
-      {loading ? (
+      {/* Show loading while fetching sections */}
+      {fetchingSections ? (
         <View style={styles.loadingContainer}>
-          <Text style={styles.emptyText}>Loading...</Text>
+          <ActivityIndicator size="large" color="#FF6B00" />
+          <Text style={styles.loadingText}>Finding experiences...</Text>
+        </View>
+      ) : loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF6B00" />
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       ) : !analysis ? (
         <View style={styles.emptyContainer}>
