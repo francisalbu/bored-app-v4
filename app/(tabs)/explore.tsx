@@ -86,8 +86,66 @@ export default function ExploreScreen() {
 
   // Combine Bored and Viator experiences (Bored first, then Viator)
   const combinedExperiences = useMemo(() => {
-    // Map Viator experiences to have a consistent structure
-    const viatorMapped = viatorExperiences.map(exp => ({
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Filter Viator experiences with the same search logic as Bored
+    const filteredViator = viatorExperiences.filter(exp => {
+      // If no search query, skip search filter
+      if (query === '') {
+        // No search query - proceed to category filter
+        if (selectedCategory === 'all') {
+          return true; // Show all if no filters
+        }
+        
+        // Apply category filter
+        const expCategory = (exp.category || '').toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+        const selectedCat = selectedCategory.toLowerCase();
+        
+        const matchesCategory = expCategory === selectedCat || 
+                               expCategory.includes(selectedCat) ||
+                               (exp.category && exp.category.toLowerCase().includes(selectedCategory.toLowerCase()));
+        
+        const matchesTag = exp.tags && Array.isArray(exp.tags) && exp.tags.some(tag => {
+          if (!tag || typeof tag !== 'string') return false;
+          const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+          return normalizedTag === selectedCat || tag.toLowerCase().includes(selectedCategory.toLowerCase());
+        });
+        
+        return matchesCategory || matchesTag;
+      }
+      
+      // Has search query - apply search filter
+      const matchesSearch = 
+        (exp.title && exp.title.toLowerCase().includes(query)) ||
+        (exp.location && exp.location.toLowerCase().includes(query)) ||
+        (exp.category && exp.category.toLowerCase().includes(query)) ||
+        (exp.tags && Array.isArray(exp.tags) && exp.tags.some(tag => tag && typeof tag === 'string' && tag.toLowerCase().includes(query))) ||
+        (exp.description && exp.description.toLowerCase().includes(query));
+      
+      // If no category filter, just apply search
+      if (selectedCategory === 'all') {
+        return matchesSearch;
+      }
+      
+      // Apply both search and category filters
+      const expCategory = (exp.category || '').toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+      const selectedCat = selectedCategory.toLowerCase();
+      
+      const matchesCategory = expCategory === selectedCat || 
+                             expCategory.includes(selectedCat) ||
+                             (exp.category && exp.category.toLowerCase().includes(selectedCategory.toLowerCase()));
+      
+      const matchesTag = exp.tags && Array.isArray(exp.tags) && exp.tags.some(tag => {
+        if (!tag || typeof tag !== 'string') return false;
+        const normalizedTag = tag.toLowerCase().replace(/\s+&?\s+/g, '-').replace(/\s+/g, '-');
+        return normalizedTag === selectedCat || tag.toLowerCase().includes(selectedCategory.toLowerCase());
+      });
+      
+      return matchesSearch && (matchesCategory || matchesTag);
+    });
+    
+    // Map filtered Viator experiences to have a consistent structure
+    const viatorMapped = filteredViator.map(exp => ({
       ...exp,
       isViator: true
     }));
@@ -103,7 +161,7 @@ export default function ExploreScreen() {
     
     // Bored experiences first (only for Lisbon), then Viator
     return [...boredMapped, ...viatorMapped];
-  }, [filteredExperiences, viatorExperiences, selectedLocation]);
+  }, [filteredExperiences, viatorExperiences, selectedLocation, searchQuery, selectedCategory]);
 
   // Sort combined experiences by price
   const sortedExperiences = [...combinedExperiences].sort((a, b) => {

@@ -220,6 +220,17 @@ async function getCachedAnalysis(instagramUrl) {
  */
 async function saveCachedAnalysis(instagramUrl, analysis, experiences, thumbnailUrl) {
   try {
+    // Log thumbnail status
+    if (!thumbnailUrl) {
+      console.warn('⚠️ WARNING: Saving cache without thumbnail URL!');
+    } else {
+      const thumbnailType = thumbnailUrl.startsWith('http') ? 'URL' : 'base64';
+      const thumbnailPreview = thumbnailUrl.startsWith('http') 
+        ? thumbnailUrl.substring(0, 50) + '...'
+        : `base64 (${thumbnailUrl.length} chars)`;
+      console.log(`💾 Caching with thumbnail (${thumbnailType}): ${thumbnailPreview}`);
+    }
+    
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
     
@@ -606,6 +617,13 @@ router.post('/', async (req, res) => {
     // Save to cache if this was a fresh analysis (not from cache)
     if (!cached) {
       await saveCachedAnalysis(instagramUrl, analysis, experiences, thumbnailUrl);
+    }
+    
+    // Final check: Ensure thumbnail is present
+    if (!thumbnailUrl) {
+      console.error('⚠️ CRITICAL WARNING: Returning response WITHOUT thumbnail! This should never happen!');
+      console.error('   Analysis type:', analysis.type);
+      console.error('   From cache:', !!cached);
     }
     
     res.json({

@@ -284,7 +284,16 @@ class SimpleVideoAnalyzer {
       }
       
       // Use first frame as thumbnail if no thumbnail from provider
-      const finalThumbnail = videoData.thumbnailUrl || (frames.length > 0 ? frames[0] : null);
+      // CRITICAL: Always ensure we have a thumbnail - prefer videoData.thumbnailUrl, fallback to first frame
+      let finalThumbnail = videoData.thumbnailUrl || (frames.length > 0 ? frames[0] : null);
+      
+      // If still no thumbnail, log error (this shouldn't happen if frames were extracted)
+      if (!finalThumbnail) {
+        console.error('⚠️ WARNING: No thumbnail available - neither from provider nor from frames!');
+      } else {
+        const thumbnailSource = videoData.thumbnailUrl ? 'provider' : 'first frame';
+        console.log(`✅ Thumbnail ready (source: ${thumbnailSource})`);
+      }
       
       return {
         success: true,

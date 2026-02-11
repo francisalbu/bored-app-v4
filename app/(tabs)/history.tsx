@@ -387,44 +387,48 @@ export default function HistoryScreen() {
 
   const renderHistoryCard = ({ item }: { item: HistoryItem }) => {
     // Priority: 1) Real thumbnail from reel, 2) Activity-specific icon, 3) Generic adventure placeholder
-    const imageUrl = item.thumbnail || getActivityImage(item.activity) || 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop';
+    // Handle base64 images (first frame from video)
+    let imageUrl = item.thumbnail;
+    
+    // If thumbnail is base64, prepend data URI prefix
+    if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+      imageUrl = `data:image/jpeg;base64,${imageUrl}`;
+    }
+    
+    // Fallback chain: thumbnail → activity image → generic placeholder
+    const finalImageUrl = imageUrl || getActivityImage(item.activity) || 'https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=400&h=600&fit=crop';
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={styles.premiumCard}
         onPress={() => handleCardPress(item)}
-        activeOpacity={0.8}
+        activeOpacity={0.9}
       >
         <Image
-          source={{ uri: imageUrl }}
-          style={styles.cardImage}
+          source={{ uri: finalImageUrl }}
+          style={styles.premiumCardImage}
           resizeMode="cover"
         />
-        <View style={styles.cardOverlay}>
-          <View style={styles.cardContent}>
-            <Text style={styles.activityName} numberOfLines={2}>
+        <View style={styles.premiumCardOverlay}>
+          <View style={styles.premiumCardContent}>
+            <Text style={styles.premiumActivityName} numberOfLines={1}>
               {item.fullActivity || item.activity}
             </Text>
-            <View style={styles.cardFooter}>
-              <View style={styles.timeContainer}>
-                <Clock size={12} color="#fff" />
-                <Text style={styles.timeText}>{formatDate(item.lastSearched)}</Text>
-              </View>
-              {item.searchCount > 1 && (
-                <View style={styles.countBadge}>
-                  <Text style={styles.countText}>{item.searchCount}x</Text>
-                </View>
-              )}
-            </View>
+            <Text style={styles.premiumTimeText}>Saved {formatDate(item.lastSearched)}</Text>
           </View>
         </View>
         <TouchableOpacity
-          style={styles.deleteButton}
+          style={styles.premiumDeleteButton}
           onPress={() => handleDeleteItem(item.activity)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Trash2 size={16} color="#fff" />
+          <Trash2 size={18} color="#fff" />
         </TouchableOpacity>
+        {item.searchCount > 1 && (
+          <View style={styles.premiumCountBadge}>
+            <Text style={styles.premiumCountText}>{item.searchCount}x</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -442,10 +446,10 @@ export default function HistoryScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Adventures Saved</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>Your Collection</Text>
           <Text style={styles.subtitle}>
-            {history.length} {history.length === 1 ? 'activity' : 'activities'}
+            {history.length} {history.length === 1 ? 'adventure' : 'adventures'}
           </Text>
         </View>
         {history.length > 0 && (
@@ -468,9 +472,7 @@ export default function HistoryScreen() {
           data={history}
           renderItem={renderHistoryCard}
           keyExtractor={(item) => item.activity}
-          numColumns={2}
           contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.columnWrapper}
           ListEmptyComponent={renderEmptyState}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -550,7 +552,7 @@ export default function HistoryScreen() {
                   style={[styles.modalButton, styles.analyzeButton]}
                   onPress={handleAnalyzeLink}
                 >
-                  <Text style={styles.analyzeButtonText}>Analyze</Text>
+                  <Text style={styles.analyzeButtonText}>Discover</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -660,103 +662,109 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    paddingBottom: 20,
+  },
+  headerContent: {
+    flex: 1,
+    alignItems: 'center',
+    marginTop: 30,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#fff',
+    letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#888',
     marginTop: 4,
   },
   clearButton: {
+    position: 'absolute',
+    right: 20,
+    top: 60,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
     backgroundColor: '#1a1a1a',
   },
   clearButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#888',
     fontWeight: '500',
   },
   listContent: {
-    padding: 16,
+    padding: 20,
+    paddingBottom: 100,
   },
-  columnWrapper: {
-    justifyContent: 'space-between',
-  },
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_WIDTH * 1.3,
-    borderRadius: 16,
-    marginBottom: 16,
+  // Premium card styles
+  premiumCard: {
+    width: '100%',
+    height: 180,
+    borderRadius: 20,
+    marginBottom: 20,
     overflow: 'hidden',
     backgroundColor: '#1a1a1a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  cardImage: {
+  premiumCardImage: {
     width: '100%',
     height: '100%',
   },
-  cardOverlay: {
+  premiumCardOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     justifyContent: 'flex-end',
   },
-  cardContent: {
-    padding: 12,
+  premiumCardContent: {
+    padding: 20,
   },
-  activityName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  premiumActivityName: {
+    fontSize: 22,
+    fontWeight: '700',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 4,
     textTransform: 'capitalize',
+    letterSpacing: 0.3,
   },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  premiumTimeText: {
+    fontSize: 13,
+    color: '#fff',
+    opacity: 0.8,
+    fontWeight: '400',
   },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  premiumDeleteButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 10,
+    borderRadius: 24,
   },
-  timeText: {
+  premiumCountBadge: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  premiumCountText: {
     fontSize: 12,
     color: '#fff',
-    opacity: 0.9,
-  },
-  countBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  countText: {
-    fontSize: 11,
-    color: '#fff',
     fontWeight: '600',
-  },
-  deleteButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 8,
-    borderRadius: 20,
   },
   emptyContainer: {
     flex: 1,

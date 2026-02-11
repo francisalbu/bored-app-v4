@@ -130,11 +130,25 @@ export default function FindActivityScreen() {
       // Check if activity already exists
       const existingIndex = history.findIndex((item: any) => item.activity === activity);
       
+      // Process thumbnail: if it's base64 and too large, keep URL or skip
+      // AsyncStorage has limits (~6MB on iOS), and base64 images can be 200KB+
+      let processedThumbnail = thumbnail;
+      if (thumbnail && !thumbnail.startsWith('http')) {
+        // It's base64 - check size
+        const base64Size = thumbnail.length;
+        if (base64Size > 100000) { // > ~75KB when decoded
+          console.log(`⚠️ Base64 thumbnail too large (${Math.round(base64Size/1024)}KB) - not saving to history`);
+          processedThumbnail = null; // Will fallback to activity image in history.tsx
+        } else {
+          console.log(`✅ Base64 thumbnail OK (${Math.round(base64Size/1024)}KB)`);
+        }
+      }
+      
       const historyItem = {
         activity,
         fullActivity,
         location,
-        thumbnail,
+        thumbnail: processedThumbnail,
         lastSearched: new Date().toISOString(),
         searchCount: existingIndex >= 0 ? history[existingIndex].searchCount + 1 : 1,
         // Store all params needed to recreate find-activity screen
@@ -155,7 +169,7 @@ export default function FindActivityScreen() {
       const trimmedHistory = history.slice(0, 50);
       
       await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(trimmedHistory));
-      console.log('✅ Saved to history:', activity);
+      console.log('✅ Saved to history:', activity, processedThumbnail ? '(with thumbnail)' : '(without thumbnail - will use activity image)');
     } catch (error) {
       console.error('Failed to save to history:', error);
     }
