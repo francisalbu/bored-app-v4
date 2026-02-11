@@ -616,20 +616,64 @@ router.post('/', async (req, res) => {
       console.log(`   That view just broke our algorithm! 🔥`);
       
       // Use the detected location to search for activities on Viator
-      // Similar to "As Seen on Reel" - search by location
+      // Try multiple search strategies to get relevant results
       viatorExperiences = await viatorService.smartSearch(
-        'tours activities things to do', // Generic activity search
-        analysis.location, // ← The location from the landscape
+        analysis.location, // Search just the location name (more accurate)
+        analysis.location,
         'EUR',
         20
       );
       
       console.log(`   📦 Viator returned ${viatorExperiences.length} activities for ${analysis.location}`);
       
-      // No DB results for landscape - just Viator
-      experiences = viatorExperiences;
-      
-      message = `That view just broke our algorithm! 🔥 We can't pinpoint the exact activity, but check out these experiences near ${analysis.location}:`;
+      // CRITICAL: Filter out irrelevant results
+      // If location is not in the experience title/location/description, remove it
+      if (viatorExperiences.length > 0) {
+        const locationLower = analysis.location.toLowerCase();
+        const locationKeywords = locationLower.split(/\s+/);
+        
+        const relevantExperiences = viatorExperiences.filter(exp => {
+          // Include description in search text for better matching
+          const expText = `${exp.title} ${exp.location} ${exp.description || ''}`.toLowerCase();
+          
+          // FIRST: Check if full location string appears (e.g., "la reunion")
+          if (expText.includes(locationLower)) {
+            console.log(`   ✅ "${exp.title}" - matched full location "${locationLower}"`);
+            return true;
+          }
+          
+          // SECOND: Check if significant words appear (length >= 4 to skip "la", "de", etc.)
+          const hasSignificantWord = locationKeywords.some(keyword => {
+            if (keyword.length < 4) return false;
+            const matches = expText.includes(keyword);
+            if (matches) {
+              console.log(`   ✅ "${exp.title}" - matched keyword "${keyword}"`);
+            }
+            return matches;
+          });
+          
+          if (!hasSignificantWord) {
+            console.log(`   ❌ "${exp.title}" - no location match (${exp.location})`);
+          }
+          
+          return hasSignificantWord;
+        });
+        
+        console.log(`   🎯 Filtered to ${relevantExperiences.length} relevant experiences for ${analysis.location}`);
+        
+        if (relevantExperiences.length > 0) {
+          experiences = relevantExperiences;
+          message = `That view just broke our algorithm! 🔥 We can't pinpoint the exact activity (it's THAT special), but check out these experiences in ${analysis.location}:`;
+        } else {
+          // No relevant results - show empty state
+          experiences = [];
+          message = `That view just broke our algorithm! 🔥 We detected ${analysis.location}, but we don't have experiences there yet. Try searching for a specific activity!`;
+        }
+      } else {
+        // No results at all
+        experiences = [];
+        message = `That view just broke our algorithm! 🔥 We detected ${analysis.location}, but we don't have experiences there yet. Try searching for a specific activity!`;
+      }
     }
     
     // NO LIMIT - return all relevant experiences
