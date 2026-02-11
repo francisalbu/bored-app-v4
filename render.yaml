@@ -6,11 +6,15 @@ services:
     region: frankfurt  # ou oregon, singapore
     plan: free
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: FFMPEG_PATH
+        value: /opt/render/project/src/backend/bin/ffmpeg
+      - key: FFPROBE_PATH
+        value: /opt/render/project/src/backend/bin/ffprobe
       - key: DB_PATH
         value: /opt/render/project/src/backend/bored_tourist.db
       - key: SUPABASE_URL

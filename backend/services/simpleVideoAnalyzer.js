@@ -529,7 +529,7 @@ Return JSON only:
    * Extract frames from video (simplified - just get 3 evenly spaced frames)
    */
   async extractFrames(videoBuffer, count = 3) {
-    const ffmpeg = require('fluent-ffmpeg');
+    const ffmpeg = require('../config/ffmpeg'); // Use configured FFmpeg
     const fs = require('fs').promises;
     const path = require('path');
     const crypto = require('crypto');
