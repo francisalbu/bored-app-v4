@@ -413,7 +413,16 @@ class SimpleVideoAnalyzer {
           const item = resultsResponse.data[0];
           videoUrl = item.videoUrl || item.displayUrl;
           caption = item.caption || '';
-          location = item.locationName || null;
+          
+          // Try multiple location field names from Apify response
+          location = item.locationName || item.location?.name || item.locationTag || item.location || null;
+          console.log('🗺️ Apify location fields:', {
+            locationName: item.locationName,
+            location: item.location,
+            locationTag: item.locationTag,
+            final: location
+          });
+          
           thumbnailUrl = item.displayUrl || item.thumbnailUrl;
           hashtags = this.extractHashtags(caption);
           console.log('✅ Got video URL from Apify');

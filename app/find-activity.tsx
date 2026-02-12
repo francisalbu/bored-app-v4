@@ -828,10 +828,13 @@ export default function FindActivityScreen() {
     // Only run once
     if (initialSetupDone.current) return;
     
-    // If ALL data was preloaded (from new analysis), just set up local data
-    if (allDataLoaded && preloadedAnalysis) {
+    // Check if we have all 3 sections preloaded (from social share with full data)
+    const hasAllSectionsPreloaded = preloadedNearYou && preloadedReel && preloadedAnalysis;
+    
+    // If ALL data was preloaded (from new analysis with all 3 sections), just set up local data
+    if ((allDataLoaded || hasAllSectionsPreloaded) && preloadedAnalysis) {
       initialSetupDone.current = true;
-      console.log('✅ All data preloaded, setting up suggested locations...');
+      console.log('✅ All data preloaded (allDataLoaded or 3 sections present), showing results immediately...');
       
       // Set suggested locations from local JSON database
       const baseActivity = preloadedAnalysis.activity;
@@ -840,6 +843,11 @@ export default function FindActivityScreen() {
         setSuggestedLocations(destinations);
         console.log('📍 Suggested locations from database:', destinations.length);
       }
+      
+      // Mark sections as fetched so we don't refetch
+      setFetchingSections(false);
+      setHasFetchedSections(true);
+      setHasAnalyzed(true);
       
       // Save to history (ONLY activities, NOT landscapes)
       if (preloadedAnalysis.type !== 'landscape') {

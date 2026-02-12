@@ -295,7 +295,7 @@ async function saveCachedAnalysis(instagramUrl, analysis, experiences, thumbnail
  */
 router.post('/', async (req, res) => {
   try {
-    const { instagramUrl, userLocation } = req.body;
+    const { instagramUrl, userLocation, analysisOnly = false } = req.body;
     
     if (!instagramUrl) {
       return res.status(400).json({
@@ -310,6 +310,7 @@ router.post('/', async (req, res) => {
     
     console.log('🎯 Starting experience recommendation flow...');
     console.log('📍 User location:', userCity);
+    console.log('⚡ Analysis only mode:', analysisOnly);
     
     // 1. Check cache first
     const cached = await getCachedAnalysis(instagramUrl);
@@ -393,6 +394,28 @@ router.post('/', async (req, res) => {
         analysis: {
           confidence: analysis.confidence,
           type: analysis.type
+        }
+      });
+    }
+    
+    // OPTIMIZATION: If analysisOnly=true (social share flow), skip all experience searches
+    // Frontend will call /by-activity separately for each section (Near You, As Seen on Reel)
+    if (analysisOnly) {
+      console.log('⚡ Analysis-only mode: Skipping experience searches, returning analysis + thumbnail');
+      
+      return res.json({
+        success: true,
+        data: {
+          analysis: {
+            type: analysis.type,
+            activity: analysis.activity,
+            fullActivity: analysis.fullActivity || analysis.activity,
+            location: analysis.location,
+            confidence: analysis.confidence,
+            thumbnailUrl: thumbnailUrl
+          },
+          experiences: [], // Empty - frontend will fetch separately
+          thumbnail: thumbnailUrl
         }
       });
     }
@@ -690,6 +713,18 @@ router.post('/', async (req, res) => {
       console.error('   From cache:', !!cached);
     }
     
+    // Don't send large base64 thumbnails in response to avoid PayloadTooLarge
+    // Thumbnail is already cached and will be retrieved from cache on subsequent requests
+    const thumbnailSize = thumbnailUrl && thumbnailUrl.startsWith('data:') 
+      ? Buffer.from(thumbnailUrl.split(',')[1] || '', 'base64').length 
+      : 0;
+    
+    const shouldIncludeThumbnail = thumbnailSize < 51200; // 50KB limit
+    
+    if (!shouldIncludeThumbnail && thumbnailSize > 0) {
+      console.log(`⚠️ Thumbnail too large (${Math.round(thumbnailSize/1024)}KB), not including in response (already cached)`);
+    }
+    
     res.json({
       success: true,
       data: {
@@ -698,7 +733,7 @@ router.post('/', async (req, res) => {
           activity: analysis.activity,
           location: analysis.location,
           confidence: analysis.confidence,
-          thumbnailUrl: thumbnailUrl
+          thumbnailUrl: shouldIncludeThumbnail ? thumbnailUrl : undefined
         },
         experiences: experiences,
         message: message,

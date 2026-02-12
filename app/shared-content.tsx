@@ -420,7 +420,8 @@ export default function SharedContentScreen() {
           try {
             const response = await apiService.post('/experience-recommendations', {
               instagramUrl: url,
-              userLocation: 'Lisboa' // Default location
+              userLocation: 'Lisboa', // Default location
+              analysisOnly: true // OPTIMIZATION: Skip experience searches, frontend will fetch them separately
             });
             
             if (response.success && response.data) {
