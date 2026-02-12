@@ -200,13 +200,13 @@ export default function FindActivityScreen() {
         const experiencesData = params.experiences ? JSON.parse(params.experiences as string) : null;
         
         await api.post('/search-history', {
-          device_id: deviceId,
+          deviceId: deviceId,
           activity,
-          full_activity: fullActivity,
+          fullActivity: fullActivity,
           location,
-          instagram_url: params.instagramUrl as string || '',
-          thumbnail_url: processedThumbnail,
-          analysis_type: analysisData?.type || 'activity',
+          instagramUrl: params.instagramUrl as string || '',
+          thumbnailUrl: processedThumbnail,
+          analysisType: analysisData?.type || 'activity',
           experiences: experiencesData,
           analysis: analysisData,
         });
@@ -1218,8 +1218,8 @@ export default function FindActivityScreen() {
         </Pressable>
       </View>
       
-      {/* Show loading while fetching sections */}
-      {fetchingSections ? (
+      {/* Show loading while fetching sections - skip if coming from social share with preloaded data */}
+      {fetchingSections && !preloadedExperiences ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF6B00" />
           <Text style={styles.loadingText}>Finding experiences...</Text>

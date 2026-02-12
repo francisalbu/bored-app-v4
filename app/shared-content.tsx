@@ -257,7 +257,7 @@ export default function SharedContentScreen() {
       // Animate progress bar
       Animated.timing(scanProgress, {
         toValue: 1,
-        duration: 6000, // Longer to account for AI processing
+        duration: 3000, // Faster animation for better UX
         easing: Easing.linear,
         useNativeDriver: false,
       }).start();
@@ -267,7 +267,7 @@ export default function SharedContentScreen() {
       Animated.loop(
         Animated.timing(iconScrollAnim, {
           toValue: 1,
-          duration: 12000, // Slower for smoother movement
+          duration: 6000, // Faster for better UX
           easing: Easing.linear,
           useNativeDriver: true,
         }),
