@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStorage from '@/lib/secureStorage';
 import { usePostHog } from 'posthog-react-native';
 import { api } from '@/services/api';
 import { supabase } from '@/lib/supabase';
@@ -61,8 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone: session.user.phone || undefined,
         };
 
-        await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+        await SecureStorage.setItemAsync(TOKEN_KEY, session.access_token);
+        await SecureStorage.setItemAsync(USER_KEY, JSON.stringify(userData));
 
         api.setAuthToken(session.access_token);
         setUser(userData);
@@ -73,14 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const newToken = session.access_token;
         
         // Update stored token
-        await SecureStore.setItemAsync(TOKEN_KEY, newToken);
+        await SecureStorage.setItemAsync(TOKEN_KEY, newToken);
         api.setAuthToken(newToken);
       } else if (event === 'SIGNED_OUT') {
         console.log('🚪 User signed out');
         setUser(null);
         api.clearAuthToken();
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
-        await SecureStore.deleteItemAsync(USER_KEY);
+        await SecureStorage.deleteItemAsync(TOKEN_KEY);
+        await SecureStorage.deleteItemAsync(USER_KEY);
       }
     });
 
@@ -120,8 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             location: publicUser.location,
           };
 
-          await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-          await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+          await SecureStorage.setItemAsync(TOKEN_KEY, session.access_token);
+          await SecureStorage.setItemAsync(USER_KEY, JSON.stringify(userData));
 
           api.setAuthToken(session.access_token);
           setUser(userData);
@@ -135,8 +135,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       // FALLBACK: Load from SecureStore if no active session or sync failed
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const userData = await SecureStore.getItemAsync(USER_KEY);
+      const token = await SecureStorage.getItemAsync(TOKEN_KEY);
+      const userData = await SecureStorage.getItemAsync(USER_KEY);
 
       if (token && userData) {
         console.log('✅ Loaded auth from SecureStore');
@@ -231,8 +231,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone: backendData.data.user.phone,
         };
 
-        await SecureStore.setItemAsync(TOKEN_KEY, supabaseToken);
-        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+        await SecureStorage.setItemAsync(TOKEN_KEY, supabaseToken);
+        await SecureStorage.setItemAsync(USER_KEY, JSON.stringify(userData));
 
         api.setAuthToken(supabaseToken);
         setUser(userData);
@@ -383,8 +383,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone: backendData.data.user.phone || null,
         };
 
-        await SecureStore.setItemAsync(TOKEN_KEY, supabaseToken);
-        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+        await SecureStorage.setItemAsync(TOKEN_KEY, supabaseToken);
+        await SecureStorage.setItemAsync(USER_KEY, JSON.stringify(userData));
 
         api.setAuthToken(supabaseToken);
         setUser(userData);
@@ -444,8 +444,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
       
       // Step 2: Clear local storage
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(USER_KEY);
+      await SecureStorage.deleteItemAsync(TOKEN_KEY);
+      await SecureStorage.deleteItemAsync(USER_KEY);
       
       // Step 3: Clear API token
       api.clearAuthToken();
@@ -492,8 +492,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Clear local storage
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(USER_KEY);
+      await SecureStorage.deleteItemAsync(TOKEN_KEY);
+      await SecureStorage.deleteItemAsync(USER_KEY);
       
       // Clear API token
       api.clearAuthToken();
@@ -557,8 +557,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         console.log('💾 Storing user data:', userData.email);
 
-        await SecureStore.setItemAsync(TOKEN_KEY, session.access_token);
-        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+        await SecureStorage.setItemAsync(TOKEN_KEY, session.access_token);
+        await SecureStorage.setItemAsync(USER_KEY, JSON.stringify(userData));
 
         api.setAuthToken(session.access_token);
         setUser(userData);

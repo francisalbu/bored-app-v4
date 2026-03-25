@@ -1,6 +1,19 @@
 // API Configuration
-// Use Render.com production API
-const API_BASE_URL = 'https://bored-tourist-api.onrender.com/api';
+// Use local server in dev, Render.com in production
+const isLocalhost = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1'
+);
+const isDev = __DEV__ || process.env.NODE_ENV === 'development' || isLocalhost;
+
+// FORCE LOCAL FOR TESTING - REMOVE AFTER DEBUG
+const FORCE_LOCAL = true;
+
+const API_BASE_URL = (isDev || FORCE_LOCAL)
+  ? 'http://localhost:3000/api'
+  : 'https://bored-tourist-api.onrender.com/api';
+
+console.log('🔧 API Config - isDev:', isDev, 'isLocalhost:', isLocalhost, 'FORCE_LOCAL:', FORCE_LOCAL, 'URL:', API_BASE_URL);
 
 interface ApiResponse<T> {
   success: boolean;
@@ -441,6 +454,245 @@ class ApiService {
   async deleteSpot(spotId: number) {
     return this.request(`/spots/${spotId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Backoffice APIs
+  async getBackofficeProfile() {
+    return this.request('/backoffice/me');
+  }
+
+  async getBackofficeExperiences() {
+    return this.request('/backoffice/experiences');
+  }
+
+  async createBackofficeExperience(data: any) {
+    return this.request('/backoffice/experiences', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBackofficeExperience(id: number, data: any) {
+    return this.request(`/backoffice/experiences/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBackofficeExperience(id: number) {
+    return this.request(`/backoffice/experiences/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getBackofficeOperators() {
+    return this.request('/backoffice/operators');
+  }
+
+  async createBackofficeOperator(data: any) {
+    return this.request('/backoffice/operators', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBackofficeOperator(id: number, data: any) {
+    return this.request(`/backoffice/operators/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBackofficeOperator(id: number) {
+    return this.request(`/backoffice/operators/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Backoffice Bookings
+  async getBackofficeBookings(filters?: { 
+    status?: string; 
+    payment_status?: string; 
+    from_date?: string; 
+    to_date?: string; 
+    experience_id?: number;
+    operator_id?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.payment_status) params.append('payment_status', filters.payment_status);
+    if (filters?.from_date) params.append('from_date', filters.from_date);
+    if (filters?.to_date) params.append('to_date', filters.to_date);
+    if (filters?.experience_id) params.append('experience_id', String(filters.experience_id));
+    if (filters?.operator_id) params.append('operator_id', String(filters.operator_id));
+    const query = params.toString();
+    return this.request(`/backoffice/bookings${query ? `?${query}` : ''}`);
+  }
+
+  async updateBackofficeBookingStatus(id: number, status: string) {
+    return this.request(`/backoffice/bookings/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  // Backoffice Analytics
+  async getBackofficeRevenueAnalytics(filters?: { from_date?: string; to_date?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.from_date) params.append('from_date', filters.from_date);
+    if (filters?.to_date) params.append('to_date', filters.to_date);
+    const query = params.toString();
+    return this.request(`/backoffice/analytics/revenue${query ? `?${query}` : ''}`);
+  }
+
+  async getBackofficeRevenueChart(period: 'day' | 'week' | 'month' | 'year' = 'month') {
+    return this.request(`/backoffice/analytics/revenue-chart?period=${period}`);
+  }
+
+  async getBackofficeBookingsSummary() {
+    return this.request('/backoffice/analytics/bookings-summary');
+  }
+
+  // Backoffice Reviews
+  async getBackofficeReviews(filters?: { experience_id?: number; rating?: number; has_response?: boolean; flagged?: boolean }) {
+    const params = new URLSearchParams();
+    if (filters?.experience_id) params.append('experience_id', String(filters.experience_id));
+    if (filters?.rating) params.append('rating', String(filters.rating));
+    if (filters?.has_response !== undefined) params.append('has_response', String(filters.has_response));
+    if (filters?.flagged !== undefined) params.append('flagged', String(filters.flagged));
+    const query = params.toString();
+    return this.request(`/backoffice/reviews${query ? `?${query}` : ''}`);
+  }
+
+  async respondToBackofficeReview(id: number, response: string) {
+    return this.request(`/backoffice/reviews/${id}/respond`, {
+      method: 'PUT',
+      body: JSON.stringify({ response }),
+    });
+  }
+
+  async flagBackofficeReview(id: number, flagged: boolean, flag_reason?: string) {
+    return this.request(`/backoffice/reviews/${id}/flag`, {
+      method: 'PUT',
+      body: JSON.stringify({ flagged, flag_reason }),
+    });
+  }
+
+  async deleteBackofficeReview(id: number) {
+    return this.request(`/backoffice/reviews/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getBackofficeReviewsStatsByExperience() {
+    return this.request('/backoffice/reviews/stats-by-experience');
+  }
+
+  // Image Upload
+  async uploadBackofficeImage(base64: string, filename: string, contentType: string, folder: string = 'experiences') {
+    return this.request('/backoffice/upload-image', {
+      method: 'POST',
+      body: JSON.stringify({ base64, filename, contentType, folder }),
+    });
+  }
+
+  async deleteBackofficeImage(path: string) {
+    return this.request('/backoffice/delete-image', {
+      method: 'DELETE',
+      body: JSON.stringify({ path }),
+    });
+  }
+
+  // Enhanced Analytics
+  async getAnalyticsConversions(filters?: { from_date?: string; to_date?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.from_date) params.append('from_date', filters.from_date);
+    if (filters?.to_date) params.append('to_date', filters.to_date);
+    const query = params.toString();
+    return this.request(`/backoffice/analytics/conversions${query ? `?${query}` : ''}`);
+  }
+
+  async getAnalyticsDemographics() {
+    return this.request('/backoffice/analytics/demographics');
+  }
+
+  async getAnalyticsHeatmap() {
+    return this.request('/backoffice/analytics/heatmap');
+  }
+
+  async getAnalyticsForecast() {
+    return this.request('/backoffice/analytics/forecast');
+  }
+
+  async getAnalyticsCompare(filters?: { from_date?: string; to_date?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.from_date) params.append('from_date', filters.from_date);
+    if (filters?.to_date) params.append('to_date', filters.to_date);
+    const query = params.toString();
+    return this.request(`/backoffice/analytics/compare${query ? `?${query}` : ''}`);
+  }
+
+  async exportAnalytics(type: 'bookings' | 'revenue' | 'experiences', filters?: { from_date?: string; to_date?: string }) {
+    const params = new URLSearchParams();
+    params.append('type', type);
+    if (filters?.from_date) params.append('from_date', filters.from_date);
+    if (filters?.to_date) params.append('to_date', filters.to_date);
+    
+    // Return URL for download
+    return `${this.baseURL}/backoffice/analytics/export?${params.toString()}`;
+  }
+
+  // Calendar & Availability
+  async getCalendar(filters?: { from_date?: string; to_date?: string; experience_id?: number }) {
+    const params = new URLSearchParams();
+    if (filters?.from_date) params.append('from_date', filters.from_date);
+    if (filters?.to_date) params.append('to_date', filters.to_date);
+    if (filters?.experience_id) params.append('experience_id', String(filters.experience_id));
+    const query = params.toString();
+    return this.request(`/backoffice/calendar${query ? `?${query}` : ''}`);
+  }
+
+  async rescheduleBooking(bookingId: number, newDate: string, newTime?: string) {
+    return this.request(`/backoffice/bookings/${bookingId}/reschedule`, {
+      method: 'PUT',
+      body: JSON.stringify({ new_date: newDate, new_time: newTime }),
+    });
+  }
+
+  async getBlockedDates(filters?: { from_date?: string; to_date?: string; experience_id?: number }) {
+    const params = new URLSearchParams();
+    if (filters?.from_date) params.append('from_date', filters.from_date);
+    if (filters?.to_date) params.append('to_date', filters.to_date);
+    if (filters?.experience_id) params.append('experience_id', String(filters.experience_id));
+    const query = params.toString();
+    return this.request(`/backoffice/blocked-dates${query ? `?${query}` : ''}`);
+  }
+
+  async blockDate(date: string, reason?: string, experienceId?: number) {
+    return this.request('/backoffice/blocked-dates', {
+      method: 'POST',
+      body: JSON.stringify({ date, reason, experience_id: experienceId }),
+    });
+  }
+
+  async unblockDate(id: number) {
+    return this.request(`/backoffice/blocked-dates/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getAvailability(experienceId?: number) {
+    const params = new URLSearchParams();
+    if (experienceId) params.append('experience_id', String(experienceId));
+    const query = params.toString();
+    return this.request(`/backoffice/availability${query ? `?${query}` : ''}`);
+  }
+
+  async updateAvailability(experienceId: number, settings: { time_slots?: string[]; days_of_week?: number[]; max_per_slot?: number }) {
+    return this.request(`/backoffice/availability/${experienceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
     });
   }
 }

@@ -45,6 +45,8 @@ const discountCodesRoutes = require('./routes/discountCodes');
 const spotsRoutes = require('./routes/spots');
 const analyzeExperienceRoutes = require('./routes/analyzeExperience'); // NEW: Simplified experience analysis
 const experienceRecommendationsRoutes = require('./routes/experienceRecommendations'); // NEW: Get experience recommendations from video
+const backofficeRoutes = require('./routes/backoffice');
+const adminRoutes = require('./routes/admin'); // Admin API routes (protected by secret)
 
 // Initialize Express app
 const app = express();
@@ -110,6 +112,8 @@ app.use('/api/discount-codes', discountCodesRoutes); // Discount codes validatio
 app.use('/api/spots', spotsRoutes); // Saved travel spots for user's map
 app.use('/api/analyze-experience', analyzeExperienceRoutes); // NEW: Simplified experience analysis from video
 app.use('/api/experience-recommendations', experienceRecommendationsRoutes); // NEW: Get experience recommendations from video
+app.use('/api/backoffice', backofficeRoutes);
+app.use('/api/admin', adminRoutes); // Admin API (protected by secret)
 
 // Privacy Policy page (required for App Store)
 app.get('/privacy', (req, res) => {
@@ -328,4 +332,3 @@ initDB().then(() => {
 });
 
 module.exports = app;
-

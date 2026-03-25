@@ -4,7 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import { StripeProvider } from '@/components/StripeProvider';
 import { useFonts, Inter_300Light, Inter_400Regular, Inter_600SemiBold, Inter_800ExtraBold, Inter_900Black } from '@expo-google-fonts/inter';
 import { PostHogProvider } from 'posthog-react-native';
 import { AuthProvider } from '@/contexts/AuthContext';

@@ -240,12 +240,34 @@ async function getTrendingExperiences(limit = 20) {
 }
 
 /**
- * Increment view/review count (not used in current schema but kept for compatibility)
+ * Increment view count when an experience is viewed
  */
 async function incrementViews(id) {
-  // The current schema uses review_count, not views
-  // This is a no-op but kept for API compatibility
-  return;
+  try {
+    // First get current view count
+    const { data: current, error: getError } = await from('experiences')
+      .select('view_count')
+      .eq('id', id)
+      .single();
+    
+    if (getError) {
+      console.error('Error getting current view count:', getError);
+      return;
+    }
+    
+    const newCount = (current?.view_count || 0) + 1;
+    
+    // Update the view count
+    const { error: updateError } = await from('experiences')
+      .update({ view_count: newCount })
+      .eq('id', id);
+    
+    if (updateError) {
+      console.error('Error incrementing view count:', updateError);
+    }
+  } catch (error) {
+    console.error('Error in incrementViews:', error);
+  }
 }
 
 /**

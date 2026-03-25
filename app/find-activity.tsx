@@ -424,6 +424,7 @@ export default function FindActivityScreen() {
                   </ScrollView>
                 </View>
               </KeyboardAvoidingView>
+            )}
           </View>
           
           {/* Experience Cards */}
